@@ -21,7 +21,7 @@ const Post = ({ post }) => {
       <div className="post-header">
         <img src="https://via.placeholder.com/40" alt={post.handle} />
         <div>
-          <strong>{post.user}</strong>
+          <strong>{post.username}</strong>
           <span>{post.handle} · {post.date}</span>
         </div>
       </div>
