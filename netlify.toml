@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"  # Optional for React, but useful
+
+[dev]
+  command = "npm start"
+  port = 3000
