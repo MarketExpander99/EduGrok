@@ -36,6 +36,7 @@
     ]
   },
   "devDependencies": {
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^5.0.1",
+    "web-vitals": "^5.1.0"
   }
 }
