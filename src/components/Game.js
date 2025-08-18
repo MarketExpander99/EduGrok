@@ -8,9 +8,9 @@ const Game = () => {
   const sketchRef = useRef();
   const [score, setScore] = useState(0);
 
-  if (!user) return <p>Loading...</p>;
-
   useEffect(() => {
+    if (!user) return;
+
     const sketch = (p) => {
       p.setup = () => {
         p.createCanvas(400, 400);
@@ -22,14 +22,15 @@ const Game = () => {
     };
     new p5(sketch, sketchRef.current);
 
-    // Example score update
     const updateScore = async () => {
       setScore(100);
       await supabase.from('scores').insert([{ user_id: user.id, score: 100 }]);
       localStorage.setItem('gameScore', '100');
     };
-    updateScore(); // Simulate
-  }, [user.id]);
+    updateScore();
+  }, [user]);
+
+  if (!user) return <p>Loading...</p>;
 
   return (
     <div className="game">
@@ -38,7 +39,7 @@ const Game = () => {
       <p>Score: {score}</p>
       <button>Start Game</button>
       <button>Play Fullscreen</button>
-      <button>Upgrade to Premium</button> {/* Placeholder */}
+      <button>Upgrade to Premium</button>
     </div>
   );
 };
