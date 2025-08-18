@@ -5,11 +5,14 @@ import { useNavigate } from 'react-router-dom';
 const Login = () => {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    navigate('/feed');
+  }, [navigate]);
+
   return (
     <div className="login">
       <SignedIn>
         <p>Logged in! Redirecting...</p>
-        {useEffect(() => { navigate('/feed'); }, [])}
       </SignedIn>
       <SignedOut>
         <SignIn afterSignInUrl="/profile-setup" />
