@@ -17,7 +17,12 @@ const Feed = () => {
   useEffect(() => {
     const fetchData = async () => {
       const { data: postData } = await supabase.from('posts').select('*');
-      setPosts(postData || []);
+      // Map posts to ensure username is used, in case of old data
+      const mappedPosts = postData?.map(post => ({
+        ...post,
+        username: post.username || post.user || 'Unknown User' // Fallback for old data
+      })) || [];
+      setPosts(mappedPosts);
 
       if (user) {
         const { data: userData } = await supabase.from('users').select('framework, age').eq('id', user.id);
