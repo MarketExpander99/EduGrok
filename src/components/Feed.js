@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Post from './Post';
 import LessonCard from './LessonCard';
-import { supabase, useSupabaseAuth } from '../utils/api';
+import { supabase } from '../utils/api';
+import { useSupabaseAuth } from '../utils/supabaseAuth';
 import { useUser } from '@clerk/clerk-react';
 
 const grade4Lessons = [
@@ -14,14 +15,25 @@ const Feed = () => {
   const { setSupabaseSession } = useSupabaseAuth();
   const [posts, setPosts] = useState([]);
   const [lessons, setLessons] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setError(null);
       // Set Supabase session with Clerk JWT
-      await setSupabaseSession();
+      const sessionSet = await setSupabaseSession();
+      if (!sessionSet) {
+        setError('Failed to authenticate with Supabase');
+        return;
+      }
 
       // Fetch posts
-      const { data: postData } = await supabase.from('posts').select('*');
+      const { data: postData, error: postError } = await supabase.from('posts').select('*');
+      if (postError) {
+        console.error('Error fetching posts:', postError.message);
+        setError('Failed to load posts');
+        return;
+      }
       const mappedPosts = postData?.map(post => ({
         ...post,
         username: post.username || post.user || 'Unknown User'
@@ -30,7 +42,12 @@ const Feed = () => {
 
       // Fetch user data if logged in
       if (user) {
-        const { data: userData } = await supabase.from('users').select('framework, age').eq('id', user.id);
+        const { data: userData, error: userError } = await supabase.from('users').select('framework, age').eq('id', user.id);
+        if (userError) {
+          console.error('Error fetching user data:', userError.message);
+          setError('Failed to load user data');
+          return;
+        }
         if (userData?.length > 0) {
           const { age, framework } = userData[0];
           if (age >= 9 && age <= 10) {
@@ -42,6 +59,10 @@ const Feed = () => {
     };
     fetchData();
   }, [user, setSupabaseSession]);
+
+  if (error) {
+    return <div className="error">Error: {error}</div>;
+  }
 
   return (
     <div className="feed">

@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
 import './styles/main.css';
 import './styles/components.css';
@@ -8,7 +8,11 @@ import reportWebVitals from './reportWebVitals';
 
 const clerkPubKey = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+if (!clerkPubKey) {
+  throw new Error('Clerk Publishable Key is required');
+}
+
+const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <ClerkProvider publishableKey={clerkPubKey}>
@@ -17,7 +21,6 @@ root.render(
   </React.StrictMode>
 );
 
-// Optional: Register service worker for offline
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
