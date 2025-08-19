@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useUser, useAuth } from '@clerk/clerk-react';
+import {  useAuth } from '@clerk/clerk-react';
 import Home from './components/Home';
 import Feed from './components/Feed';
 import Profile from './components/Profile';
