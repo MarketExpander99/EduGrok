@@ -1,43 +1,15 @@
 {
-  "name": "edugrok",
-  "version": "0.1.0",
-  "private": true,
   "dependencies": {
-    "@clerk/clerk-react": "^4.0.0",
-    "@supabase/supabase-js": "^2.0.0",
-    "p5": "^1.4.0",
+    "@clerk/clerk-react": "^5.19.5",
+    "@supabase/supabase-js": "^2.45.4",
+    "p5": "^1.9.4",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.0.0",
-    "workbox-window": "^6.1.5"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
-    "react-scripts": "^0.0.0",
-    "web-vitals": "^5.1.0"
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^7.1.3"
   }
 }
