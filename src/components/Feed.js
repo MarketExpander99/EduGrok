@@ -12,7 +12,7 @@ const grade4Lessons = [
 
 const Feed = () => {
   const { user } = useUser();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const { setSupabaseSession } = useSupabaseAuth();
   const [posts, setPosts] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -21,10 +21,17 @@ const Feed = () => {
   useEffect(() => {
     const fetchData = async () => {
       setError(null);
+      if (!isLoaded) {
+        setError('Loading authentication...');
+        return;
+      }
       if (!isSignedIn) {
         setError('Please sign in to view the feed');
         return;
       }
+
+      // Wait for Clerk session to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Set Supabase session
       const sessionSet = await setSupabaseSession();
@@ -60,13 +67,11 @@ const Feed = () => {
             const filteredLessons = grade4Lessons.filter(l => l.framework === framework);
             setLessons(filteredLessons);
           }
-        } else {
-          setError('No user data found');
         }
       }
     };
     fetchData();
-  }, [user, isSignedIn, setSupabaseSession]);
+  }, [user, isSignedIn, isLoaded, setSupabaseSession]);
 
   if (error) {
     return <div className="error">Error: {error}</div>;

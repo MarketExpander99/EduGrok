@@ -7,30 +7,38 @@ import Profile from './components/Profile';
 import ProfileSetup from './components/ProfileSetup';
 import Settings from './components/Settings';
 import Game from './components/Game';
-import PrivateRoute from './components/PrivateRoute';
-import { supabase } from './utils/api';
 import { useSupabaseAuth } from './utils/supabaseAuth';
 
 const App = () => {
-  const { user, isLoaded } = useUser();
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { setSupabaseSession } = useSupabaseAuth();
 
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      setSupabaseSession();
-    }
+    const checkProfileAndSetSession = async () => {
+      if (isLoaded && isSignedIn) {
+        // Set Supabase session
+        const sessionSet = await setSupabaseSession();
+        if (!sessionSet) {
+          console.error('Failed to set Supabase session in App');
+        }
+      }
+    };
+    checkProfileAndSetSession();
   }, [isLoaded, isSignedIn, setSupabaseSession]);
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/feed" element={<Feed />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/profile-setup" element={<ProfileSetup />} />
-        <Route path="/feed" element={<PrivateRoute><Feed /></PrivateRoute>} />
-        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-        <Route path="/game" element={<PrivateRoute><Game /></PrivateRoute>} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/game" element={<Game />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
