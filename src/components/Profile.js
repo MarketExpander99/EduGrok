@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import { supabase } from '../utils/api';
 import { useSupabaseAuth } from '../utils/supabaseAuth';
 
 const Profile = () => {
   const { user } = useUser();
+  const { isSignedIn } = useAuth();
   const { setSupabaseSession } = useSupabaseAuth();
   const [userData, setUserData] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!user) return;
+      if (!isSignedIn || !user) {
+        setError('Please sign in to view your profile');
+        return;
+      }
 
       setError(null);
       // Set Supabase session
@@ -24,7 +28,7 @@ const Profile = () => {
       const { data, error } = await supabase.from('users').select('*').eq('id', user.id);
       if (error) {
         console.error('Error fetching user data:', error.message);
-        setError('Failed to load profile');
+        setError('Failed to load profile: ' + error.message);
         return;
       }
       if (data?.length > 0) {
@@ -34,7 +38,7 @@ const Profile = () => {
       }
     };
     fetchUserData();
-  }, [user, setSupabaseSession]);
+  }, [user, isSignedIn, setSupabaseSession]);
 
   if (error) {
     return <div className="error">Error: {error}</div>;

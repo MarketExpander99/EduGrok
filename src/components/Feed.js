@@ -3,7 +3,7 @@ import Post from './Post';
 import LessonCard from './LessonCard';
 import { supabase } from '../utils/api';
 import { useSupabaseAuth } from '../utils/supabaseAuth';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useAuth } from '@clerk/clerk-react';
 
 const grade4Lessons = [
   { title: 'Math: Fractions', content: 'Learn about adding fractions...', framework: 'Common Core' },
@@ -12,6 +12,7 @@ const grade4Lessons = [
 
 const Feed = () => {
   const { user } = useUser();
+  const { isSignedIn } = useAuth();
   const { setSupabaseSession } = useSupabaseAuth();
   const [posts, setPosts] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -20,7 +21,12 @@ const Feed = () => {
   useEffect(() => {
     const fetchData = async () => {
       setError(null);
-      // Set Supabase session with Clerk JWT
+      if (!isSignedIn) {
+        setError('Please sign in to view the feed');
+        return;
+      }
+
+      // Set Supabase session
       const sessionSet = await setSupabaseSession();
       if (!sessionSet) {
         setError('Failed to authenticate with Supabase');
@@ -54,11 +60,13 @@ const Feed = () => {
             const filteredLessons = grade4Lessons.filter(l => l.framework === framework);
             setLessons(filteredLessons);
           }
+        } else {
+          setError('No user data found');
         }
       }
     };
     fetchData();
-  }, [user, setSupabaseSession]);
+  }, [user, isSignedIn, setSupabaseSession]);
 
   if (error) {
     return <div className="error">Error: {error}</div>;

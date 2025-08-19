@@ -1,40 +1,37 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
-import Sidebar from './components/Sidebar';
-import StarlinkMode from './components/StarlinkMode';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import Home from './components/Home';
 import Feed from './components/Feed';
-import Lesson from './components/Lesson';
-import Game from './components/Game';
 import Profile from './components/Profile';
 import ProfileSetup from './components/ProfileSetup';
-import Terms from './components/Terms';
-import Login from './components/Login';
 import Settings from './components/Settings';
-
-const ProtectedRoute = ({ children }) => (
-  <>
-    <SignedIn>{children}</SignedIn>
-    <SignedOut><RedirectToSignIn /></SignedOut>
-  </>
-);
+import Game from './components/Game';
+import PrivateRoute from './components/PrivateRoute';
+import { supabase } from './utils/api';
+import { useSupabaseAuth } from './utils/supabaseAuth';
 
 const App = () => {
+  const { user, isLoaded } = useUser();
+  const { isSignedIn } = useAuth();
+  const { setSupabaseSession } = useSupabaseAuth();
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      setSupabaseSession();
+    }
+  }, [isLoaded, isSignedIn, setSupabaseSession]);
+
   return (
     <Router>
-      <Sidebar />
-      <StarlinkMode />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/profile-setup" element={<ProtectedRoute><ProfileSetup /></ProtectedRoute>} />
-        <Route path="/feed" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
-        <Route path="/lesson" element={<ProtectedRoute><Lesson /></ProtectedRoute>} />
-        <Route path="/game" element={<ProtectedRoute><Game /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/profile-setup" element={<ProfileSetup />} />
+        <Route path="/feed" element={<PrivateRoute><Feed /></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="/game" element={<PrivateRoute><Game /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );
