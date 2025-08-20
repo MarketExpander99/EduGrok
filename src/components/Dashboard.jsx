@@ -12,6 +12,7 @@ function Dashboard({ user }) {
 
   useEffect(() => {
     async function fetchProgress() {
+      console.log('Fetching progress for user_id:', user.id); // Debug log
       const { data, error } = await supabase
         .from('user_progress')
         .select('points')
