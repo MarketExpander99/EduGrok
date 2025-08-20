@@ -1,7 +1,13 @@
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [build]
   command = "npm run build"
-  publish = "build"
+  publish = "dist"
 
-[dev]
-  command = "npm start"
-  port = 3000
+[build.environment]
+  VITE_SUPABASE_URL = "$VITE_SUPABASE_URL"
+  VITE_SUPABASE_ANON_KEY = "$VITE_SUPABASE_ANON_KEY"
+  VITE_CLERK_PUBLISHABLE_KEY = "$VITE_CLERK_PUBLISHABLE_KEY"
