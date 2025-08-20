@@ -1,15 +1,23 @@
 {
+  "name": "sa-homeschool",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@clerk/clerk-react": "^5.19.5",
     "@supabase/supabase-js": "^2.45.4",
-    "p5": "^1.9.4",
+    "@clerk/clerk-react": "^5.19.5",
     "react": "^18.2.0",
-    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.2"
+    "react-router-dom": "^6.26.2",
+    "p5": "^1.9.4",
+    "react-beautiful-dnd": "^13.1.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^7.1.3"
+    "vite": "^5.4.8"
   }
 }
