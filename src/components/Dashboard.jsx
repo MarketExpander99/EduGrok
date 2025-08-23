@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// Enhanced debug logs
+console.log('Dashboard.jsx - Checking environment variables:');
+try {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'undefined';
+  console.log('VITE_SUPABASE_URL:', supabaseUrl);
+  const url = new URL(supabaseUrl);
+  console.log('Validated URL:', url.href);
+  const supabase = createClient(supabaseUrl, import.meta.env.VITE_SUPABASE_ANON_KEY || 'fallback-anon-key');
+  console.log('Supabase client initialized with URL:', supabaseUrl);
+} catch (e) {
+  console.error('Invalid URL in Dashboard.jsx:', e, 'Value:', import.meta.env.VITE_SUPABASE_URL);
+}
+
 const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_URL || 'https://zahrotkjbhfegvwsevjy.supabase.co',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphaHJvdGtqYmhmZWd2d3Nldmp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzcwNDksImV4cCI6MjA3MTExMzA0OX0.PJHE_2uvVuixA1velpE-KPmD4o2W-UENiegcZl1wFI8'
 );
 
 function Dashboard({ user }) {
@@ -12,13 +25,13 @@ function Dashboard({ user }) {
 
   useEffect(() => {
     async function fetchProgress() {
-      console.log('Fetching progress for user_id:', user.id); // Debug log
+      console.log('Fetching progress for user_id:', user.id, 'with URL:', supabaseUrl);
       const { data, error } = await supabase
         .from('user_progress')
         .select('points')
         .eq('user_id', user.id);
       if (error) {
-        console.error('Error fetching progress:', error);
+        console.error('Error fetching progress:', error, 'Response:', data);
       } else {
         const totalCoins = data.reduce((sum, record) => sum + record.points, 0);
         setLearnCoins(totalCoins);
