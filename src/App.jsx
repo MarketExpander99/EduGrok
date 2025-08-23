@@ -20,10 +20,8 @@ try {
   console.log('VITE_CLERK_PUBLISHABLE_KEY:', clerkKey);
   const url = new URL(supabaseUrl);
   console.log('Validated URL:', url.href);
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  console.log('Supabase client initialized, testing with:', { url: supabaseUrl });
 } catch (e) {
-  console.error('Invalid URL or setup in App.jsx:', e, 'Values:', {
+  console.error('Invalid URL in App.jsx:', e, 'Values:', {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
@@ -31,8 +29,8 @@ try {
 }
 
 const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || 'https://zahrotkjbhfegvwsevjy.supabase.co',
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphaHJvdGtqYmhmZWd2d3Nldmp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1MzcwNDksImV4cCI6MjA3MTExMzA0OX0.PJHE_2uvVuixA1velpE-KPmD4o2W-UENiegcZl1wFI8'
+  import.meta.env.VITE_SUPABASE_URL || 'https://fallback.supabase.co',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'fallback-anon-key'
 );
 
 function App() {
@@ -44,19 +42,20 @@ function App() {
     if (isLoaded && clerkUser) {
       const userData = {
         id: clerkUser.id,
+        email: clerkUser.emailAddresses[0]?.email || null,
         age: clerkUser.unsafeMetadata?.age || 6,
         grade: clerkUser.unsafeMetadata?.grade || 1,
-        ageGroup: (clerkUser.unsafeMetadata?.age || 6) <= 8 ? '6-8' : '9-12',
-        theme: clerkUser.unsafeMetadata?.theme || 'light'
       };
       setUser(userData);
+      const upsertUrl = `${supabaseUrl}/rest/v1/users?upsert=true`;
+      console.log('Upsert URL:', upsertUrl);
       supabase.from('users').upsert({
         id: userData.id,
+        email: userData.email,
         age: userData.age,
         grade: userData.grade
-      }).then(({ data, error }) => {
-        if (error) console.error('Error upserting user:', error, 'Response:', data);
-        else console.log('User upserted:', data);
+      }).then(({ error }) => {
+        if (error) console.error('Error upserting user:', error.message, 'URL:', upsertUrl);
       });
     }
     setLoading(false);
@@ -67,7 +66,7 @@ function App() {
   }
 
   return (
-    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_ZGVzdGluZWQtc2F0eXItMzEuY2xlcmsuYWNjb3VudHMuZGV2JA'}>
+    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'fallback-clerk-key'}>
       <ErrorBoundary>
         <BrowserRouter>
           <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
