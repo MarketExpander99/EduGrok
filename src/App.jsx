@@ -34,11 +34,15 @@ const supabase = createClient(
 );
 
 function App() {
-  const { user: clerkUser, isLoaded } = useUser();
+  const { user: clerkUser, isLoaded, error } = useUser(); // Added error check
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (error) {
+      console.error('Clerk useUser error:', error.message);
+      return;
+    }
     if (isLoaded && clerkUser) {
       const userData = {
         id: clerkUser.id,
@@ -59,7 +63,7 @@ function App() {
       });
     }
     setLoading(false);
-  }, [clerkUser, isLoaded]);
+  }, [clerkUser, isLoaded, error]);
 
   if (loading || !isLoaded) {
     return <div className="p-4 text-center" aria-live="polite">Loading...</div>;
