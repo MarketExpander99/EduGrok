@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { useSupabaseAuth } from './hooks/useSupabaseAuth'; // Custom hook (see below)
+import { useSupabaseAuth } from './hooks/useSupabaseAuth.js'; // Custom hook with .js
 import Feed from './components/Feed.jsx';
 import Grading from './components/Grading.jsx';
 import SpaceInvaders from './components/SpaceInvaders.jsx';
