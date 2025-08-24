@@ -34,7 +34,7 @@ const supabase = createClient(
 );
 
 function App() {
-  const { user: clerkUser, isLoaded, error } = useUser(); // Moved inside conditional
+  const { user: clerkUser, isLoaded, error } = useUser();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,14 +61,17 @@ function App() {
       }).then(({ error }) => {
         if (error) console.error('Error upserting user:', error.message, 'URL:', upsertUrl);
       });
-    } else {
-      console.log('ClerkProvider not ready or no user:', { isLoaded, clerkUser });
     }
     setLoading(false);
   }, [clerkUser, isLoaded, error]);
 
   if (loading || !isLoaded) {
     return <div className="p-4 text-center" aria-live="polite">Loading...</div>;
+  }
+
+  if (error) {
+    console.error('Rendering with Clerk error:', error.message);
+    return <div className="p-4 text-center text-red-500">Error: {error.message}</div>;
   }
 
   return (
