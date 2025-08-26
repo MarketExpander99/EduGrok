@@ -2,30 +2,60 @@
 <html>
 <head>
     <title>EduGrok Stream</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/static/style.css" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
     <script>if('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body>
-    <h1>EduGrok Educational Stream</h1>
-    {% if not subscribed %}
-    <a href="/subscribe">Subscribe for Premium ($5/month)</a>
-    {% endif %}
-    <a href="/logout">Logout</a>
-    <form method="POST" action="/post">
-        <textarea name="content" required placeholder="Share educational content (e.g., math fact)"></textarea>
-        <select name="subject">
-            <option value="math">Math</option>
-            <option value="science">Science</option>
-        </select>
-        <button type="submit">Post</button>
-    </form>
-    <h2>Stream</h2>
-    {% for post in posts %}
-    <div>
-        <p><strong>{{ post[4] }}</strong> ({{ post[2] }}): {{ post[1] }}</p>
-        <p>Likes: {{ post[3] }} <a href="/like/{{ post[0] }}">Like</a></p>
+<body class="{% if theme == 'astronaut' %}bg-astronaut{% else %}bg-jewel{% endif %}">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">EduGrok Educational Stream</h1>
+        <div class="flex justify-between mb-4">
+            <div>
+                {% if not subscribed %}
+                <a href="/subscribe" class="btn">Subscribe for Premium ($5/month)</a>
+                {% endif %}
+                <a href="/logout" class="btn">Logout</a>
+            </div>
+            <button onclick="toggleTheme()" class="btn">Toggle Light/Dark Mode</button>
+        </div>
+        {% if lesson %}
+        <div class="card">
+            <h2 class="text-xl font-semibold">{{ lesson[1] }} Lesson</h2>
+            <p>{{ lesson[2] }}</p>
+            <a href="/complete_lesson/{{ lesson[0] }}" class="btn">Complete Lesson</a>
+        </div>
+        {% endif %}
+        {% if test %}
+        <div class="card">
+            <h2 class="text-xl font-semibold">Weekly Test (Grade {{ test[1] }})</h2>
+            <p>Score: {{ test[2] }} | Taken: {{ test[3] }}</p>
+            <a href="/game/{{ test[2] }}" class="btn">Play Boss Battle</a>
+        </div>
+        {% else %}
+        <a href="/test" class="btn">Take Weekly Test</a>
+        {% endif %}
+        <form method="POST" action="/post" class="card">
+            <textarea name="content" required placeholder="Share educational content (e.g., math fact)" class="w-full"></textarea>
+            <select name="subject">
+                <option value="math">Math</option>
+                <option value="language">Language</option>
+                <option value="science">Science</option>
+            </select>
+            <button type="submit" class="btn">Post</button>
+        </form>
+        <h2 class="text-xl font-semibold mt-4">Stream</h2>
+        {% for post in posts %}
+        <div class="card">
+            <p><strong>{{ post[4] }}</strong> ({{ post[2] }}): {{ post[1] }}</p>
+            <p>Likes: {{ post[3] }} <a href="/like/{{ post[0] }}" class="btn">Like</a> <a href="/report/{{ post[0] }}" class="btn">Report</a></p>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+        }
+    </script>
 </body>
 </html>

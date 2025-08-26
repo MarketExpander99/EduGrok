@@ -1,13 +1,24 @@
 <!DOCTYPE html>
 <html>
-<head><title>EduGrok Register</title></head>
+<head>
+    <title>EduGrok Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/static/style.css" rel="stylesheet">
+</head>
 <body>
-    <h1>Register for EduGrok</h1>
-    <form method="POST">
-        <input type="email" name="email" required placeholder="Email">
-        <input type="password" name="password" required placeholder="Password">
-        <button type="submit">Register</button>
-    </form>
-    <a href="/login">Login</a>
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">Register for EduGrok</h1>
+        <form method="POST" class="card">
+            <input type="email" name="email" required placeholder="Email" class="w-full">
+            <input type="password" name="password" required placeholder="Password" class="w-full">
+            <select name="theme">
+                <option value="astronaut">Astronaut</option>
+                <option value="jewel">Sparkly Jewel</option>
+                <option value="ocean">Ocean Explorer</option>
+            </select>
+            <button type="submit" class="btn">Register</button>
+        </form>
+        <a href="/login" class="btn">Login</a>
+    </div>
 </body>
 </html>

@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    background-color: #1a1e2d;
+    color: #ffffff;
+}
+.card {
+    background-color: #2d3748;
+    padding: 16px;
+    margin: 16px;
+    border-radius: 8px;
+}
+button, a.btn {
+    background-color: #00b7eb;
+    color: #ffffff;
+    padding: 8px 16px;
+    margin: 8px;
+    border-radius: 4px;
+}
+select, textarea, input {
+    background-color: #4a5568;
+    color: #ffffff;
+    padding: 8px;
+    margin: 8px;
+    border-radius: 4px;
+}
+.light-mode {
+    background-color: #ffffff;
+    color: #000000;
+}
+.light-mode .card {
+    background-color: #edf2f7;
+}
+.light-mode select, .light-mode textarea, .light-mode input {
+    background-color: #e2e8f0;
+    color: #000000;
+}
+.bg-astronaut {
+    background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://source.unsplash.com/random/1920x1080?stars');
+}
+.bg-jewel {
+    background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://source.unsplash.com/random/1920x1080?jewels');
+}
+.bg-ocean {
+    background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://source.unsplash.com/random/1920x1080?ocean');
+}

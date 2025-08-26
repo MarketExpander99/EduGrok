@@ -1,34 +1,58 @@
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
-import stripe
+import paypalrestsdk
 import sqlite3
 import re
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Stripe setup (free test keys from dashboard.stripe.com/test/apikeys)
-stripe.api_key = 'sk_test_your_test_secret_key'  # Replace with your key
+# PayPal setup (free sandbox credentials from developer.paypal.com)
+paypalrestsdk.configure({
+    "mode": "sandbox",  # Use 'live' for production
+    "client_id": "your_paypal_client_id",
+    "client_secret": "your_paypal_secret"
+})
 
-# Simple bad-word filter for kid-friendliness
-BAD_WORDS = ['bad', 'word', 'example']
+# Bad-word filter
+BAD_WORDS = ['bad', 'word']
 def filter_content(content):
     for word in BAD_WORDS:
         content = re.sub(rf'\b{word}\b', '***', content, flags=re.IGNORECASE)
     return content
 
-# Initialize SQLite database (free)
+# Initialize SQLite database
 def init_db():
     conn = sqlite3.connect('edugrok.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, subscribed BOOLEAN DEFAULT 0)''')
+                 (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
     c.execute('''CREATE TABLE IF NOT EXISTS posts 
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, likes INTEGER DEFAULT 0)''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, likes INTEGER DEFAULT 0, reported BOOLEAN DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS lessons 
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS tests 
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT)''')
     conn.commit()
     conn.close()
 
 init_db()
+
+# Seed CAPS-aligned lessons
+def seed_lessons():
+    conn = sqlite3.connect('edugrok.db')
+    c = conn.cursor()
+    lessons = [
+        (1, 'math', 'Grade 1: Addition (Solve: 2 + 3 = ?)', 1),
+        (2, 'language', 'Grade 2: Write a sentence about the sun.', 2),
+        (3, 'science', 'Grade 3: Name a planet in our solar system.', 3)
+    ]
+    c.executemany("INSERT OR IGNORE INTO lessons (grade, subject, content) VALUES (?, ?, ?, 0)", lessons)
+    conn.commit()
+    conn.close()
+
+seed_lessons()
 
 @app.route('/')
 def home():
@@ -36,23 +60,31 @@ def home():
         return redirect(url_for('login'))
     conn = sqlite3.connect('edugrok.db')
     c = conn.cursor()
-    c.execute("SELECT p.id, p.content, p.subject, p.likes, u.email FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.id DESC")
-    posts = [(pid, filter_content(content), subject, likes, email) for pid, content, subject, likes, email in c.fetchall()]
+    c.execute("SELECT p.id, p.content, p.subject, p.likes, u.email, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
+    posts = [(pid, filter_content(content), subject, likes, email, reported) for pid, content, subject, likes, email, reported in c.fetchall()]
+    c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
+    lesson = c.fetchone()
+    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? AND date > ?", (session['user_id'], (datetime.now() - timedelta(days=7)).isoformat()))
+    test = c.fetchone()
     conn.close()
-    return render_template('home.html', posts=posts, subscribed=session.get('subscribed', False))
+    return render_template('home.html', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         email = request.form['email']
-        password = request.form['password']  # Hash in production (werkzeug.security)
+        password = request.form['password']
+        theme = request.form.get('theme', 'astronaut')
         try:
             conn = sqlite3.connect('edugrok.db')
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
+            c.execute("INSERT INTO users (email, password, theme) VALUES (?, ?, ?)", (email, password, theme))
             conn.commit()
+            user_id = c.lastrowid
             conn.close()
-            return redirect(url_for('login'))
+            session['user_id'] = user_id
+            session['email'] = email
+            return redirect(url_for('assess'))
         except sqlite3.IntegrityError:
             return "Email already in use", 400
     return render_template('register.html')
@@ -64,12 +96,14 @@ def login():
         password = request.form['password']
         conn = sqlite3.connect('edugrok.db')
         c = conn.cursor()
-        c.execute("SELECT id, subscribed FROM users WHERE email = ? AND password = ?", (email, password))
+        c.execute("SELECT id, grade, theme, subscribed FROM users WHERE email = ? AND password = ?", (email, password))
         user = c.fetchone()
         conn.close()
         if user:
             session['user_id'] = user[0]
-            session['subscribed'] = user[1]
+            session['grade'] = user[1]
+            session['theme'] = user[2]
+            session['subscribed'] = user[3]
             session['email'] = email
             return redirect(url_for('home'))
         return "Invalid credentials", 401
@@ -104,6 +138,76 @@ def like_post(post_id):
     conn.close()
     return redirect(url_for('home'))
 
+@app.route('/report/<int:post_id>')
+def report_post(post_id):
+    if 'user_id' not in session:
+        return "Unauthorized", 401
+    conn = sqlite3.connect('edugrok.db')
+    c = conn.cursor()
+    c.execute("UPDATE posts SET reported = 1 WHERE id = ?", (post_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('home'))
+
+@app.route('/assess', methods=['GET', 'POST'])
+def assess():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        score = sum(int(request.form.get(f'q{i}', 0)) for i in range(1, 11))
+        grade = 1 if score < 4 else 2 if score < 7 else 3
+        conn = sqlite3.connect('edugrok.db')
+        c = conn.cursor()
+        c.execute("UPDATE users SET grade = ? WHERE id = ?", (grade, session['user_id']))
+        conn.commit()
+        conn.close()
+        session['grade'] = grade
+        return redirect(url_for('home'))
+    questions = [
+        {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
+        {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
+        {"q": "Science: What do plants need to grow?", "a": ["Water", "Sand", "Rocks"], "correct": "Water"},
+        # Placeholder for 7 more questions
+    ]
+    return render_template('assess.html', questions=questions)
+
+@app.route('/complete_lesson/<int:lesson_id>')
+def complete_lesson(lesson_id):
+    if 'user_id' not in session:
+        return "Unauthorized", 401
+    conn = sqlite3.connect('edugrok.db')
+    c = conn.cursor()
+    c.execute("UPDATE lessons SET completed = 1 WHERE id = ? AND user_id = ?", (lesson_id, session['user_id']))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('home'))
+
+@app.route('/test', methods=['GET', 'POST'])
+def take_test():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        score = sum(int(request.form.get(f'q{i}', 0)) for i in range(1, 6))
+        conn = sqlite3.connect('edugrok.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO tests (user_id, grade, score, date) VALUES (?, ?, ?, ?)", 
+                  (session['user_id'], session['grade'], score, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('game', score=score))
+    questions = [
+        {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
+        # Placeholder for 4 more
+    ]
+    return render_template('test.html', questions=questions)
+
+@app.route('/game/<int:score>')
+def game(score):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    difficulty = 'easy' if score < 3 else 'hard'
+    return render_template('game.html', difficulty=difficulty, theme=session.get('theme', 'astronaut'))
+
 @app.route('/subscribe', methods=['GET', 'POST'])
 def subscribe():
     if 'user_id' not in session:
@@ -111,38 +215,55 @@ def subscribe():
     if request.method == 'POST':
         email = session.get('email')
         try:
-            customer = stripe.Customer.create(email=email)
-            subscription = stripe.Subscription.create(
-                customer=customer.id,
-                items=[{'price': 'price_your_monthly_plan_id'}],  # Create $5/month plan in Stripe dashboard
-            )
-            conn = sqlite3.connect('edugrok.db')
-            c = conn.cursor()
-            c.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (session['user_id'],))
-            conn.commit()
-            conn.close()
-            session['subscribed'] = True
-            return redirect(url_for('home'))
-        except stripe.error.StripeError as e:
-            return jsonify({'error': str(e)}), 400
+            plan = paypalrestsdk.BillingPlan({
+                "name": "EduGrok Premium",
+                "description": "$5/month for premium content",
+                "type": "FIXED",
+                "payment_definitions": [{
+                    "type": "REGULAR",
+                    "frequency": "MONTH",
+                    "amount": {"value": "5", "currency": "USD"},
+                    "cycles": "12",
+                    "frequency_interval": "1"
+                }],
+                "merchant_preferences": {
+                    "return_url": "http://your-render-app.com/subscribe/success",
+                    "cancel_url": "http://your-render-app.com/subscribe/cancel"
+                }
+            })
+            if plan.create():
+                agreement = paypalrestsdk.BillingAgreement({
+                    "name": "EduGrok Subscription",
+                    "description": "Monthly subscription for EduGrok",
+                    "start_date": (datetime.now() + timedelta(days=1)).isoformat(),
+                    "plan": {"id": plan.id},
+                    "payer": {"payment_method": "paypal"},
+                    "shipping_address": None
+                })
+                if agreement.create():
+                    for link in agreement.links:
+                        if link.rel == "approval_url":
+                            return redirect(link.href)
+            return jsonify({"error": "Failed to create subscription"}), 400
+        except paypalrestsdk.exceptions.ResourceError as e:
+            return jsonify({"error": str(e)}), 400
     return render_template('subscribe.html')
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    payload = request.data
-    sig_header = request.headers.get('Stripe-Signature')
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, 'whsec_your_webhook_secret')  # Replace with webhook secret
-        if event['type'] == 'customer.subscription.deleted':
-            customer_id = event['data']['object']['customer']
-            conn = sqlite3.connect('edugrok.db')
-            c = conn.cursor()
-            c.execute("UPDATE users SET subscribed = 0 WHERE email = (SELECT email FROM users WHERE id = (SELECT id FROM users WHERE stripe_customer_id = ?))", (customer_id,))
-            conn.commit()
-            conn.close()
-    except ValueError:
-        return '', 400
-    return '', 200
+@app.route('/subscribe/success')
+def subscribe_success():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    conn = sqlite3.connect('edugrok.db')
+    c = conn.cursor()
+    c.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (session['user_id'],))
+    conn.commit()
+    conn.close()
+    session['subscribed'] = True
+    return redirect(url_for('home'))
+
+@app.route('/subscribe/cancel')
+def subscribe_cancel():
+    return redirect(url_for('home'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
