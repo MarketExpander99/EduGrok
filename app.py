@@ -232,8 +232,8 @@ def subscribe():
                     "frequency_interval": "1"
                 }],
                 "merchant_preferences": {
-                    "return_url": "http://yourappname.onrender.com/subscribe/success",
-                    "cancel_url": "http://yourappname.onrender.com/subscribe/cancel"
+                    "return_url": "http://edugrok-v1-2.onrender.com/subscribe/success",
+                    "cancel_url": "http://edugrok-v1-2.onrender.com/subscribe/cancel"
                 }
             })
             if plan.create():
