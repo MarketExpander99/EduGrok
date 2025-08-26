@@ -39,18 +39,23 @@ def init_db():
 
 init_db()
 
-# Seed CAPS-aligned lessons
+# Seed CAPS-aligned lessons with QA check
 def seed_lessons():
     conn = sqlite3.connect('edugrok.db')
     c = conn.cursor()
     lessons = [
-        (1, 'math', 'Grade 1: Addition (Solve: 2 + 3 = ?)', 1),
-        (2, 'language', 'Grade 2: Write a sentence about the sun.', 2),
-        (3, 'science', 'Grade 3: Name a planet in our solar system.', 3)
+        (None, 1, 'math', 'Grade 1: Addition (Solve: 2 + 3 = ?)', 0),
+        (None, 2, 'language', 'Grade 2: Write a sentence about the sun.', 0),
+        (None, 3, 'science', 'Grade 3: Name a planet in our solar system.', 0)
     ]
-    c.executemany("INSERT OR IGNORE INTO lessons (grade, subject, content) VALUES (?, ?, ?, 0)", lessons)
-    conn.commit()
-    conn.close()
+    try:
+        c.executemany("INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, ?)", lessons)
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        print(f"Seed lessons failed: {e}")
+        raise
+    finally:
+        conn.close()
 
 seed_lessons()
 
@@ -227,8 +232,8 @@ def subscribe():
                     "frequency_interval": "1"
                 }],
                 "merchant_preferences": {
-                    "return_url": "http://your-render-app.com/subscribe/success",
-                    "cancel_url": "http://your-render-app.com/subscribe/cancel"
+                    "return_url": "http://yourappname.onrender.com/subscribe/success",
+                    "cancel_url": "http://yourappname.onrender.com/subscribe/cancel"
                 }
             })
             if plan.create():
