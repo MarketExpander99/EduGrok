@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EduGrok Stream</title>
+    <link rel="manifest" href="/manifest.json">
+    <script>if('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <h1>EduGrok Educational Stream</h1>
+    {% if not subscribed %}
+    <a href="/subscribe">Subscribe for Premium ($5/month)</a>
+    {% endif %}
+    <a href="/logout">Logout</a>
+    <form method="POST" action="/post">
+        <textarea name="content" required placeholder="Share educational content (e.g., math fact)"></textarea>
+        <select name="subject">
+            <option value="math">Math</option>
+            <option value="science">Science</option>
+        </select>
+        <button type="submit">Post</button>
+    </form>
+    <h2>Stream</h2>
+    {% for post in posts %}
+    <div>
+        <p><strong>{{ post[4] }}</strong> ({{ post[2] }}): {{ post[1] }}</p>
+        <p>Likes: {{ post[3] }} <a href="/like/{{ post[0] }}">Like</a></p>
+    </div>
+    {% endfor %}
+</body>
+</html>
