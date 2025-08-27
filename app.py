@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import paypalrestsdk
 import sqlite3
 import re
@@ -7,7 +8,7 @@ import logging
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-for-local-testing')
+app.secret_key = os.environ['SECRET_KEY']  # No fallback for production security
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -34,12 +35,19 @@ def check_db_schema():
     c = conn.cursor()
     # Check users table columns
     c.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in c.fetchall()]
-    expected = ['id', 'email', 'password', 'grade', 'theme', 'subscribed']
-    if set(columns) != set(expected):
-        logger.error(f"Users table schema mismatch. Expected: {expected}, Found: {columns}")
-        raise ValueError("Users table schema is outdated. Run migration.")
-    # Check other tables (simplified)
+    columns = {col[1]: col[2] for col in c.fetchall()}  # Map column name to type
+    expected = {
+        'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
+        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'BOOLEAN'
+    }
+    for col, col_type in expected.items():
+        if col not in columns:
+            logger.error(f"Users table missing column: {col}")
+            raise ValueError(f"Users table schema is outdated. Missing column: {col}")
+        if columns[col] != col_type:
+            logger.error(f"Users table column {col} has wrong type: expected {col_type}, got {columns[col]}")
+            raise ValueError(f"Users table column {col} type mismatch")
+    # Check other tables
     for table in ['posts', 'lessons', 'tests']:
         c.execute(f"PRAGMA table_info({table})")
         if not c.fetchall():
@@ -53,34 +61,52 @@ def init_db():
     conn = sqlite3.connect('edugrok.db', timeout=10)
     conn.execute('PRAGMA journal_mode=WAL;')
     c = conn.cursor()
-    # Check if users table exists and its schema
+    # Check users table schema
     c.execute("PRAGMA table_info(users)")
     columns = {col[1]: col for col in c.fetchall()}
     if not columns:
         # Create users table if it doesn't exist
         c.execute('''CREATE TABLE users 
-                     (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
-    elif 'theme' not in columns:
-        # Migrate: Create new table, copy data, drop old
-        logger.debug("Migrating users table to add theme column")
-        c.execute('''CREATE TABLE users_new 
-                     (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
-        c.execute('''INSERT INTO users_new (id, email, password, grade, subscribed)
-                     SELECT id, email, password, grade, subscribed FROM users''')
-        c.execute('DROP TABLE users')
-        c.execute('ALTER TABLE users_new RENAME TO users')
+                     (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, 
+                      grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+    else:
+        missing_cols = [col for col in ['grade', 'theme'] if col not in columns]
+        if missing_cols:
+            logger.debug(f"Migrating users table to add columns: {missing_cols}")
+            # Create new table with full schema
+            c.execute('''CREATE TABLE users_new 
+                         (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, 
+                          grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+            # Copy existing data, setting defaults for new columns
+            old_cols = [col for col in columns if col != 'id']
+            old_cols_str = ', '.join(old_cols)
+            insert_cols = old_cols + missing_cols
+            insert_cols_str = ', '.join(insert_cols)
+            defaults = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' for col in insert_cols])
+            c.execute(f'''INSERT INTO users_new (id, {insert_cols_str})
+                         SELECT id, {defaults} FROM users''')
+            # Migrate plaintext passwords to hashed if needed
+            c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
+            for user_id, plaintext in c.fetchall():
+                hashed = generate_password_hash(plaintext)
+                c.execute("UPDATE users_new SET password = ? WHERE id = ?", (hashed, user_id))
+            c.execute('DROP TABLE users')
+            c.execute('ALTER TABLE users_new RENAME TO users')
     # Create other tables
     c.execute('''CREATE TABLE IF NOT EXISTS posts 
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, likes INTEGER DEFAULT 0, reported BOOLEAN DEFAULT 0)''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, 
+                  likes INTEGER DEFAULT 0, reported BOOLEAN DEFAULT 0)''')
     c.execute('''CREATE TABLE IF NOT EXISTS lessons 
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0)''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, 
+                  subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0)''')
     c.execute('''CREATE TABLE IF NOT EXISTS tests 
-                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT)''')
+                 (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, 
+                  score INTEGER, date TEXT)''')
     conn.commit()
     conn.close()
 
 init_db()
-check_db_schema()  # Run QA check on startup
+check_db_schema()
 
 # Seed CAPS-aligned lessons
 def seed_lessons():
@@ -114,7 +140,7 @@ def home():
     c = conn.cursor()
     c.execute("SELECT p.id, p.content, p.subject, p.likes, u.email, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
     posts = [(pid, filter_content(content), subject, likes, email, reported) for pid, content, subject, likes, email, reported in c.fetchall()]
-    c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
+    c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id IS NULL OR user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
     lesson = c.fetchone()
     c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? AND date > ?", (session['user_id'], (datetime.now() - timedelta(days=7)).isoformat()))
     test = c.fetchone()
@@ -132,7 +158,8 @@ def register():
             conn = sqlite3.connect('edugrok.db', timeout=10)
             conn.execute('PRAGMA journal_mode=WAL;')
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password, theme) VALUES (?, ?, ?)", (email, password, theme))
+            hashed_password = generate_password_hash(password)
+            c.execute("INSERT INTO users (email, password, theme) VALUES (?, ?, ?)", (email, hashed_password, theme))
             conn.commit()
             user_id = c.lastrowid
             conn.close()
@@ -158,14 +185,14 @@ def login():
             conn = sqlite3.connect('edugrok.db', timeout=10)
             conn.execute('PRAGMA journal_mode=WAL;')
             c = conn.cursor()
-            c.execute("SELECT id, grade, theme, subscribed FROM users WHERE email = ? AND password = ?", (email, password))
+            c.execute("SELECT id, password, grade, theme, subscribed FROM users WHERE email = ?", (email,))
             user = c.fetchone()
             conn.close()
-            if user:
+            if user and check_password_hash(user[1], password):
                 session['user_id'] = user[0]
-                session['grade'] = user[1]
-                session['theme'] = user[2]
-                session['subscribed'] = user[3]
+                session['grade'] = user[2]
+                session['theme'] = user[3]
+                session['subscribed'] = user[4]
                 session['email'] = email
                 logger.debug(f"Logged in user: {email}")
                 return redirect(url_for('home'))
@@ -229,7 +256,8 @@ def assess():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if request.method == 'POST':
-        score = sum(int(request.form.get(f'q{i}', 0)) for i in range(1, 11))
+        correct_answers = ["5", "Hat", "Water"]  # Add 7 more for full 10
+        score = sum(1 for i in range(1, 4) if request.form.get(f'q{i}') == correct_answers[i-1])
         grade = 1 if score < 4 else 2 if score < 7 else 3
         conn = sqlite3.connect('edugrok.db', timeout=10)
         conn.execute('PRAGMA journal_mode=WAL;')
@@ -266,7 +294,8 @@ def take_test():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if request.method == 'POST':
-        score = sum(int(request.form.get(f'q{i}', 0)) for i in range(1, 6))
+        correct_answers = ["9"]  # Add 4 more for full 5
+        score = sum(1 for i in range(1, 2) if request.form.get(f'q{i}') == correct_answers[i-1])
         conn = sqlite3.connect('edugrok.db', timeout=10)
         conn.execute('PRAGMA journal_mode=WAL;')
         c = conn.cursor()
@@ -274,18 +303,19 @@ def take_test():
                   (session['user_id'], session['grade'], score, datetime.now().isoformat()))
         conn.commit()
         conn.close()
-        return redirect(url_for('game', score=score))
+        return redirect(url_for('game'))
     questions = [
         {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
         # Placeholder for 4 more
     ]
     return render_template('test.html', questions=questions)
 
-@app.route('/game/<int:score>')
-def game(score):
-    logger.debug(f"Accessing game with score {score}")
+@app.route('/game')
+def game():
+    logger.debug("Accessing game route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    score = int(request.args.get('score', 0))
     difficulty = 'easy' if score < 3 else 'hard'
     return render_template('game.html', difficulty=difficulty, theme=session.get('theme', 'astronaut'))
 
@@ -309,8 +339,8 @@ def subscribe():
                     "frequency_interval": "1"
                 }],
                 "merchant_preferences": {
-                    "return_url": "http://edugrok-v1-2.onrender.com/subscribe/success",
-                    "cancel_url": "http://edugrok-v1-2.onrender.com/subscribe/cancel"
+                    "return_url": f"{request.url_root}subscribe/success",
+                    "cancel_url": f"{request.url_root}subscribe/cancel"
                 }
             })
             if plan.create():
@@ -330,7 +360,7 @@ def subscribe():
             return jsonify({"error": "Failed to create subscription"}), 400
         except paypalrestsdk.exceptions.ResourceError as e:
             logger.error(f"Subscribe failed: {e}")
-            return jsonify({"error": str(e)}), 400
+            return jsonify({"error": "Subscription creation failed"}), 400
     return render_template('subscribe.html')
 
 @app.route('/subscribe/success')
@@ -338,14 +368,24 @@ def subscribe_success():
     logger.debug("Accessing subscribe success")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = sqlite3.connect('edugrok.db', timeout=10)
-    conn.execute('PRAGMA journal_mode=WAL;')
-    c = conn.cursor()
-    c.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (session['user_id'],))
-    conn.commit()
-    conn.close()
-    session['subscribed'] = True
-    return redirect(url_for('home'))
+    token = request.args.get('token')
+    try:
+        agreement = paypalrestsdk.BillingAgreement.execute(token)
+        if agreement.state == "Active":
+            conn = sqlite3.connect('edugrok.db', timeout=10)
+            conn.execute('PRAGMA journal_mode=WAL;')
+            c = conn.cursor()
+            c.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (session['user_id'],))
+            conn.commit()
+            conn.close()
+            session['subscribed'] = True
+            logger.debug("Subscription activated")
+            return redirect(url_for('home'))
+        logger.error("Subscription not active")
+        return jsonify({"error": "Subscription not active"}), 400
+    except paypalrestsdk.exceptions.ResourceError as e:
+        logger.error(f"Subscription execution failed: {e}")
+        return jsonify({"error": "Subscription execution failed"}), 400
 
 @app.route('/subscribe/cancel')
 def subscribe_cancel():
