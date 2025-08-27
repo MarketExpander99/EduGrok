@@ -7,9 +7,9 @@ import logging
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-for-local-testing')  # Use Render env var
+app.secret_key = os.environ.get('SECRET_KEY', 'fallback-secret-key-for-local-testing')
 
-# Configure logging for gunicorn
+# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,49 @@ def filter_content(content):
         content = re.sub(rf'\b{word}\b', '***', content, flags=re.IGNORECASE)
     return content
 
-# Initialize SQLite database with WAL mode
-def init_db():
-    conn = sqlite3.connect('edugrok.db', timeout=10)  # 10s timeout
-    conn.execute('PRAGMA journal_mode=WAL;')  # Enable WAL mode
+# Check database schema for QA
+def check_db_schema():
+    conn = sqlite3.connect('edugrok.db', timeout=10)
+    conn.execute('PRAGMA journal_mode=WAL;')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+    # Check users table columns
+    c.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in c.fetchall()]
+    expected = ['id', 'email', 'password', 'grade', 'theme', 'subscribed']
+    if set(columns) != set(expected):
+        logger.error(f"Users table schema mismatch. Expected: {expected}, Found: {columns}")
+        raise ValueError("Users table schema is outdated. Run migration.")
+    # Check other tables (simplified)
+    for table in ['posts', 'lessons', 'tests']:
+        c.execute(f"PRAGMA table_info({table})")
+        if not c.fetchall():
+            logger.error(f"Table {table} does not exist")
+            raise ValueError(f"Table {table} missing")
+    conn.close()
+    logger.debug("Database schema check passed")
+
+# Initialize and migrate SQLite database
+def init_db():
+    conn = sqlite3.connect('edugrok.db', timeout=10)
+    conn.execute('PRAGMA journal_mode=WAL;')
+    c = conn.cursor()
+    # Check if users table exists and its schema
+    c.execute("PRAGMA table_info(users)")
+    columns = {col[1]: col for col in c.fetchall()}
+    if not columns:
+        # Create users table if it doesn't exist
+        c.execute('''CREATE TABLE users 
+                     (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+    elif 'theme' not in columns:
+        # Migrate: Create new table, copy data, drop old
+        logger.debug("Migrating users table to add theme column")
+        c.execute('''CREATE TABLE users_new 
+                     (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+        c.execute('''INSERT INTO users_new (id, email, password, grade, subscribed)
+                     SELECT id, email, password, grade, subscribed FROM users''')
+        c.execute('DROP TABLE users')
+        c.execute('ALTER TABLE users_new RENAME TO users')
+    # Create other tables
     c.execute('''CREATE TABLE IF NOT EXISTS posts 
                  (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, likes INTEGER DEFAULT 0, reported BOOLEAN DEFAULT 0)''')
     c.execute('''CREATE TABLE IF NOT EXISTS lessons 
@@ -44,6 +80,7 @@ def init_db():
     conn.close()
 
 init_db()
+check_db_schema()  # Run QA check on startup
 
 # Seed CAPS-aligned lessons
 def seed_lessons():
