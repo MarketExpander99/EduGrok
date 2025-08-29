@@ -1,5 +1,6 @@
 import os
 import secrets
+import shutil
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
@@ -15,30 +16,35 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
 
+# Configure secure session settings
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax'
+)
+
 # Configure logging
 handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=1)
 handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 
-# # PayPal setup (commented out for clean build)
-# PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_CLIENT_ID')
-# PAYPAL_CLIENT_SECRET = os.environ.get('PAYPAL_CLIENT_SECRET')
-# PAYPAL_PRODUCT_ID = os.environ.get('PAYPAL_PRODUCT_ID')
-# PAYPAL_PLAN_ID = os.environ.get('PAYPAL_PLAN_ID')
-
 # Bad-word filter
 BAD_WORDS = ['bad', 'word']
 def filter_content(content):
+    if not isinstance(content, str):
+        return ""
     for word in BAD_WORDS:
         content = re.sub(rf'\b{word}\b', '***', content, flags=re.IGNORECASE)
     return content
 
-# Get DB connection
+# Get DB connection with persistent path
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect('edugrok.db', timeout=10)
+        db_path = '/data/edugrok.db' if os.path.exists('/data/edugrok.db') else 'edugrok.db'
+        g.db = sqlite3.connect(db_path, timeout=10)
         g.db.execute('PRAGMA journal_mode=WAL;')
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 @app.teardown_appcontext
@@ -55,16 +61,16 @@ def check_db_schema():
     columns = {col[1]: col[2] for col in c.fetchall()}
     expected = {
         'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
-        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'BOOLEAN'
+        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER DEFAULT 0'
     }
     for col, col_type in expected.items():
         if col not in columns:
             logger.error(f"Users table missing column: {col}")
             raise ValueError(f"Users table schema is outdated. Missing column: {col}")
-        if columns[col] != col_type:
+        if columns[col] != col_type.split()[0]:
             logger.error(f"Users table column {col} has wrong type: expected {col_type}, got {columns[col]}")
             raise ValueError(f"Users table column {col} type mismatch")
-    for table in ['posts', 'lessons', 'tests']:
+    for table in ['posts', 'lessons', 'tests', 'user_likes']:
         c.execute(f"PRAGMA table_info({table})")
         if not c.fetchall():
             logger.error(f"Table {table} does not exist")
@@ -76,28 +82,29 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     try:
+        db_path = '/data/edugrok.db' if os.path.exists('/data/edugrok.db') else 'edugrok.db'
+        if not os.path.exists(db_path):
+            if os.path.exists('edugrok.db'):
+                shutil.copy('edugrok.db', db_path)
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col for col in c.fetchall()}
         if not columns:
             logger.debug("Creating users table")
             c.execute('''CREATE TABLE users 
-                         (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, 
-                          grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
+                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0)''')
         else:
-            missing_cols = [col for col in ['grade', 'theme'] if col not in columns]
+            missing_cols = [col for col in ['grade', 'theme', 'subscribed'] if col not in columns]
             if missing_cols:
                 logger.debug(f"Migrating users table to add columns: {missing_cols}")
                 c.execute("DROP TABLE IF EXISTS users_new")
                 c.execute('''CREATE TABLE users_new 
-                             (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, 
-                              grade INTEGER, theme TEXT, subscribed BOOLEAN DEFAULT 0)''')
+                             (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
+                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0)''')
                 old_cols = [col for col in columns if col != 'id']
-                old_cols_str = ', '.join(old_cols)
                 insert_cols = old_cols + missing_cols
-                insert_cols_str = ', '.join(insert_cols)
-                defaults = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' for col in insert_cols])
-                c.execute(f'''INSERT INTO users_new (id, {insert_cols_str})
-                             SELECT id, {defaults} FROM users''')
+                insert_vals = ', '.join(['?' if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' for col in insert_cols])
+                c.execute(f"INSERT INTO users_new (id, {', '.join(insert_cols)}) SELECT id, {insert_vals} FROM users")
                 c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
                 for user_id, plaintext in c.fetchall():
                     hashed = generate_password_hash(plaintext)
@@ -106,14 +113,22 @@ def init_db():
                 c.execute('ALTER TABLE users_new RENAME TO users')
                 logger.debug("Migration completed")
         c.execute('''CREATE TABLE IF NOT EXISTS posts 
-                     (id INTEGER PRIMARY KEY, user_id INTEGER, content TEXT, subject TEXT, 
-                      likes INTEGER DEFAULT 0, reported BOOLEAN DEFAULT 0)''')
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, subject TEXT, 
+                      likes INTEGER DEFAULT 0, reported INTEGER DEFAULT 0, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
-                     (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, 
-                      subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0)''')
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
+                      subject TEXT, content TEXT, completed INTEGER DEFAULT 0, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS tests 
-                     (id INTEGER PRIMARY KEY, user_id INTEGER, grade INTEGER, 
-                      score INTEGER, date TEXT)''')
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
+                      score INTEGER, date TEXT, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_likes 
+                     (user_id INTEGER, post_id INTEGER, 
+                      PRIMARY KEY (user_id, post_id), 
+                      FOREIGN KEY (user_id) REFERENCES users(id), 
+                      FOREIGN KEY (post_id) REFERENCES posts(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_reported_id ON posts(reported, id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
@@ -122,9 +137,6 @@ def init_db():
         logger.error(f"Database initialization failed: {e}")
         conn.rollback()
         raise
-
-init_db()
-check_db_schema()
 
 # Seed CAPS-aligned lessons
 def seed_lessons():
@@ -145,7 +157,14 @@ def seed_lessons():
         conn.rollback()
         raise
 
-seed_lessons()
+# Initialize database and seed data within app context
+def init_app():
+    with app.app_context():
+        init_db()
+        check_db_schema()
+        seed_lessons()
+
+init_app()
 
 @app.route('/')
 def home():
@@ -158,7 +177,7 @@ def home():
     posts = [(pid, filter_content(content), subject, likes, email, reported) for pid, content, subject, likes, email, reported in c.fetchall()]
     c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id IS NULL OR user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
     lesson = c.fetchone()
-    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? AND date > ?", (session['user_id'], datetime.now() - timedelta(days=7)))
+    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? AND date > ?", (session['user_id'], (datetime.now() - timedelta(days=7)).isoformat()))
     test = c.fetchone()
     return render_template('home.html', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
 
@@ -166,10 +185,10 @@ def home():
 def register():
     logger.debug("Accessing register route")
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
         theme = request.form.get('theme', 'astronaut')
-        if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+        if not email or not re.match(r'[^@]+@[^@]+\.[^@]+', email):
             logger.error("Invalid email")
             return "Invalid email", 400
         if len(password) < 8:
@@ -192,25 +211,25 @@ def register():
         except Exception as e:
             logger.error(f"Register failed: {e}")
             conn.rollback()
-            raise
+            return "Server error", 500
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     logger.debug("Accessing login route")
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
         try:
             conn = get_db()
             c = conn.cursor()
             c.execute("SELECT id, password, grade, theme, subscribed FROM users WHERE email = ?", (email,))
             user = c.fetchone()
-            if user and check_password_hash(user[1], password):
-                session['user_id'] = user[0]
-                session['grade'] = user[2]
-                session['theme'] = user[3]
-                session['subscribed'] = user[4]
+            if user and check_password_hash(user['password'], password):
+                session['user_id'] = user['id']
+                session['grade'] = user['grade']
+                session['theme'] = user['theme']
+                session['subscribed'] = bool(user['subscribed'])
                 session['email'] = email
                 logger.debug(f"Logged in user: {email}")
                 return redirect(url_for('home'))
@@ -219,7 +238,7 @@ def login():
         except Exception as e:
             logger.error(f"Login failed: {e}")
             conn.rollback()
-            raise
+            return "Server error", 500
     return render_template('login.html')
 
 @app.route('/logout')
@@ -233,8 +252,10 @@ def create_post():
     logger.debug("Creating post")
     if 'user_id' not in session:
         return "Unauthorized", 401
-    content = filter_content(request.form['content'])
-    subject = request.form['subject']
+    content = filter_content(request.form.get('content', ''))
+    subject = request.form.get('subject', '')
+    if not content or not subject:
+        return "Content and subject are required", 400
     try:
         conn = get_db()
         c = conn.cursor()
@@ -244,7 +265,7 @@ def create_post():
     except Exception as e:
         logger.error(f"Create post failed: {e}")
         conn.rollback()
-        raise
+        return "Server error", 500
 
 @app.route('/like/<int:post_id>')
 def like_post(post_id):
@@ -264,7 +285,7 @@ def like_post(post_id):
     except Exception as e:
         logger.error(f"Like post failed: {e}")
         conn.rollback()
-        raise
+        return "Server error", 500
 
 @app.route('/report/<int:post_id>')
 def report_post(post_id):
@@ -280,7 +301,7 @@ def report_post(post_id):
     except Exception as e:
         logger.error(f"Report post failed: {e}")
         conn.rollback()
-        raise
+        return "Server error", 500
 
 @app.route('/assess', methods=['GET', 'POST'])
 def assess():
@@ -290,6 +311,7 @@ def assess():
     if request.method == 'POST':
         correct_answers = ["5", "Hat", "Water", "Example4", "Example5", "Example6", "Example7", "Example8", "Example9", "Example10"]
         score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}') == correct_answers[i-1])
+        grade = 1 if score < 4 else 2 if score < 7 else 3
         try:
             conn = get_db()
             c = conn.cursor()
@@ -300,7 +322,7 @@ def assess():
         except Exception as e:
             logger.error(f"Assess failed: {e}")
             conn.rollback()
-            raise
+            return "Server error", 500
     questions = [
         {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
         {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
@@ -329,7 +351,7 @@ def complete_lesson(lesson_id):
     except Exception as e:
         logger.error(f"Complete lesson failed: {e}")
         conn.rollback()
-        raise
+        return "Server error", 500
 
 @app.route('/test', methods=['GET', 'POST'])
 def take_test():
@@ -349,7 +371,7 @@ def take_test():
         except Exception as e:
             logger.error(f"Test failed: {e}")
             conn.rollback()
-            raise
+            return "Server error", 500
     questions = [
         {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
         {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
@@ -367,50 +389,6 @@ def game():
     score = int(request.args.get('score', 0))
     difficulty = 'easy' if score < 3 else 'hard'
     return render_template('game.html', difficulty=difficulty, theme=session.get('theme', 'astronaut'))
-
-@app.route('/subscribe', methods=['GET', 'POST'])
-def subscribe():
-    logger.debug("Accessing subscribe route")
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('subscribe.html')
-
-@app.route('/subscribe/activate/<subscription_id>', methods=['POST'])
-def activate_subscription(subscription_id):
-    logger.debug(f"Activating subscription {subscription_id}")
-    if 'user_id' not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-    token = get_access_token()
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    response = requests.get(f"https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_id}", headers=headers)
-    if response.status_code == 200 and response.json()['status'] == 'ACTIVE':
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("UPDATE users SET subscribed = 1 WHERE id = ?", (session['user_id'],))
-        conn.commit()
-        session['subscribed'] = True
-        logger.debug("Subscription activated")
-        return jsonify({"success": True})
-    logger.error("Subscription not active")
-    return jsonify({"error": "Subscription not active"}), 400
-
-def get_access_token():
-    url = "https://api-m.sandbox.paypal.com/v1/oauth2/token"
-    auth = (PAYPAL_CLIENT_ID, os.environ['PAYPAL_CLIENT_SECRET'])
-    response = requests.post(url, auth=auth, data={"grant_type": "client_credentials"})
-    return response.json()['access_token']
-
-@app.route('/subscribe/success')
-def subscribe_success():
-    logger.debug("Accessing subscribe success")
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return redirect(url_for('home'))
-
-@app.route('/subscribe/cancel')
-def subscribe_cancel():
-    logger.debug("Accessing subscribe cancel")
-    return redirect(url_for('home'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
