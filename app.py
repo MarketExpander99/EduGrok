@@ -101,9 +101,12 @@ def init_db():
                 c.execute('''CREATE TABLE users_new 
                              (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
                               grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0)''')
-                # Use SELECT with COALESCE for default values
-                select_cols = ', '.join([f"COALESCE(NULL, {col})" if col in missing_cols else col for col in ['id', 'email', 'password', 'grade', 'theme', 'subscribed']])
-                c.execute(f"INSERT INTO users_new (id, email, password, grade, theme, subscribed) SELECT {select_cols} FROM users")
+                old_cols = [col for col in columns if col != 'id']
+                insert_cols = old_cols + missing_cols
+                insert_cols_str = ', '.join(insert_cols)
+                # Use COALESCE to provide defaults in SELECT
+                select_cols = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' for col in insert_cols])
+                c.execute(f"INSERT INTO users_new (id, {insert_cols_str}) SELECT id, {select_cols} FROM users")
                 c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
                 for user_id, plaintext in c.fetchall():
                     hashed = generate_password_hash(plaintext)
