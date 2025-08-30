@@ -8,23 +8,27 @@
 <body class="{{ theme }}">
     <h1>EduGrok Educational Stream</h1>
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <p class="error">{{ error }}</p>
     {% endif %}
-    {% if not subscribed %}
-        <a href="/subscribe" class="btn">Subscribe for Premium ($5/month)</a>
-    {% endif %}
-    <a href="/logout" class="btn">Logout</a>
-    <a href="/profile" class="btn">Profile</a>
-    <a href="/lessons" class="btn">Lessons</a>
+    <div class="nav">
+        {% if not subscribed %}
+            <a href="/subscribe" class="btn">Subscribe for Premium ($5/month)</a>
+        {% endif %}
+        <a href="/logout" class="btn">Logout</a>
+        <a href="/profile" class="btn">Profile</a>
+        <a href="/lessons" class="btn">Lessons</a>
+    </div>
 
     {% if lesson %}
         <div class="lesson-card">
             <h2>{{ lesson['subject'] }} Lesson</h2>
             {{ lesson['content'] | safe }}
-            <a href="/complete_lesson/{{ lesson['id'] }}" class="btn">Complete Lesson</a>
-            {% if lesson['subject'] == 'language' %}
-                <a href="/phonics_game" class="btn">Play Phonics Game!</a>
-            {% endif %}
+            <div class="nav">
+                <a href="/complete_lesson/{{ lesson['id'] }}" class="btn">Complete Lesson</a>
+                {% if lesson['subject'] == 'language' %}
+                    <a href="/phonics_game" class="btn">Play Phonics Game!</a>
+                {% endif %}
+            </div>
         </div>
     {% endif %}
 

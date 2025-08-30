@@ -336,7 +336,7 @@ def assess():
         return redirect(url_for('login'))
     if request.method == 'POST':
         correct_answers = ["5", "Hat", "Water", "Example4", "Example5", "Example6", "Example7", "Example8", "Example9", "Example10"]
-        score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}') == correct_answers[i-1])
+        score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}', '') == correct_answers[i-1])
         grade = 1 if score < 4 else 2 if score < 7 else 3
         try:
             conn = get_db()
@@ -344,6 +344,7 @@ def assess():
             c.execute("UPDATE users SET grade = ? WHERE id = ?", (grade, session['user_id']))
             conn.commit()
             session['grade'] = grade
+            logger.debug(f"Assessment completed: score={score}, grade={grade}")
             return redirect(url_for('home'))
         except Exception as e:
             logger.error(f"Assess failed: {e}")
@@ -387,7 +388,7 @@ def take_test():
         return redirect(url_for('login'))
     if request.method == 'POST':
         correct_answers = ["9", "Example2", "Example3", "Example4", "Example5"]
-        score = sum(1 for i in range(1, 6) if request.form.get(f'q{i}') == correct_answers[i-1])
+        score = sum(1 for i in range(1, 6) if request.form.get(f'q{i}', '') == correct_answers[i-1])
         try:
             conn = get_db()
             c = conn.cursor()

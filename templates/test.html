@@ -8,15 +8,17 @@
 <body class="{{ theme }}">
     <h1>Weekly Test</h1>
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <p class="error">{{ error }}</p>
     {% endif %}
     <form method="POST">
         {% for q in questions %}
             <div class="lesson-card">
                 <p>{{ q.q }}</p>
-                {% for a in q.a %}
-                    <label><input type="radio" name="q{{ loop.index }}" value="{{ a }}"> {{ a }}</label><br>
-                {% endfor %}
+                <div class="radio-group">
+                    {% for a in q.a %}
+                        <label><input type="radio" name="q{{ loop.index }}" value="{{ a }}" {{ 'required' if loop.first }}>{{ a }}</label>
+                    {% endfor %}
+                </div>
             </div>
         {% endfor %}
         <button type="submit" class="btn">Submit Test</button>

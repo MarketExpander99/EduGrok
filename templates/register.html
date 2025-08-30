@@ -8,17 +8,19 @@
 <body class="{{ theme }}">
     <h1>Register</h1>
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <p class="error">{{ error }}</p>
     {% endif %}
     <form method="POST">
-        <label>Email: <input type="email" name="email" required></label><br>
-        <label>Password: <input type="password" name="password" required></label><br>
+        <label>Email: <input type="email" name="email" required></label>
+        <label>Password: <input type="password" name="password" required></label>
         <label>Theme: <select name="theme">
             <option value="astronaut">Astronaut</option>
             <option value="farm">Farm</option>
-        </select></label><br>
-        <button type="submit" class="btn">Register</button>
+        </select></label>
+        <div class="nav">
+            <button type="submit" class="btn">Register</button>
+            <a href="/login" class="btn">Login</a>
+        </div>
     </form>
-    <a href="/login" class="btn">Login</a>
 </body>
 </html>
