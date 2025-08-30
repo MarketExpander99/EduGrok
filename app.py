@@ -61,7 +61,8 @@ def check_db_schema():
     columns = {col[1]: col[2] for col in c.fetchall()}
     expected = {
         'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
-        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER DEFAULT 0'
+        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER DEFAULT 0',
+        'handle': 'TEXT'
     }
     for col, col_type in expected.items():
         if col not in columns:
@@ -70,7 +71,7 @@ def check_db_schema():
         if columns[col] != col_type.split()[0]:
             logger.error(f"Users table column {col} has wrong type: expected {col_type}, got {columns[col]}")
             raise ValueError(f"Users table column {col} type mismatch")
-    for table in ['posts', 'lessons', 'tests', 'user_likes']:
+    for table in ['posts', 'lessons', 'tests', 'user_likes', 'user_points']:
         c.execute(f"PRAGMA table_info({table})")
         if not c.fetchall():
             logger.error(f"Table {table} does not exist")
@@ -92,20 +93,19 @@ def init_db():
             logger.debug("Creating users table")
             c.execute('''CREATE TABLE users 
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0)''')
+                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT)''')
         else:
-            missing_cols = [col for col in ['grade', 'theme', 'subscribed'] if col not in columns]
+            missing_cols = [col for col in ['grade', 'theme', 'subscribed', 'handle'] if col not in columns]
             if missing_cols:
                 logger.debug(f"Migrating users table to add columns: {missing_cols}")
                 c.execute("DROP TABLE IF EXISTS users_new")
                 c.execute('''CREATE TABLE users_new 
                              (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0)''')
+                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT)''')
                 old_cols = [col for col in columns if col != 'id']
                 insert_cols = old_cols + missing_cols
                 insert_cols_str = ', '.join(insert_cols)
-                # Use COALESCE to provide defaults in SELECT
-                select_cols = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' for col in insert_cols])
+                select_cols = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' if col == 'subscribed' else "email" for col in insert_cols])
                 c.execute(f"INSERT INTO users_new (id, {insert_cols_str}) SELECT id, {select_cols} FROM users")
                 c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
                 for user_id, plaintext in c.fetchall():
@@ -131,10 +131,36 @@ def init_db():
                       PRIMARY KEY (user_id, post_id), 
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (post_id) REFERENCES posts(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_points 
+                     (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_reported_id ON posts(reported, id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         conn.commit()
+
+        # Seed bot users
+        bots = [
+            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz'),
+            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu'),
+        ]
+        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle) VALUES (?, ?, ?, ?, ?, ?)", bots)
+        conn.commit()
+
+        # Get bot IDs
+        c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
+        skykidz_id = c.fetchone()[0]
+        c.execute("SELECT id FROM users WHERE email = 'grokedu@example.com'")
+        grokedu_id = c.fetchone()[0]
+
+        # Seed bot posts
+        bot_posts = [
+            (skykidz_id, 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 5, 0),
+            (grokedu_id, 'Explore the solar system: Name a planet close to the sun.', 'science', 10, 0),
+        ]
+        c.executemany("INSERT OR IGNORE INTO posts (user_id, content, subject, likes, reported) VALUES (?, ?, ?, ?, ?)", bot_posts)
+        conn.commit()
+
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         conn.rollback()
@@ -145,9 +171,12 @@ def seed_lessons():
     conn = get_db()
     c = conn.cursor()
     lessons = [
-        (None, 1, 'math', 'Grade 1: Addition (Solve: 2 + 3 = ?)', 0),
-        (None, 2, 'language', 'Grade 2: Write a sentence about the sun.', 0),
-        (None, 3, 'science', 'Grade 3: Name a planet in our solar system.', 0)
+        (None, 1, 'math', 'Grade 1: Farm Addition<br>Solve: 2 + 3 = ?<br>Explanation: Imagine 2 apples + 3 more = 5!<br><video controls><source src="/static/mock-farm-video.mp4" type="video/mp4"></video>', 0),
+        (None, 1, 'language', 'Grade 1: Farm Spelling<br>Spell "cat".<br>Hint: Sounds like /k/ /a/ /t/.<br><img src="/static/cat.png">', 0),
+        (None, 1, 'language', 'Grade 1: Phonics - M Sounds<br>Match words starting with M!<br>After this, play the Mars Memory Match game.', 0),
+        (None, 2, 'science', 'Grade 2: Solar System<br>Name a planet in our solar system.<br>Explanation: Earth is our home!<br><iframe width="560" height="315" src="https://www.youtube.com/embed/mock-video" title="Planet Explanation" frameborder="0" allowfullscreen></iframe>', 0),
+        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br><video controls><source src="/static/mock-sub-video.mp4" type="video/mp4"></video>', 0),
+        (None, 3, 'language', 'Grade 3: Write a Story<br>Write a short sentence about the sun.<br>Example: The sun is bright and warm.', 0),
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
@@ -175,12 +204,12 @@ def home():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT p.id, p.content, p.subject, p.likes, u.email, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
-    posts = [(pid, filter_content(content), subject, likes, email, reported) for pid, content, subject, likes, email, reported in c.fetchall()]
+    c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
+    posts = [dict(id=row['id'], content=filter_content(row['content']), subject=row['subject'], likes=row['likes'], handle=row['handle'], reported=row['reported']) for row in c.fetchall()]
     c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id IS NULL OR user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
-    lesson = c.fetchone()
-    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? AND date > ?", (session['user_id'], (datetime.now() - timedelta(days=7)).isoformat()))
-    test = c.fetchone()
+    lesson = dict(c.fetchone()) if c.fetchone() else None
+    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
+    test = dict(c.fetchone()) if c.fetchone() else None
     return render_template('home.html', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -190,31 +219,26 @@ def register():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         theme = request.form.get('theme', 'astronaut')
-        if not email or not re.match(r'[^@]+@[^@]+\.[^@]+', email):
-            logger.error("Invalid email")
-            return "Invalid email", 400
-        if len(password) < 8:
-            logger.error("Password too short")
-            return "Password must be at least 8 characters", 400
+        hashed_password = generate_password_hash(password)
         try:
             conn = get_db()
             c = conn.cursor()
-            hashed_password = generate_password_hash(password)
-            c.execute("INSERT INTO users (email, password, theme) VALUES (?, ?, ?)", (email, hashed_password, theme))
+            c.execute("INSERT INTO users (email, password, theme, handle) VALUES (?, ?, ?, ?)", (email, hashed_password, theme, email))
             conn.commit()
             user_id = c.lastrowid
             session['user_id'] = user_id
             session['email'] = email
+            session['theme'] = theme
             logger.debug(f"Registered user: {email}")
             return redirect(url_for('assess'))
         except sqlite3.IntegrityError:
             logger.error("Email already in use")
-            return "Email already in use", 400
+            return render_template('register.html', error="Email already in use", theme=theme)
         except Exception as e:
             logger.error(f"Register failed: {e}")
             conn.rollback()
-            return "Server error", 500
-    return render_template('register.html')
+            return render_template('register.html', error="Server error", theme=theme)
+    return render_template('register.html', theme=session.get('theme', 'astronaut'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -236,12 +260,12 @@ def login():
                 logger.debug(f"Logged in user: {email}")
                 return redirect(url_for('home'))
             logger.error("Invalid credentials")
-            return "Invalid credentials", 401
+            return render_template('login.html', error="Invalid credentials", theme=session.get('theme', 'astronaut'))
         except Exception as e:
             logger.error(f"Login failed: {e}")
             conn.rollback()
-            return "Server error", 500
-    return render_template('login.html')
+            return render_template('login.html', error="Server error", theme=session.get('theme', 'astronaut'))
+    return render_template('login.html', theme=session.get('theme', 'astronaut'))
 
 @app.route('/logout')
 def logout():
@@ -253,11 +277,11 @@ def logout():
 def create_post():
     logger.debug("Creating post")
     if 'user_id' not in session:
-        return "Unauthorized", 401
+        return render_template('login.html', error="Unauthorized", theme=session.get('theme', 'astronaut'))
     content = filter_content(request.form.get('content', ''))
     subject = request.form.get('subject', '')
     if not content or not subject:
-        return "Content and subject are required", 400
+        return render_template('home.html', error="Content and subject are required", theme=session.get('theme', 'astronaut'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -267,19 +291,19 @@ def create_post():
     except Exception as e:
         logger.error(f"Create post failed: {e}")
         conn.rollback()
-        return "Server error", 500
+        return render_template('home.html', error="Server error", theme=session.get('theme', 'astronaut'))
 
 @app.route('/like/<int:post_id>')
 def like_post(post_id):
     logger.debug(f"Liking post {post_id}")
     if 'user_id' not in session:
-        return "Unauthorized", 401
+        return render_template('login.html', error="Unauthorized", theme=session.get('theme', 'astronaut'))
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
         if c.fetchone():
-            return "Already liked", 400
+            return render_template('home.html', error="Already liked", theme=session.get('theme', 'astronaut'))
         c.execute("INSERT INTO user_likes (user_id, post_id) VALUES (?, ?)", (session['user_id'], post_id))
         c.execute("UPDATE posts SET likes = likes + 1 WHERE id = ?", (post_id,))
         conn.commit()
@@ -287,13 +311,13 @@ def like_post(post_id):
     except Exception as e:
         logger.error(f"Like post failed: {e}")
         conn.rollback()
-        return "Server error", 500
+        return render_template('home.html', error="Server error", theme=session.get('theme', 'astronaut'))
 
 @app.route('/report/<int:post_id>')
 def report_post(post_id):
     logger.debug(f"Reporting post {post_id}")
     if 'user_id' not in session:
-        return "Unauthorized", 401
+        return render_template('login.html', error="Unauthorized", theme=session.get('theme', 'astronaut'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -303,7 +327,7 @@ def report_post(post_id):
     except Exception as e:
         logger.error(f"Report post failed: {e}")
         conn.rollback()
-        return "Server error", 500
+        return render_template('home.html', error="Server error", theme=session.get('theme', 'astronaut'))
 
 @app.route('/assess', methods=['GET', 'POST'])
 def assess():
@@ -324,7 +348,7 @@ def assess():
         except Exception as e:
             logger.error(f"Assess failed: {e}")
             conn.rollback()
-            return "Server error", 500
+            return render_template('assess.html', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'))
     questions = [
         {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
         {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
@@ -337,23 +361,24 @@ def assess():
         {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
         {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"},
     ]
-    return render_template('assess.html', questions=questions)
+    return render_template('assess.html', questions=questions, theme=session.get('theme', 'astronaut'))
 
 @app.route('/complete_lesson/<int:lesson_id>')
 def complete_lesson(lesson_id):
     logger.debug(f"Completing lesson {lesson_id}")
     if 'user_id' not in session:
-        return "Unauthorized", 401
+        return render_template('login.html', error="Unauthorized", theme=session.get('theme', 'astronaut'))
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("UPDATE lessons SET completed = 1 WHERE id = ? AND (user_id IS NULL OR user_id = ?)", (lesson_id, session['user_id']))
+        c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + 5)", (session['user_id'], session['user_id']))
         conn.commit()
         return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {e}")
         conn.rollback()
-        return "Server error", 500
+        return render_template('home.html', error="Server error", theme=session.get('theme', 'astronaut'))
 
 @app.route('/test', methods=['GET', 'POST'])
 def take_test():
@@ -368,12 +393,14 @@ def take_test():
             c = conn.cursor()
             c.execute("INSERT INTO tests (user_id, grade, score, date) VALUES (?, ?, ?, ?)", 
                       (session['user_id'], session['grade'], score, datetime.now().isoformat()))
+            points_award = score * 2
+            c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
             conn.commit()
             return redirect(url_for('game', score=score))
         except Exception as e:
             logger.error(f"Test failed: {e}")
             conn.rollback()
-            return "Server error", 500
+            return render_template('test.html', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'))
     questions = [
         {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
         {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
@@ -381,7 +408,7 @@ def take_test():
         {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
         {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
     ]
-    return render_template('test.html', questions=questions)
+    return render_template('test.html', questions=questions, theme=session.get('theme', 'astronaut'))
 
 @app.route('/game')
 def game():
@@ -390,7 +417,69 @@ def game():
         return redirect(url_for('login'))
     score = int(request.args.get('score', 0))
     difficulty = 'easy' if score < 3 else 'hard'
-    return render_template('game.html', difficulty=difficulty, theme=session.get('theme', 'astronaut'))
+    return render_template('game.html', difficulty=difficulty, theme=session.get('theme', 'astronaut'), score=score)
+
+@app.route('/profile')
+def profile():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
+    lessons_completed = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
+    total_lessons = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM tests WHERE user_id = ?", (session['user_id'],))
+    games_played = c.fetchone()[0]
+    c.execute("SELECT AVG(score) FROM tests WHERE user_id = ?", (session['user_id'],))
+    avg_score = round(c.fetchone()[0] or 0, 1)
+    grade_letter = 'A' if session['grade'] >= 3 else 'B' if session['grade'] == 2 else 'C'
+    c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
+    result = c.fetchone()
+    points = result['points'] if result else 0
+    return render_template('profile.html', 
+                           lessons_completed=f"{lessons_completed}/{total_lessons}",
+                           games_played=games_played,
+                           avg_score=avg_score,
+                           grade=grade_letter,
+                           theme=session['theme'],
+                           points=points)
+
+@app.route('/lessons')
+def lessons():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
+    lessons_list = [dict(row) for row in c.fetchall()]
+    return render_template('lessons.html', lessons=lessons_list, theme=session.get('theme', 'astronaut'))
+
+@app.route('/update_points')
+def update_points():
+    if 'user_id' not in session:
+        return render_template('login.html', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+    points_award = int(request.args.get('points', 0))
+    if points_award <= 0 or points_award > 20:
+        return render_template('home.html', error="Invalid points", theme=session.get('theme', 'astronaut'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", 
+                  (session['user_id'], session['user_id'], points_award))
+        conn.commit()
+        return "Points updated", 200
+    except Exception as e:
+        logger.error(f"Update points failed: {e}")
+        conn.rollback()
+        return render_template('home.html', error="Server error", theme=session.get('theme', 'astronaut'))
+
+@app.route('/phonics_game')
+def phonics_game():
+    logger.debug("Accessing phonics game route")
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('phonics_game.html', theme=session['theme'], grade=session['grade'])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

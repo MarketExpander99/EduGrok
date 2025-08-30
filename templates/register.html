@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>EduGrok Register</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="/static/style.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Register - EduGrok</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">Register for EduGrok</h1>
-        <form method="POST" class="card">
-            <input type="email" name="email" required placeholder="Email" class="w-full">
-            <input type="password" name="password" required placeholder="Password" class="w-full">
-            <select name="theme">
-                <option value="astronaut">Astronaut</option>
-                <option value="jewel">Sparkly Jewel</option>
-                <option value="ocean">Ocean Explorer</option>
-            </select>
-            <button type="submit" class="btn">Register</button>
-        </form>
-        <a href="/login" class="btn">Login</a>
-    </div>
+<body class="{{ theme }}">
+    <h1>Register</h1>
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    <form method="POST">
+        <label>Email: <input type="email" name="email" required></label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <label>Theme: <select name="theme">
+            <option value="astronaut">Astronaut</option>
+            <option value="farm">Farm</option>
+        </select></label><br>
+        <button type="submit" class="btn">Register</button>
+    </form>
+    <a href="/login" class="btn">Login</a>
 </body>
 </html>

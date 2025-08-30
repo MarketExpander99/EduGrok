@@ -2,3 +2,4 @@ Database initialization failed: Incorrect number of bindings supplied. The curre
 Database initialization failed: Incorrect number of bindings supplied. The current statement uses 3, and there are 0 supplied.
 Database initialization failed: no such column: grade
 Database initialization failed: no such column: grade
+Invalid credentials

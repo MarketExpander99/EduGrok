@@ -1,22 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>EduGrok Weekly Test</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="/static/style.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Boss Battle - EduGrok</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4">Weekly Test</h1>
-        <form method="POST" class="card">
-            {% for q in questions %}
-            <p>{{ q.q }}</p>
-            {% for a in q.a %}
-            <label><input type="radio" name="q{{ loop.index }}" value="{{ '1' if a == q.correct else '0' }}"> {{ a }}</label><br>
-            {% endfor %}
-            {% endfor %}
-            <button type="submit" class="btn">Submit</button>
-        </form>
+<body class="{{ theme }}">
+    <h1>Boss Battle ({{ difficulty }})</h1>
+    <div class="game-container">
+        <p>Score from test: {{ score }}</p>
+        <!-- Placeholder for future game JS -->
     </div>
+    <a href="/" class="btn">Back to Home</a>
 </body>
 </html>
