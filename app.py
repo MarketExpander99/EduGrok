@@ -41,7 +41,7 @@ def filter_content(content):
 # Get DB connection
 def get_db():
     if 'db' not in g:
-        db_path = 'edugrok.db'  # Default to repo root
+        db_path = 'edugrok.db'
         if os.path.exists('/data/edugrok.db'):
             db_path = '/data/edugrok.db'
         try:
@@ -49,7 +49,6 @@ def get_db():
             g.db.execute('PRAGMA journal_mode=WAL;')
             g.db.row_factory = sqlite3.Row
             logger.debug(f"Connected to DB at {db_path}")
-            # Ensure write permissions
             if db_path == '/data/edugrok.db':
                 try:
                     os.chmod(db_path, 0o666)
@@ -106,10 +105,9 @@ def init_db():
             db_path = '/data/edugrok.db'
         if not os.path.exists(db_path):
             logger.debug(f"Creating new DB at {db_path}")
-            open(db_path, 'a').close()  # Create empty file
-            os.chmod(db_path, 0o666)  # Ensure writable
+            open(db_path, 'a').close()
+            os.chmod(db_path, 0o666)
 
-        # Check if schema is valid; if not, drop and recreate users table
         if not check_db_schema():
             logger.debug("Dropping and recreating users table due to invalid schema")
             c.execute("DROP TABLE IF EXISTS users")
@@ -117,7 +115,6 @@ def init_db():
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
                           grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT)''')
 
-        # Create other tables
         c.execute('''CREATE TABLE IF NOT EXISTS posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, subject TEXT, 
                       likes INTEGER DEFAULT 0, reported INTEGER DEFAULT 0, 
@@ -143,7 +140,6 @@ def init_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         conn.commit()
 
-        # Seed bot users
         bots = [
             ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz'),
             ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu'),
@@ -155,9 +151,8 @@ def init_db():
         except Exception as e:
             logger.error(f"Failed to seed bot users: {e}")
             conn.rollback()
-            raise
+            return
 
-        # Get bot IDs
         c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
         skykidz_row = c.fetchone()
         skykidz_id = skykidz_row['id'] if skykidz_row else None
@@ -165,7 +160,6 @@ def init_db():
         grokedu_row = c.fetchone()
         grokedu_id = grokedu_row['id'] if grokedu_row else None
 
-        # Seed bot posts only if bot users exist
         if skykidz_id and grokedu_id:
             bot_posts = [
                 (skykidz_id, 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 5, 0),
@@ -178,10 +172,8 @@ def init_db():
             except Exception as e:
                 logger.error(f"Failed to seed bot posts: {e}")
                 conn.rollback()
-                raise
         else:
             logger.warning("Skipping bot posts seeding: bot users not found")
-
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         conn.rollback()
@@ -232,17 +224,28 @@ def internal_error(error):
 def home():
     logger.debug("Accessing home route")
     if 'user_id' not in session:
+        logger.debug("No user_id in session, redirecting to login")
         return redirect(url_for('login'))
     try:
         conn = get_db()
         c = conn.cursor()
+        logger.debug(f"Fetching posts for user_id={session['user_id']}")
         c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
         posts = [dict(id=row['id'], content=filter_content(row['content']), subject=row['subject'], likes=row['likes'], handle=row['handle'], reported=row['reported']) for row in c.fetchall()]
-        c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id IS NULL OR user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
-        lesson = dict(c.fetchone()) if c.fetchone() else None
+        grade = session.get('grade', 1)
+        if not isinstance(grade, int):
+            logger.warning(f"Invalid grade in session: {grade}, defaulting to 1")
+            grade = 1
+        logger.debug(f"Fetching lesson for user_id={session['user_id']}, grade={grade}")
+        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], grade))
+        lesson_row = c.fetchone()
+        lesson = dict(lesson_row) if lesson_row else None
+        logger.debug(f"Fetching test for user_id={session['user_id']}")
         c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
-        test = dict(c.fetchone()) if c.fetchone() else None
-        return render_template('home.html', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
+        test_row = c.fetchone()
+        test = dict(test_row) if test_row else None
+        logger.debug(f"Rendering home.html with posts={len(posts)}, lesson={lesson is not None}, test={test is not None}")
+        return render_template('home.html', posts=posts or [], lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
     except Exception as e:
         logger.error(f"Home route failed: {e}")
         return render_template('error.html', error="Failed to load feed. Please try again.", theme=session.get('theme', 'astronaut')), 500
@@ -265,7 +268,7 @@ def register():
             session['email'] = email
             session['theme'] = theme
             session['grade'] = 1
-            logger.debug(f"Registered user: {email}")
+            logger.debug(f"Registered user: {email}, user_id={user_id}, grade=1")
             return redirect(url_for('home'))
         except sqlite3.IntegrityError:
             logger.error("Email already in use")
@@ -289,18 +292,18 @@ def login():
             user = c.fetchone()
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
-                session['grade'] = user['grade'] or 1  # Fallback grade
+                session['grade'] = user['grade'] if user['grade'] is not None else 1
                 session['theme'] = user['theme'] or 'astronaut'
                 session['subscribed'] = bool(user['subscribed'])
                 session['email'] = email
-                logger.debug(f"Logged in user: {email}")
+                logger.debug(f"Logged in user: {email}, user_id={session['user_id']}, grade={session['grade']}")
                 return redirect(url_for('home'))
             logger.error("Invalid credentials")
             return render_template('login.html', error="Invalid credentials", theme=session.get('theme', 'astronaut'))
         except Exception as e:
             logger.error(f"Login failed: {e}")
             conn.rollback()
-            return render_template('login.html', error="Server error", theme=session.get('theme', 'astronaut')), 500
+            return render_template('error.html', error="Server error", theme=session.get('theme', 'astronaut')), 500
     return render_template('login.html', theme=session.get('theme', 'astronaut'))
 
 @app.route('/logout')
@@ -529,5 +532,23 @@ def phonics_game():
         return redirect(url_for('login'))
     return render_template('phonics_game.html', theme=session.get('theme', 'astronaut'), grade=session.get('grade', 1))
 
+@app.route('/debug_db')
+def debug_db():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = c.fetchall()
+        c.execute("PRAGMA table_info(users)")
+        columns = c.fetchall()
+        return jsonify({'tables': [t['name'] for t in tables], 'users_columns': [c['name'] for c in columns]})
+    except Exception as e:
+        logger.error(f"Debug DB failed: {e}")
+        return render_template('error.html', error=str(e), theme=session.get('theme', 'astronaut')), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    logger.debug(f"Starting Flask server on 0.0.0.0:{port}")
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
