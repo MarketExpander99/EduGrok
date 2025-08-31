@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error - EduGrok</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{{ theme | default('astronaut') }}">
+    <div class="sidebar">
+        <a href="/">Home</a>
+        <a href="/assess">Assess</a>
+        <a href="/lessons">Lessons</a>
+        <a href="/profile">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+    <h1>Error</h1>
+    <p class="error">{{ error }}</p>
+    <a href="/" class="btn">Back to Home</a>
+</body>
+</html>
