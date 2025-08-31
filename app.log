@@ -3,3 +3,8 @@ Database initialization failed: Incorrect number of bindings supplied. The curre
 Database initialization failed: no such column: grade
 Database initialization failed: no such column: grade
 Invalid credentials
+Invalid credentials
+Invalid credentials
+Invalid credentials
+Invalid credentials
+Users table missing column: id
