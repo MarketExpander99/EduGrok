@@ -33,3 +33,7 @@ Home route failed: No filter named 'filter_content'.
 Home route failed: No filter named 'filter_content'.
 Home route failed: home.html
 Home route failed: home.html
+App init failed: [Errno 13] Permission denied: '/data'
+Internal Server Error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application. - Request: http://localhost:5000/ - Session: <SecureCookieSession {'email': 'test@test.com', 'grade': 1, 'theme': 'astronaut', 'user_id': 15}>
+Internal Server Error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application. - Request: http://localhost:5000/ - Session: <SecureCookieSession {'email': 'test@test.com', 'grade': 1, 'theme': 'astronaut', 'user_id': 15}>
+404 Not Found: http://localhost:5000/home
