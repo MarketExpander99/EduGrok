@@ -40,3 +40,4 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-09-08 12:01:07,911 - __main__ - ERROR - 404 Not Found: http://localhost:5000/static/mock-farm-video.mp4
 2025-09-08 12:30:23,418 - __main__ - ERROR - 404 Not Found: http://localhost:5000/favicon.ico
 2025-09-08 13:01:30,387 - __main__ - ERROR - 404 Not Found: http://localhost:5000/static/cat.png
+2025-09-08 13:05:05,638 - __main__ - ERROR - 404 Not Found: http://localhost:5000/set_theme

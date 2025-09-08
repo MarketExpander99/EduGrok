@@ -31,16 +31,16 @@
         }
     </style>
 </head>
-<body class="{% if theme == 'farm' %}bg-green-100 dark:bg-green-900{% elif theme == 'space' %}bg-black dark:bg-gray-900{% elif theme == 'astronaut' %}bg-blue-100 dark:bg-blue-900{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+<body class="{% if session.theme == 'farm' %}farm{% elif session.theme == 'space' %}space{% elif session.theme == 'astronaut' %}astronaut{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
     <header class="w-full bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold">Your Lessons</h1>
         <div class="flex items-center space-x-4">
             <form action="/set_theme" method="POST" class="flex items-center">
                 <label for="theme" class="mr-2">Theme:</label>
                 <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
-                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
-                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
-                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                    <option value="farm" {% if session.theme == 'farm' %}selected{% endif %}>Farm</option>
+                    <option value="space" {% if session.theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if session.theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                 </select>
                 <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
             </form>
@@ -57,12 +57,12 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                         Status: {{ 'Completed' if lesson.completed else 'In Progress' }}
                         {% if session.language == 'bilingual' %}
-                        | Estado: {{ 'Completado' if lesson.completed else 'En Progreso' }}
+                        | Status: {{ 'Voltooi' if lesson.completed else 'In vordering' }}
                         {% endif %}
                     </p>
                     {% if lesson.subject == 'Language' and not lesson.completed %}
                     <div class="mt-4">
-                        <h4 class="text-md font-semibold">Handwriting Practice</h4>
+                        <h4 class="text-md font-semibold">Handwriting Practice{% if session.language == 'bilingual' %} / Handskrif-oefening{% endif %}</h4>
                         <div class="flex flex-wrap gap-4 mt-2" id="tracing-area-{{ lesson.id }}">
                             {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
                             <div class="svg-container" data-letter="{{ letter }}">
@@ -73,7 +73,6 @@
                             </div>
                             {% endfor %}
                         </div>
-                        <button class="complete-btn mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" data-lesson-id="{{ lesson.id }}" disabled>Complete Lesson</button>
                     </div>
                     {% endif %}
                 </div>
@@ -86,39 +85,44 @@
         const tracingAreas = document.querySelectorAll('[id^="tracing-area-"]');
         const completedLetters = new Map();
 
-        function getTracingPath(letter) {
-            // Simplified path data for Quicksand-like font (smooth, rounded)
+        function get_tracing_path(letter) {
+            // Simplified smooth rounded paths mimicking Quicksand font (sans-serif, rounded edges)
             const paths = {
-                'A': 'M30 80 L50 20 L70 80 M40 60 L60 60',
-                'B': 'M30 20 V80 C50 80 70 60 70 40 C70 20 50 20 30 20',
-                'C': 'M70 20 C50 20 30 40 30 60 C30 80 50 80 70 80',
-                // Add more letters as needed; simplified for demo
-                'D': 'M30 20 V80 C50 80 70 60 70 40 C70 20 50 20 30 20',
-                'E': 'M30 20 V80 H70 M30 50 H60 M30 80 H70',
+                'A': 'M30 80 Q40 50 50 20 Q60 50 70 80 M40 60 H60',
+                'B': 'M30 20 V80 Q50 80 70 60 Q70 40 50 20 Q30 20 30 20',
+                'C': 'M70 20 Q50 20 30 40 Q30 60 50 80 Q70 80 70 60',
+                'D': 'M30 20 V80 Q50 80 70 60 Q70 20 50 20 H30',
+                'E': 'M70 20 H30 V80 H70 M30 50 H60',
                 'F': 'M30 20 V80 H60 M30 50 H60',
-                'G': 'M70 20 C50 20 30 40 30 60 C30 80 50 80 70 80 H50 V60',
+                'G': 'M70 20 Q50 20 30 40 Q30 80 70 80 H50 V60',
                 'H': 'M30 20 V80 M70 20 V80 M30 50 H70',
                 'I': 'M50 20 V80 M40 20 H60 M40 80 H60',
-                'J': 'M50 20 V60 C50 80 30 80 30 60',
-                'K': 'M30 20 V80 M70 20 L50 50 L70 80',
+                'J': 'M50 20 V60 Q50 80 30 80 Q20 80 20 70',
+                'K': 'M30 20 V80 M70 20 Q60 50 70 80',
                 'L': 'M30 20 V80 H70',
-                'M': 'M30 80 L40 20 H60 L70 80',
-                'N': 'M30 80 L30 20 L70 80 L70 20',
-                'O': 'M50 20 C70 20 70 80 50 80 C30 80 30 20 50 20',
-                'P': 'M30 20 V80 C50 20 70 40 30 40',
-                'Q': 'M50 20 C70 20 70 80 50 80 C30 80 30 20 50 20 M60 60 L70 80',
-                'R': 'M30 20 V80 C50 20 70 40 30 40 L70 80',
-                'S': 'M70 20 C50 20 30 40 70 40 C30 60 50 80 30 80',
+                'M': 'M30 80 Q35 50 40 20 H60 Q65 50 70 80',
+                'N': 'M30 80 V20 L70 80 V20',
+                'O': 'M50 20 Q70 20 70 50 Q70 80 50 80 Q30 80 30 50 Q30 20 50 20',
+                'P': 'M30 20 V80 Q50 20 70 40 Q50 40 30 40',
+                'Q': 'M50 20 Q70 20 70 50 Q70 80 50 80 Q30 80 30 50 Q30 20 50 20 M60 60 Q70 70 70 80',
+                'R': 'M30 20 V80 Q50 20 70 40 Q50 40 30 40 L70 80',
+                'S': 'M30 20 Q70 20 70 50 Q30 80 30 50',
                 'T': 'M30 20 H70 M50 20 V80',
-                'U': 'M30 20 V60 C30 80 70 80 70 60 V20',
+                'U': 'M30 20 Q30 80 50 80 Q70 80 70 20',
                 'V': 'M30 20 L50 80 L70 20',
-                'W': 'M30 20 L40 80 L50 40 L60 80 L70 20',
-                'X': 'M30 20 L70 80 M70 20 L30 80',
-                'Y': 'M30 20 L50 50 L70 20 M50 50 V80',
-                'Z': 'M30 20 H70 L30 80 H70'
+                'W': 'M30 20 L40 80 L50 20 L60 80 L70 20',
+                'X': 'M30 20 Q50 50 70 80 M70 20 Q50 50 30 80',
+                'Y': 'M30 20 Q50 50 50 50 L70 20 M50 50 V80',
+                'Z': 'M30 20 H70 Q50 50 70 80 H30'
             };
-            return paths[letter] || 'M50 20 V80'; // Fallback for undefined letters
+            return paths[letter] || 'M50 20 V80'; // Fallback
         }
+
+        // Replace Jinja placeholder with JS function
+        document.querySelectorAll('.trace-path').forEach(path => {
+            const letter = path.closest('.svg-container').dataset.letter;
+            path.setAttribute('d', get_tracing_path(letter));
+        });
 
         tracingAreas.forEach(area => {
             const lessonId = area.id.split('-')[2];
@@ -136,35 +140,33 @@
                 function startDrawing(e) {
                     isDrawing = true;
                     const rect = canvas.getBoundingClientRect();
-                    lastX = (e.clientX || e.touches[0].clientX) - rect.left;
-                    lastY = (e.clientY || e.touches[0].clientY) - rect.top;
+                    [lastX, lastY] = [e.clientX - rect.left || e.touches[0].clientX - rect.left, e.clientY - rect.top || e.touches[0].clientY - rect.top];
                 }
 
                 function draw(e) {
                     if (!isDrawing) return;
                     e.preventDefault();
                     const rect = canvas.getBoundingClientRect();
-                    const x = (e.clientX || e.touches[0].clientX) - rect.left;
-                    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+                    const x = e.clientX - rect.left || e.touches[0].clientX - rect.left;
+                    const y = e.clientY - rect.top || e.touches[0].clientY - rect.top;
 
                     ctx.beginPath();
                     ctx.moveTo(lastX, lastY);
                     ctx.lineTo(x, y);
                     ctx.stroke();
-                    lastX = x;
-                    lastY = y;
+                    [lastX, lastY] = [x, y];
 
-                    // Check if tracing is complete (simple coverage check)
+                    // Simple coverage check for completion
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const pixels = imageData.data;
                     let coloredPixels = 0;
                     for (let i = 3; i < pixels.length; i += 4) {
                         if (pixels[i] > 0) coloredPixels++;
                     }
-                    if (coloredPixels > (canvas.width * canvas.height * 0.2)) { // 20% coverage
+                    if (coloredPixels > (canvas.width * canvas.height * 0.2)) { // 20% coverage threshold
                         const letter = canvas.parentElement.dataset.letter;
                         completedLetters.get(lessonId).add(letter);
-                        canvas.style.pointerEvents = 'none'; // Disable further drawing
+                        canvas.style.pointerEvents = 'none';
                         checkLessonCompletion(lessonId);
                     }
                 }
@@ -186,23 +188,20 @@
         function checkLessonCompletion(lessonId) {
             const completed = completedLetters.get(lessonId);
             if (completed.size === letters.length) {
-                const completeBtn = document.querySelector(`button[data-lesson-id="${lessonId}"]`);
-                completeBtn.disabled = false;
-                completeBtn.addEventListener('click', () => {
-                    fetch(`/complete_lesson/${lessonId}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            alert('Failed to mark lesson as complete.');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error));
-                });
+                console.log(`Lesson ${lessonId} tracing completed`);
+                fetch(`/complete_lesson/${lessonId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        console.error('Failed to complete lesson');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
             }
         }
     </script>
