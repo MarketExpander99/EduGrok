@@ -10,6 +10,19 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 
+from flask import request, redirect, url_for, flash
+from flask_login import login_required
+import requests
+import logging
+from datetime import datetime
+from your_models import Lesson, db  # Assuming Lesson model and db from SQLAlchemy
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 # Load .env file for local development
 load_dotenv()
 
@@ -565,6 +578,66 @@ def phonics_game():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
+
+@app.route('/generate_lesson', methods=['POST'])
+@login_required
+def generate_lesson():
+    try:
+        data = request.form
+        grade = data.get('grade')
+        subject = data.get('subject')
+
+        if not grade or not subject:
+            flash('Grade and subject are required!', 'error')
+            return redirect(url_for('lessons'))
+
+        # Placeholder xAI API call
+        api_url = 'https://x.ai/api'  # Update with actual endpoint
+        headers = {'Authorization': 'Bearer YOUR_XAI_API_KEY'}  # Replace with secure key
+        payload = {
+            'grade': grade,
+            'subject': subject,
+            'curriculum': 'CAPS'
+        }
+
+        logger.info(f"Requesting lesson generation for grade {grade}, subject {subject}")
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+
+        if response.status_code != 200:
+            logger.error(f"xAI API request failed: {response.status_code} - {response.text}")
+            flash('Failed to generate lesson. Please try again later.', 'error')
+            return redirect(url_for('lessons'))
+
+        lesson_data = response.json()
+        lesson_content = lesson_data.get('content', 'No content provided')
+        lesson_title = lesson_data.get('title', f'{subject} Lesson for Grade {grade}')
+
+        # Insert into lessons table
+        new_lesson = Lesson(
+            title=lesson_title,
+            subject=subject,
+            content=lesson_content,
+            grade=grade,
+            user_id=current_user.id,  # Assuming Flask-Login
+            created_at=datetime.utcnow(),
+            completed=False
+        )
+        db.session.add(new_lesson)
+        db.session.commit()
+
+        logger.info(f"Lesson '{lesson_title}' created for user {current_user.id}")
+        flash('Lesson generated successfully!', 'success')
+        return redirect(url_for('lessons'))
+
+    except requests.RequestException as e:
+        logger.error(f"API call failed: {str(e)}")
+        flash('Error connecting to lesson generation service.', 'error')
+        return redirect(url_for('lessons'))
+    except Exception as e:
+        logger.error(f"Error generating lesson: {str(e)}")
+        db.session.rollback()
+        flash('An unexpected error occurred.', 'error')
+        return redirect(url_for('lessons'))
 
 # Enhanced error handling
 @app.errorhandler(500)
