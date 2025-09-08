@@ -28,6 +28,8 @@ handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=1)
 handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
 
 # Bad-word filter
 BAD_WORDS = ['bad', 'word']
@@ -41,11 +43,17 @@ def filter_content(content):
 # Get DB connection with persistent path
 def get_db():
     if 'db' not in g:
-        db_path = '/data/edugrok.db'  # Persistent on Render
-        if not os.path.exists('/data'):
-            os.makedirs('/data', exist_ok=True)
+        # Detect environment: Render sets RENDER=true
+        if 'RENDER' in os.environ:
+            db_path = '/data/edugrok.db'
+            print("Using Render persistent DB path: /data/edugrok.db")
+            logger.info("Using Render persistent DB path: /data/edugrok.db")
+        else:
+            db_path = 'edugrok.db'  # Local fallback to current dir
+            print("Using local DB path: edugrok.db")
+            logger.info("Using local DB path: edugrok.db")
         if not os.path.exists(db_path):
-            init_db()  # Seed if missing
+            print(f"DB not found at {db_path} - will init on first use")
         g.db = sqlite3.connect(db_path, timeout=10)
         g.db.execute('PRAGMA journal_mode=WAL;')
         g.db.row_factory = sqlite3.Row
@@ -56,6 +64,41 @@ def close_db(error):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+
+# Force DB Reset/Migration (temporary for local fix)
+def reset_db():
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        # Drop all tables
+        c.execute("DROP TABLE IF EXISTS user_points")
+        c.execute("DROP TABLE IF EXISTS user_likes")
+        c.execute("DROP TABLE IF EXISTS tests")
+        c.execute("DROP TABLE IF EXISTS lessons")
+        c.execute("DROP TABLE IF EXISTS posts")
+        c.execute("DROP TABLE IF EXISTS users")
+        conn.commit()
+        print("Dropped all tables - forcing fresh migration")
+        logger.info("Force reset: Dropped all tables")
+        
+        # Recreate via init_db
+        init_db()
+        seed_lessons()
+        check_db_schema()
+        print("DB reset complete - tables recreated and seeded")
+        logger.info("Force reset complete")
+    except Exception as e:
+        print(f"DB reset failed: {e}")
+        logger.error(f"DB reset failed: {e}")
+        conn.rollback()
+        raise
+
+@app.route('/reset_db')
+def reset_db_route():
+    if 'user_id' not in session:
+        return "Login required", 401
+    reset_db()
+    return redirect(url_for('home'))
 
 # Check database schema for QA
 def check_db_schema():
@@ -81,16 +124,15 @@ def check_db_schema():
             logger.error(f"Table {table} does not exist")
             raise ValueError(f"Table {table} missing")
     logger.debug("Database schema check passed")
+    print("Schema check passed")
 
-# Initialize and migrate SQLite database
+# Initialize and migrate SQLite database (called in reset/init)
 def init_db():
     conn = get_db()
     c = conn.cursor()
     try:
-        db_path = '/data/edugrok.db'
-        if not os.path.exists(db_path):
-            if os.path.exists('edugrok.db'):
-                shutil.copy('edugrok.db', db_path)
+        db_path = conn.execute("PRAGMA database_list").fetchall()[0][2]  # Get current DB path
+        print(f"Initializing DB at {db_path}")
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col for col in c.fetchall()}
         if not columns:
@@ -118,6 +160,7 @@ def init_db():
                 c.execute('DROP TABLE users')
                 c.execute('ALTER TABLE users_new RENAME TO users')
                 logger.debug("Migration completed")
+                print("Users table migrated")
         c.execute('''CREATE TABLE IF NOT EXISTS posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, subject TEXT, 
                       likes INTEGER DEFAULT 0, reported INTEGER DEFAULT 0, 
@@ -142,6 +185,7 @@ def init_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         conn.commit()
+        print("Tables created/updated")
 
         # Seed bot users
         bots = [
@@ -150,6 +194,7 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle) VALUES (?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
+        print("Bot users seeded")
 
         # Get bot IDs
         c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
@@ -164,8 +209,10 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO posts (user_id, content, subject, likes, reported) VALUES (?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
+        print("Bot posts seeded")
 
     except Exception as e:
+        print(f"Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
         conn.rollback()
         raise
@@ -187,7 +234,9 @@ def seed_lessons():
         c.executemany("INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, ?)", lessons)
         conn.commit()
         logger.debug("Seeded lessons successfully")
+        print("Lessons seeded")
     except sqlite3.OperationalError as e:
+        print(f"Seed lessons failed: {e}")
         logger.error(f"Seed lessons failed: {e}")
         conn.rollback()
         raise
@@ -199,8 +248,10 @@ def init_app():
             init_db()
             check_db_schema()
             seed_lessons()
+            print("App initialized successfully - DB ready")
             logger.info("App initialized successfully - DB ready")
         except Exception as e:
+            print(f"App init failed: {e}")
             logger.error(f"App init failed: {e}")
 
 init_app()
@@ -208,12 +259,16 @@ init_app()
 @app.route('/')
 def home():
     logger.debug("Accessing home route")
+    print("Home route called")
     if 'user_id' not in session:
+        print("No user session - redirecting to login")
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
+    print("Fetching posts...")
     c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
     posts_data = c.fetchall()
+    print(f"Fetched {len(posts_data)} posts from DB")
     posts = []
     user_id = session.get('user_id')
     for row in posts_data:
@@ -231,10 +286,15 @@ def home():
         else:
             post['liked_by_user'] = False
         posts.append(post)
-    c.execute("SELECT id, subject, content, completed FROM lessons WHERE user_id IS NULL OR user_id = ? AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
-    lesson = dict(c.fetchone()) if c.fetchone() else None
+    print(f"Processed {len(posts)} posts for template")
+    c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
+    lesson_row = c.fetchone()
+    lesson = dict(lesson_row) if lesson_row else None
+    print(f"Fetched lesson: {lesson['subject'] if lesson else 'None'}")
     c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
-    test = dict(c.fetchone()) if c.fetchone() else None
+    test_row = c.fetchone()
+    test = dict(test_row) if test_row else None
+    print(f"Fetched test: {test['score'] if test else 'None'}")
     return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -506,24 +566,17 @@ def phonics_game():
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
 
-@app.route('/logs')
-def show_logs():
-    if 'user_id' not in session or session.get('email') != 'admin@example.com':  # Restrict to admin
-        return "Unauthorized", 403
-    if os.path.exists('app.log'):
-        with open('app.log', 'r') as f:
-            return f.read()
-    return "No logs available", 404
-
 # Enhanced error handling
 @app.errorhandler(500)
 def internal_error(error):
     logger.error(f"Internal Server Error: {error} - Request: {request.url} - Session: {session}")
+    print(f"Internal Error: {error}")
     return render_template('error.html.j2', error="Failed to load feed. Please try again."), 500
 
 @app.errorhandler(404)
 def not_found_error(error):
     logger.error(f"404 Not Found: {request.url}")
+    print(f"404 Not Found: {request.url}")
     return render_template('error.html.j2', error="Page not found."), 404
 
 # Log all requests
