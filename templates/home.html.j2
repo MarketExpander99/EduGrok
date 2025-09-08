@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - EduGrok</title>
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <script>
+        function likePost(postId) {
+            fetch('/like/' + postId, { method: 'GET' })
+                .then(function(response) {
+                    if (response.redirected) {
+                        window.location.reload();
+                    } else {
+                        alert('Error liking post');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                });
+        }
+
+        function reportPost(postId) {
+            fetch('/report/' + postId, { method: 'GET' })
+                .then(function(response) {
+                    if (response.redirected) {
+                        window.location.reload();
+                    } else {
+                        alert('Error reporting post');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                });
+        }
+
+        function completeLesson(lessonId) {
+            fetch('/complete_lesson/' + lessonId, { method: 'GET' })
+                .then(function(response) {
+                    if (response.redirected) {
+                        window.location.reload();
+                    } else {
+                        alert('Error completing lesson');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+</head>
+<body class="min-h-screen {{ session.theme|default('astronaut') }} bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
+    <header class="bg-white dark:bg-gray-700 p-4 shadow">
+        <h1 class="text-3xl font-bold">EduGrok</h1>
+        <nav class="mt-2">
+            <a href="{{ url_for('home') }}" class="mr-4 text-blue-500 hover:underline">Home</a>
+            <a href="{{ url_for('lessons') }}" class="mr-4 text-blue-500 hover:underline">Lessons</a>
+            <a href="{{ url_for('profile') }}" class="text-blue-500 hover:underline">Profile</a>
+        </nav>
+    </header>
+
+    <div class="container mx-auto p-4">
+        <!-- Welcome Message -->
+        <div class="bg-white dark:bg-gray-700 p-4 mb-6 rounded shadow">
+            <h2 class="text-xl font-semibold">Welcome, {{ session.get('email', 'Guest') }}!</h2>
+            {% if subscribed %}
+                <p class="text-green-600 dark:text-green-300 mt-2">Subscribed to Premium</p>
+            {% endif %}
+        </div>
+
+        <!-- Active Lesson -->
+        {% if lesson %}
+            <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
+                <h2 class="text-xl font-semibold">{{ lesson.subject }}</h2>
+                <div class="mt-2">{{ lesson.content|safe }}</div>
+                <button onclick="completeLesson({{ lesson.id }})" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete Lesson</button>
+            </div>
+        {% endif %}
+
+        <!-- Recent Test -->
+        {% if test %}
+            <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
+                <h2 class="text-xl font-semibold">Latest Test</h2>
+                <p>Grade: {{ test.grade }}, Score: {{ test.score }}, Date: {{ test.date }}</p>
+            </div>
+        {% endif %}
+
+        <!-- Feed of Posts -->
+        <div class="space-y-4">
+            {% for post in posts %}
+                <div class="bg-white dark:bg-gray-700 p-4 rounded shadow">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-semibold">{{ post.handle }}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ post.subject }}</span>
+                    </div>
+                    <p class="mb-2">{{ post.content|safe }}</p>
+                    <div class="flex space-x-4">
+                        <button onclick="likePost({{ post.id }})" class="flex items-center {% if post.liked_by_user is defined and post.liked_by_user %}text-red-500{% else %}text-gray-500{% endif %} hover:text-red-600">
+                            ❤️ <span id="likes-{{ post.id }}" class="ml-1">{{ post.likes|default(0) }}</span>
+                        </button>
+                        <button onclick="reportPost({{ post.id }})" class="text-gray-500 hover:text-yellow-500">
+                            🚩 Report
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+            {% if not posts %}
+                <p class="text-center text-gray-500">No posts available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <footer class="bg-white dark:bg-gray-700 p-4 mt-6 text-center text-gray-500 dark:text-gray-400">
+        <p>&copy; 2025 EduGrok. All rights reserved.</p>
+    </footer>
+</body>
+</html>

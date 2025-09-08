@@ -1,18 +1,201 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Profile - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phonics Memory Match</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .card {
+            width: 100px;
+            height: 150px;
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .card-front {
+            background-color: #ccc;
+        }
+        .card-back {
+            background-color: #fff;
+            transform: rotateY(180deg);
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .dark .card-front {
+            background-color: #555;
+        }
+        .dark .card-back {
+            background-color: #333;
+            color: #fff;
+        }
+        .card.hidden {
+            visibility: hidden;
+        }
+    </style>
 </head>
-<body class="{{ theme }}">
-    <h1>Your Profile</h1>
-    <div class="profile-stat">Grade: {{ grade }}</div>
-    <div class="profile-stat">Avg Score: {{ avg_score }}</div>
-    <div class="profile-stat">Lessons Completed: {{ lessons_completed }}</div>
-    <div class="profile-stat">Games Played: {{ games_played }}</div>
-    <div class="profile-stat">Points: {{ points }}</div>
-    <div class="profile-stat">Theme: {{ theme }}</div>
-    <a href="/" class="btn">Back to Home</a>
+<body class="{% if theme == 'farm' %}bg-green-100 dark:bg-green-900{% elif theme == 'space' %}bg-black dark:bg-gray-900{% elif theme == 'astronaut' %}bg-blue-100 dark:bg-blue-900{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <header class="w-full max-w-4xl bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center rounded-t-lg">
+        <h1 class="text-2xl font-bold">Phonics Memory Match</h1>
+        <div class="flex items-center space-x-4">
+            <form action="/set_theme" method="POST" class="flex items-center">
+                <label for="theme" class="mr-2">Theme:</label>
+                <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
+                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
+                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                </select>
+                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
+            </form>
+        </div>
+    </header>
+    <main class="w-full max-w-4xl flex-1 bg-white dark:bg-gray-800 p-6 rounded-b-lg shadow-lg flex flex-col items-center">
+        <p class="text-lg mb-4">Match words that start with the same sound!</p>
+        <div id="game-board" class="grid grid-cols-4 gap-4 mb-4"></div>
+        <div id="message" class="text-xl font-semibold"></div>
+    </main>
+    <script>
+        const words = [
+            { word: 'moon', sound: 'm' },
+            { word: 'mars', sound: 'm' },
+            { word: 'sun', sound: 's' },
+            { word: 'saturn', sound: 's' },
+            { word: 'planet', sound: 'p' },
+            { word: 'pluto', sound: 'p' },
+            { word: 'earth', sound: 'e' },
+            { word: 'explorer', sound: 'e' }
+        ];
+
+        let board = document.getElementById('game-board');
+        let message = document.getElementById('message');
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+        let matches = 0;
+        const totalPairs = words.length / 2;
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createCard(item) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.sound = item.sound;
+
+            const inner = document.createElement('div');
+            inner.classList.add('card-inner');
+
+            const front = document.createElement('div');
+            front.classList.add('card-front');
+
+            const back = document.createElement('div');
+            back.classList.add('card-back');
+            back.textContent = item.word;
+
+            inner.appendChild(front);
+            inner.appendChild(back);
+            card.appendChild(inner);
+
+            card.addEventListener('click', flipCard);
+            return card;
+        }
+
+        function initGame() {
+            const shuffledWords = shuffle([...words]);
+            shuffledWords.forEach(item => {
+                board.appendChild(createCard(item));
+            });
+        }
+
+        function flipCard() {
+            if (lockBoard || this === firstCard || this.classList.contains('flipped')) return;
+
+            this.classList.add('flipped');
+
+            if (!firstCard) {
+                firstCard = this;
+            } else {
+                secondCard = this;
+                lockBoard = true;
+                checkForMatch();
+            }
+        }
+
+        function checkForMatch() {
+            if (firstCard.dataset.sound === secondCard.dataset.sound) {
+                disableCards();
+                matches++;
+                if (matches === totalPairs) {
+                    winGame();
+                }
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            setTimeout(() => {
+                firstCard.classList.add('hidden');
+                secondCard.classList.add('hidden');
+                resetBoard();
+            }, 500);
+        }
+
+        function unflipCards() {
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetBoard();
+            }, 1000);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard] = [null, null];
+            lockBoard = false;
+        }
+
+        function winGame() {
+            message.textContent = 'You won! +10 points';
+            fetch('/update_points', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ points: 10 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    console.error('Failed to update points');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        initGame();
+    </script>
 </body>
 </html>

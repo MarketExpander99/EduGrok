@@ -1,18 +1,254 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Boss Battle - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Spelling Invaders</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        canvas {
+            border: 1px solid #ccc;
+            max-width: 100%;
+            height: auto;
+        }
+        .dark canvas {
+            border-color: #555;
+        }
+    </style>
 </head>
-<body class="{{ theme }}">
-    <h1>Boss Battle ({{ difficulty }})</h1>
-    <div class="game-container">
-        <p>Score from test: {{ score }}</p>
-        <!-- Placeholder for future game JS -->
-    </div>
-    <div class="nav">
-        <a href="/" class="btn">Back to Home</a>
-    </div>
+<body class="{% if theme == 'farm' %}bg-green-100 dark:bg-green-900{% elif theme == 'space' %}bg-black dark:bg-gray-900{% elif theme == 'astronaut' %}bg-blue-100 dark:bg-blue-900{% else %}bg-black dark:bg-gray-900{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <header class="w-full max-w-lg bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center rounded-t-lg">
+        <h1 class="text-xl font-bold">Space Spelling Invaders</h1>
+        <div class="flex items-center space-x-4">
+            <form action="/set_theme" method="POST" class="flex items-center">
+                <label for="theme" class="mr-2">Theme:</label>
+                <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
+                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
+                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                </select>
+                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
+            </form>
+        </div>
+    </header>
+    <main class="w-full max-w-lg bg-white dark:bg-gray-800 p-6 rounded-b-lg shadow-lg flex flex-col items-center">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <p id="score" class="text-lg mt-4">Score: 0</p>
+        <p id="message" class="text-lg font-semibold mt-2"></p>
+        <div class="flex space-x-4 mt-4">
+            <button id="startBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Start Game</button>
+            <button id="restartBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 hidden">Restart</button>
+        </div>
+    </main>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const messageDisplay = document.getElementById('message');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        
+        const difficulty = new URLSearchParams(window.location.search).get('difficulty') || 'easy';
+        const isEasy = difficulty === 'easy';
+        const alienWords = isEasy ? ['CAT', 'DOG', 'SUN'] : ['MOON', 'STAR', 'PLANET', 'COMET'];
+        const alienRows = isEasy ? 2 : 3;
+        const alienCols = isEasy ? 3 : 4;
+        const alienSpeed = isEasy ? 0.5 : 1;
+        const pointsToAward = isEasy ? 5 : 15;
+
+        let player = { x: canvas.width / 2 - 25, y: canvas.height - 50, width: 50, height: 30, speed: 5 };
+        let bullets = [];
+        let aliens = [];
+        let score = 0;
+        let gameOver = false;
+        let gameStarted = false;
+        let lastTime = 0;
+
+        function initAliens() {
+            aliens = [];
+            for (let row = 0; row < alienRows; row++) {
+                for (let col = 0; col < alienCols; col++) {
+                    aliens.push({
+                        x: col * 80 + 50,
+                        y: row * 60 + 50,
+                        width: 50,
+                        height: 30,
+                        word: alienWords[Math.floor(Math.random() * alienWords.length)],
+                        alive: true
+                    });
+                }
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = '#00f';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function drawBullets() {
+            ctx.fillStyle = '#ff0';
+            bullets.forEach(bullet => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+        }
+
+        function drawAliens() {
+            ctx.fillStyle = '#0f0';
+            ctx.font = '16px Arial';
+            aliens.forEach(alien => {
+                if (alien.alive) {
+                    ctx.fillRect(alien.x, alien.y, alien.width, alien.height);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(alien.word, alien.x + 5, alien.y + 20);
+                    ctx.fillStyle = '#0f0';
+                }
+            });
+        }
+
+        function movePlayer(e) {
+            if (!gameStarted || gameOver) return;
+            if (e.key === 'ArrowLeft' && player.x > 0) player.x -= player.speed;
+            if (e.key === 'ArrowRight' && player.x < canvas.width - player.width) player.x += player.speed;
+            if (e.key === ' ') {
+                bullets.push({ x: player.x + player.width / 2 - 2.5, y: player.y, width: 5, height: 10 });
+            }
+        }
+
+        function updateBullets() {
+            bullets = bullets.filter(bullet => bullet.y > 0);
+            bullets.forEach(bullet => {
+                bullet.y -= 5;
+            });
+        }
+
+        function updateAliens(timestamp) {
+            if (isEasy) {
+                aliens.forEach(alien => {
+                    if (alien.alive) alien.x += alienSpeed;
+                    if (alien.x + alien.width > canvas.width || alien.x < 0) {
+                        aliens.forEach(a => { if (a.alive) a.y += 20; });
+                        alienSpeed = -alienSpeed;
+                    }
+                });
+            } else {
+                const elapsed = timestamp - lastTime;
+                if (elapsed > 1000) {
+                    aliens.forEach(alien => {
+                        if (alien.alive) alien.y += 10;
+                    });
+                    lastTime = timestamp;
+                }
+            }
+        }
+
+        function checkCollisions() {
+            bullets.forEach((bullet, bulletIdx) => {
+                aliens.forEach((alien, alienIdx) => {
+                    if (alien.alive &&
+                        bullet.x < alien.x + alien.width &&
+                        bullet.x + bullet.width > alien.x &&
+                        bullet.y < alien.y + alien.height &&
+                        bullet.y + bullet.height > alien.y) {
+                        alien.alive = false;
+                        bullets.splice(bulletIdx, 1);
+                        score += 10;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                    }
+                });
+            });
+        }
+
+        function checkGameOver() {
+            if (aliens.every(alien => !alien.alive)) {
+                gameOver = true;
+                messageDisplay.textContent = `You Win! +${pointsToAward} points`;
+                fetch('/update_points', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ points: pointsToAward })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) console.error('Failed to update points');
+                })
+                .catch(error => console.error('Error:', error));
+                startBtn.classList.add('hidden');
+                restartBtn.classList.remove('hidden');
+            }
+            aliens.forEach(alien => {
+                if (alien.alive && alien.y + alien.height > player.y) {
+                    gameOver = true;
+                    messageDisplay.textContent = 'Game Over!';
+                    startBtn.classList.add('hidden');
+                    restartBtn.classList.remove('hidden');
+                }
+            });
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameStarted || gameOver) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            drawBullets();
+            drawAliens();
+            updateBullets();
+            updateAliens(timestamp);
+            checkCollisions();
+            checkGameOver();
+            requestAnimationFrame(gameLoop);
+        }
+
+        startBtn.addEventListener('click', () => {
+            gameStarted = true;
+            startBtn.classList.add('hidden');
+            initAliens();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            gameStarted = false;
+            gameOver = false;
+            score = 0;
+            scoreDisplay.textContent = 'Score: 0';
+            messageDisplay.textContent = '';
+            bullets = [];
+            initAliens();
+            player.x = canvas.width / 2 - 25;
+            startBtn.classList.remove('hidden');
+            restartBtn.classList.add('hidden');
+        });
+
+        document.addEventListener('keydown', movePlayer);
+
+        // Mobile touch controls
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+        canvas.addEventListener('touchmove', (e) => {
+            if (!gameStarted || gameOver) return;
+            const touchX = e.touches[0].clientX;
+            const deltaX = touchX - touchStartX;
+            player.x += deltaX / 5;
+            player.x = Math.max(0, Math.min(player.x, canvas.width - player.width));
+            touchStartX = touchX;
+        });
+        canvas.addEventListener('touchend', () => {
+            if (!gameStarted || gameOver) return;
+            bullets.push({ x: player.x + player.width / 2 - 2.5, y: player.y, width: 5, height: 10 });
+        });
+
+        // Adjust canvas for mobile
+        function resizeCanvas() {
+            const maxWidth = window.innerWidth - 40;
+            const maxHeight = window.innerHeight - 200;
+            canvas.width = Math.min(400, maxWidth);
+            canvas.height = Math.min(500, maxHeight);
+            player.x = canvas.width / 2 - 25;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
 </body>
 </html>

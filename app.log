@@ -16,3 +16,20 @@ Home route failed: 'NoneType' object is not iterable
 Internal server error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.
 Home route failed: 'NoneType' object is not iterable
 Home route failed: 'NoneType' object is not iterable
+Invalid grade in session: None, defaulting to 1
+Invalid grade in session: None, defaulting to 1
+Lessons route failed: lessons.html
+Invalid grade in session: None, defaulting to 1
+Profile route failed: '>=' not supported between instances of 'NoneType' and 'int'
+Profile route failed: '>=' not supported between instances of 'NoneType' and 'int'
+Invalid grade in session: None, defaulting to 1
+Invalid grade in session: None, defaulting to 1
+Invalid grade in session: None, defaulting to 1
+Invalid credentials
+Invalid credentials
+Home route failed: No filter named 'filter_content'.
+Home route failed: No filter named 'filter_content'.
+Home route failed: No filter named 'filter_content'.
+Home route failed: No filter named 'filter_content'.
+Home route failed: home.html
+Home route failed: home.html
