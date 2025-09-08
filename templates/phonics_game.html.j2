@@ -11,6 +11,7 @@
             height: 150px;
             perspective: 1000px;
             cursor: pointer;
+            user-select: none;
         }
         .card-inner {
             position: relative;
@@ -32,6 +33,8 @@
             justify-content: center;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 1.2rem;
+            font-weight: bold;
         }
         .card-front {
             background-color: #ccc;
@@ -39,8 +42,6 @@
         .card-back {
             background-color: #fff;
             transform: rotateY(180deg);
-            font-size: 1.2rem;
-            font-weight: bold;
         }
         .dark .card-front {
             background-color: #555;
@@ -52,18 +53,27 @@
         .card.hidden {
             visibility: hidden;
         }
+        .farm .card-front {
+            background-color: #d2e3c8;
+        }
+        .space .card-front {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .card:focus {
+            outline: 2px solid blue;
+        }
     </style>
 </head>
-<body class="{% if theme == 'farm' %}bg-green-100 dark:bg-green-900{% elif theme == 'space' %}bg-black dark:bg-gray-900{% elif theme == 'astronaut' %}bg-blue-100 dark:bg-blue-900{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+<body class="{{ theme }} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
     <header class="w-full max-w-4xl bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center rounded-t-lg">
-        <h1 class="text-2xl font-bold">Phonics Memory Match</h1>
+        <h1 class="text-2xl font-bold">Phonics Memory Match (Grade {{ grade }})</h1>
         <div class="flex items-center space-x-4">
             <form action="/set_theme" method="POST" class="flex items-center">
                 <label for="theme" class="mr-2">Theme:</label>
                 <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
                     <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
                     <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
-                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                 </select>
                 <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
             </form>
@@ -75,24 +85,43 @@
         <div id="message" class="text-xl font-semibold"></div>
     </main>
     <script>
-        const words = [
-            { word: 'moon', sound: 'm' },
-            { word: 'mars', sound: 'm' },
-            { word: 'sun', sound: 's' },
-            { word: 'saturn', sound: 's' },
-            { word: 'planet', sound: 'p' },
-            { word: 'pluto', sound: 'p' },
-            { word: 'earth', sound: 'e' },
-            { word: 'explorer', sound: 'e' }
-        ];
+        const theme = '{{ theme }}';
+        const grade = {{ grade }};
 
-        let board = document.getElementById('game-board');
-        let message = document.getElementById('message');
+        let wordPairs = [];
+        if (theme === 'farm') {
+            wordPairs = [
+                { word: 'mule', sound: 'm' }, { word: 'mouse', sound: 'm' },
+                { word: 'sheep', sound: 's' }, { word: 'sow', sound: 's' },
+                { word: 'cow', sound: 'c' }, { word: 'chicken', sound: 'c' }
+            ];
+            if (grade >= 2) {
+                wordPairs.push({ word: 'pig', sound: 'p' }, { word: 'pony', sound: 'p' });
+            }
+            if (grade >= 3) {
+                wordPairs.push({ word: 'duck', sound: 'd' }, { word: 'dog', sound: 'd' });
+            }
+        } else { // space
+            wordPairs = [
+                { word: 'moon', sound: 'm' }, { word: 'mars', sound: 'm' },
+                { word: 'star', sound: 's' }, { word: 'saturn', sound: 's' },
+                { word: 'comet', sound: 'c' }, { word: 'cosmos', sound: 'c' }
+            ];
+            if (grade >= 2) {
+                wordPairs.push({ word: 'planet', sound: 'p' }, { word: 'pluto', sound: 'p' });
+            }
+            if (grade >= 3) {
+                wordPairs.push({ word: 'dark', sound: 'd' }, { word: 'dust', sound: 'd' });
+            }
+        }
+
+        const board = document.getElementById('game-board');
+        const message = document.getElementById('message');
         let firstCard = null;
         let secondCard = null;
         let lockBoard = false;
         let matches = 0;
-        const totalPairs = words.length / 2;
+        const totalPairs = wordPairs.length / 2;
 
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -106,12 +135,15 @@
             const card = document.createElement('div');
             card.classList.add('card');
             card.dataset.sound = item.sound;
+            card.tabIndex = 0;
+            card.setAttribute('aria-label', 'Memory card, unflipped');
 
             const inner = document.createElement('div');
             inner.classList.add('card-inner');
 
             const front = document.createElement('div');
             front.classList.add('card-front');
+            front.textContent = '?'; // Simple placeholder for low-bandwidth
 
             const back = document.createElement('div');
             back.classList.add('card-back');
@@ -122,20 +154,31 @@
             card.appendChild(inner);
 
             card.addEventListener('click', flipCard);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    flipCard.call(card);
+                }
+            });
+
             return card;
         }
 
         function initGame() {
-            const shuffledWords = shuffle([...words]);
+            const shuffledWords = shuffle([...wordPairs]);
             shuffledWords.forEach(item => {
                 board.appendChild(createCard(item));
             });
+            if (wordPairs.length > 8) {
+                board.classList.replace('grid-cols-4', 'grid-cols-6');
+            }
         }
 
         function flipCard() {
             if (lockBoard || this === firstCard || this.classList.contains('flipped')) return;
 
             this.classList.add('flipped');
+            this.setAttribute('aria-label', 'Memory card, flipped, showing ' + this.querySelector('.card-back').textContent);
 
             if (!firstCard) {
                 firstCard = this;
@@ -162,6 +205,8 @@
             setTimeout(() => {
                 firstCard.classList.add('hidden');
                 secondCard.classList.add('hidden');
+                firstCard.setAttribute('aria-hidden', 'true');
+                secondCard.setAttribute('aria-hidden', 'true');
                 resetBoard();
             }, 500);
         }
@@ -170,6 +215,8 @@
             setTimeout(() => {
                 firstCard.classList.remove('flipped');
                 secondCard.classList.remove('flipped');
+                firstCard.setAttribute('aria-label', 'Memory card, unflipped');
+                secondCard.setAttribute('aria-label', 'Memory card, unflipped');
                 resetBoard();
             }, 1000);
         }
