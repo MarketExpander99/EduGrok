@@ -1,20 +1,102 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Profile - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .reward-btn:disabled {
+            @apply opacity-50 cursor-not-allowed;
+        }
+        .stats-card {
+            @apply bg-white dark:bg-gray-800 p-4 rounded-lg shadow;
+        }
+    </style>
 </head>
-<body class="{{ theme }}">
-    <h1>Your Profile</h1>
-    <div class="nav">
-        <a href="/" class="btn">Back to Home</a>
-    </div>
-    <div class="profile-stat">Grade: {{ grade }}</div>
-    <div class="profile-stat">Avg Score: {{ avg_score }}</div>
-    <div class="profile-stat">Lessons Completed: {{ lessons_completed }}</div>
-    <div class="profile-stat">Games Played: {{ games_played }}</div>
-    <div class="profile-stat">Points: {{ points }}</div>
-    <div class="profile-stat">Theme: {{ theme }}</div>
+<body class="{% if theme == 'farm' %}farm{% elif theme == 'space' %}space{% elif theme == 'astronaut' %}astronaut{% else %}farm{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+    <header class="w-full bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Your Profile</h1>
+        <div class="flex items-center space-x-4">
+            <form action="/set_theme" method="POST" class="flex items-center">
+                <label for="theme" class="mr-2">Theme:</label>
+                <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
+                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
+                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                </select>
+                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
+            </form>
+        </div>
+    </header>
+    <main class="flex-1 p-4">
+        <section class="w-full max-w-4xl mx-auto">
+            <h2 class="text-xl font-semibold mb-4">Profile Overview</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="stats-card">
+                    <h3 class="text-lg font-bold">Stats</h3>
+                    <p>Lessons Completed: {{ user_stats.lessons_completed | default(0) }}</p>
+                    <p>Games Played: {{ user_stats.games_played | default(0) }}</p>
+                    <p>Average Score: {{ user_stats.avg_score | default(0) | round(2) }}%</p>
+                    <p>Grade: {{ user_stats.grade | default('Not set') }}</p>
+                    <p>Star Coins: <span id="star-coins">{{ user_stats.points | default(0) }}</span></p>
+                </div>
+                <div class="stats-card">
+                    <h3 class="text-lg font-bold">Reward Redemption</h3>
+                    <p>Spend 10 Star Coins to unlock a virtual badge!</p>
+                    <button id="redeem-btn" class="reward-btn mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" {% if user_stats.points < 10 %}disabled{% endif %}>Unlock Badge</button>
+                    <p id="redeem-message" class="text-sm mt-2"></p>
+                </div>
+            </div>
+            <h2 class="text-xl font-semibold mb-4">Completed Lessons</h2>
+            <div class="space-y-4">
+                {% if completed_lessons %}
+                {% for lesson in completed_lessons %}
+                <div class="stats-card">
+                    <h3 class="text-lg font-bold">{{ lesson.subject }} - {{ lesson.title }}</h3>
+                    <p class="mb-2">{{ lesson.content | truncate(100) | safe }}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Completed: {{ lesson.completed_at | default('N/A') }}</p>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-gray-600 dark:text-gray-400">No lessons completed yet.</p>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+    <script>
+        const redeemBtn = document.getElementById('redeem-btn');
+        const redeemMessage = document.getElementById('redeem-message');
+        const starCoinsDisplay = document.getElementById('star-coins');
+
+        redeemBtn.addEventListener('click', () => {
+            redeemBtn.disabled = true;
+            redeemMessage.textContent = 'Processing...';
+
+            fetch('/update_points', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ points: -10 }) // Deduct 10 points
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    redeemMessage.textContent = 'Badge unlocked! 10 Star Coins spent.';
+                    starCoinsDisplay.textContent = parseInt(starCoinsDisplay.textContent) - 10;
+                    if (parseInt(starCoinsDisplay.textContent) < 10) {
+                        redeemBtn.disabled = true;
+                    }
+                } else {
+                    redeemMessage.textContent = 'Failed to redeem reward. Try again.';
+                    redeemBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                redeemMessage.textContent = 'Error redeeming reward.';
+                redeemBtn.disabled = parseInt(starCoinsDisplay.textContent) >= 10;
+            });
+        });
+    </script>
 </body>
 </html>

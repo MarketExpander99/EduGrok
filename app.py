@@ -9,19 +9,7 @@ import re
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
-
-from flask import request, redirect, url_for, flash
-from flask_login import login_required
-import requests
-import logging
-from datetime import datetime
-from your_models import Lesson, db  # Assuming Lesson model and db from SQLAlchemy
-
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+import requests  # Added for API call
 
 # Load .env file for local development
 load_dotenv()
@@ -579,65 +567,43 @@ def phonics_game():
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
 
+# New route for generating lessons via xAI API
 @app.route('/generate_lesson', methods=['POST'])
-@login_required
 def generate_lesson():
+    logger.debug("Accessing generate_lesson route")
+    if 'user_id' not in session:
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+    grade = request.form.get('grade')
+    subject = request.form.get('subject')
+    if not grade or not subject or not grade.isdigit() or int(grade) not in [1, 2, 3]:
+        logger.error("Invalid grade or subject")
+        return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'))
     try:
-        data = request.form
-        grade = data.get('grade')
-        subject = data.get('subject')
-
-        if not grade or not subject:
-            flash('Grade and subject are required!', 'error')
-            return redirect(url_for('lessons'))
-
-        # Placeholder xAI API call
-        api_url = 'https://x.ai/api'  # Update with actual endpoint
-        headers = {'Authorization': 'Bearer YOUR_XAI_API_KEY'}  # Replace with secure key
+        # Placeholder API call to xAI (replace with real API key/token in production)
+        api_url = "https://x.ai/api"
+        headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}  # Replace with actual key
         payload = {
-            'grade': grade,
-            'subject': subject,
-            'curriculum': 'CAPS'
+            "grade": int(grade),
+            "subject": subject,
+            "language": "en"  # Extendable to Afrikaans if needed
         }
-
-        logger.info(f"Requesting lesson generation for grade {grade}, subject {subject}")
         response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-
-        if response.status_code != 200:
-            logger.error(f"xAI API request failed: {response.status_code} - {response.text}")
-            flash('Failed to generate lesson. Please try again later.', 'error')
-            return redirect(url_for('lessons'))
-
-        lesson_data = response.json()
-        lesson_content = lesson_data.get('content', 'No content provided')
-        lesson_title = lesson_data.get('title', f'{subject} Lesson for Grade {grade}')
-
-        # Insert into lessons table
-        new_lesson = Lesson(
-            title=lesson_title,
-            subject=subject,
-            content=lesson_content,
-            grade=grade,
-            user_id=current_user.id,  # Assuming Flask-Login
-            created_at=datetime.utcnow(),
-            completed=False
-        )
-        db.session.add(new_lesson)
-        db.session.commit()
-
-        logger.info(f"Lesson '{lesson_title}' created for user {current_user.id}")
-        flash('Lesson generated successfully!', 'success')
+        response.raise_for_status()
+        lesson_content = response.json().get("content", f"Generated {subject} lesson for Grade {grade}")
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, 0)", 
+                  (session['user_id'], grade, subject, lesson_content))
+        conn.commit()
+        logger.info(f"Generated lesson for user {session['user_id']}: {subject}")
         return redirect(url_for('lessons'))
-
-    except requests.RequestException as e:
-        logger.error(f"API call failed: {str(e)}")
-        flash('Error connecting to lesson generation service.', 'error')
-        return redirect(url_for('lessons'))
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API call failed: {e}")
+        return render_template('lessons.html.j2', error="Failed to generate lesson - check API", theme=session.get('theme', 'astronaut'))
     except Exception as e:
-        logger.error(f"Error generating lesson: {str(e)}")
-        db.session.rollback()
-        flash('An unexpected error occurred.', 'error')
-        return redirect(url_for('lessons'))
+        logger.error(f"Generate lesson failed: {e}")
+        conn.rollback()
+        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
 
 # Enhanced error handling
 @app.errorhandler(500)
