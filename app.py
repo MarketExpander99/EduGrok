@@ -48,15 +48,24 @@ def get_db():
             db_path = '/data/edugrok.db'
             print("Using Render persistent DB path: /data/edugrok.db")
             logger.info("Using Render persistent DB path: /data/edugrok.db")
-            # Ensure /data directory exists with proper permissions
-            os.makedirs('/data', exist_ok=True)
-            os.chmod('/data', 0o755)  # Set directory permissions (read/write for owner, read for others)
+            # Check if DB file is writable; create if missing within /data (assuming /data exists)
+            if not os.path.exists(db_path):
+                print(f"DB not found at {db_path} - attempting to create")
+                try:
+                    with open(db_path, 'a'):  # Create empty file if it doesn't exist
+                        pass
+                    print(f"Created DB file at {db_path}")
+                    logger.info(f"Created DB file at {db_path}")
+                except PermissionError as e:
+                    print(f"Permission denied creating DB at {db_path}: {e}")
+                    logger.error(f"Permission denied creating DB at {db_path}: {e}")
+                    raise
         else:
             db_path = 'edugrok.db'
             print("Using local DB path: edugrok.db")
             logger.info("Using local DB path: edugrok.db")
-        if not os.path.exists(db_path):
-            print(f"DB not found at {db_path} - will init on first use")
+            if not os.path.exists(db_path):
+                print(f"DB not found at {db_path} - will init on first use")
         g.db = sqlite3.connect(db_path, timeout=10)
         g.db.execute('PRAGMA journal_mode=WAL;')
         g.db.row_factory = sqlite3.Row
@@ -258,7 +267,7 @@ def init_app():
         except Exception as e:
             print(f"App init failed: {e}")
             logger.error(f"App init failed: {e}")
-            raise  # Re-raise to ensure 500 is logged with details
+            raise
 
 init_app()
 
@@ -549,7 +558,7 @@ def lessons():
     c = conn.cursor()
     c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
     lessons_list = [dict(row) for row in c.fetchall()]
-    return render_template('lessons.html.j2', lessons=lessons_list, theme=service.get('theme', 'astronaut'))
+    return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'))
 
 @app.route('/update_points')
 def update_points():
