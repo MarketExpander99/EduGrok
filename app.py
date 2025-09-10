@@ -9,7 +9,7 @@ import re
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
-import requests  # Added for API call
+import requests
 
 # Load .env file for local development
 load_dotenv()
@@ -44,13 +44,15 @@ def filter_content(content):
 # Get DB connection with persistent path
 def get_db():
     if 'db' not in g:
-        # Detect environment: Render sets RENDER=true
         if 'RENDER' in os.environ:
             db_path = '/data/edugrok.db'
             print("Using Render persistent DB path: /data/edugrok.db")
             logger.info("Using Render persistent DB path: /data/edugrok.db")
+            # Ensure /data directory exists with proper permissions
+            os.makedirs('/data', exist_ok=True)
+            os.chmod('/data', 0o755)  # Set directory permissions (read/write for owner, read for others)
         else:
-            db_path = 'edugrok.db'  # Local fallback to current dir
+            db_path = 'edugrok.db'
             print("Using local DB path: edugrok.db")
             logger.info("Using local DB path: edugrok.db")
         if not os.path.exists(db_path):
@@ -71,7 +73,6 @@ def reset_db():
     conn = get_db()
     c = conn.cursor()
     try:
-        # Drop all tables
         c.execute("DROP TABLE IF EXISTS user_points")
         c.execute("DROP TABLE IF EXISTS user_likes")
         c.execute("DROP TABLE IF EXISTS tests")
@@ -81,8 +82,6 @@ def reset_db():
         conn.commit()
         print("Dropped all tables - forcing fresh migration")
         logger.info("Force reset: Dropped all tables")
-        
-        # Recreate via init_db
         init_db()
         seed_lessons()
         check_db_schema()
@@ -127,12 +126,12 @@ def check_db_schema():
     logger.debug("Database schema check passed")
     print("Schema check passed")
 
-# Initialize and migrate SQLite database (called in reset/init)
+# Initialize and migrate SQLite database
 def init_db():
     conn = get_db()
     c = conn.cursor()
     try:
-        db_path = conn.execute("PRAGMA database_list").fetchall()[0][2]  # Get current DB path
+        db_path = conn.execute("PRAGMA database_list").fetchall()[0][2]
         print(f"Initializing DB at {db_path}")
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col for col in c.fetchall()}
@@ -212,6 +211,11 @@ def init_db():
         conn.commit()
         print("Bot posts seeded")
 
+    except sqlite3.Error as e:
+        print(f"SQLite error during init_db: {e}")
+        logger.error(f"SQLite error during init_db: {e}")
+        conn.rollback()
+        raise
     except Exception as e:
         print(f"Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
@@ -254,6 +258,7 @@ def init_app():
         except Exception as e:
             print(f"App init failed: {e}")
             logger.error(f"App init failed: {e}")
+            raise  # Re-raise to ensure 500 is logged with details
 
 init_app()
 
@@ -511,25 +516,30 @@ def profile():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
-    lessons_completed = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
-    total_lessons = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM tests WHERE user_id = ?", (session['user_id'],))
-    games_played = c.fetchone()[0]
-    c.execute("SELECT AVG(score) FROM tests WHERE user_id = ?", (session['user_id'],))
-    avg_score = round(c.fetchone()[0] or 0, 1)
-    grade_letter = 'A' if session['grade'] >= 3 else 'B' if session['grade'] == 2 else 'C'
-    c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
-    result = c.fetchone()
-    points = result['points'] if result else 0
-    return render_template('profile.html.j2', 
-                           lessons_completed=f"{lessons_completed}/{total_lessons}",
-                           games_played=games_played,
-                           avg_score=avg_score,
-                           grade=grade_letter,
-                           theme=session['theme'],
-                           points=points)
+    try:
+        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
+        lessons_completed = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
+        total_lessons = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM tests WHERE user_id = ?", (session['user_id'],))
+        games_played = c.fetchone()[0]
+        c.execute("SELECT AVG(score) FROM tests WHERE user_id = ?", (session['user_id'],))
+        avg_score = round(c.fetchone()[0] or 0, 1)
+        grade_letter = 'A' if session['grade'] >= 3 else 'B' if session['grade'] == 2 else 'C'
+        c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
+        result = c.fetchone()
+        points = result['points'] if result else 0
+        return render_template('profile.html.j2', 
+                               lessons_completed=f"{lessons_completed}/{total_lessons}",
+                               games_played=games_played,
+                               avg_score=avg_score,
+                               grade=grade_letter,
+                               theme=session['theme'],
+                               points=points)
+    except Exception as e:
+        logger.error(f"Profile route failed: {e} - Session: {session}")
+        print(f"Profile error: {e}")
+        return render_template('error.html.j2', error="Failed to load profile. Try resetting DB."), 500
 
 @app.route('/lessons')
 def lessons():
@@ -539,7 +549,7 @@ def lessons():
     c = conn.cursor()
     c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
     lessons_list = [dict(row) for row in c.fetchall()]
-    return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'))
+    return render_template('lessons.html.j2', lessons=lessons_list, theme=service.get('theme', 'astronaut'))
 
 @app.route('/update_points')
 def update_points():
@@ -567,7 +577,6 @@ def phonics_game():
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
 
-# New route for generating lessons via xAI API
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
     logger.debug("Accessing generate_lesson route")
@@ -579,13 +588,12 @@ def generate_lesson():
         logger.error("Invalid grade or subject")
         return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'))
     try:
-        # Placeholder API call to xAI (replace with real API key/token in production)
         api_url = "https://x.ai/api"
-        headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}  # Replace with actual key
+        headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}
         payload = {
             "grade": int(grade),
             "subject": subject,
-            "language": "en"  # Extendable to Afrikaans if needed
+            "language": "en"
         }
         response = requests.post(api_url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
