@@ -586,6 +586,8 @@ def phonics_game():
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
 
+
+
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
     logger.debug("Accessing generate_lesson route")

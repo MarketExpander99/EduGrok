@@ -43,3 +43,5 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-09-08 13:05:05,638 - __main__ - ERROR - 404 Not Found: http://localhost:5000/set_theme
 2025-09-10 10:57:08,079 - __main__ - ERROR - Internal Server Error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application. - Request: http://localhost:5000/profile - Session: <SecureCookieSession {'email': 'test@test.com', 'grade': 1, 'theme': 'astronaut', 'user_id': 15}>
 2025-09-10 11:41:24,165 - __main__ - ERROR - Profile route failed: 'user_stats' is undefined - Session: <SecureCookieSession {'email': 'test@test.com', 'grade': 1, 'theme': 'astronaut', 'user_id': 15}>
+2025-09-11 10:55:44,562 - __main__ - ERROR - 404 Not Found: http://localhost:5000/favicon.ico
+2025-09-11 10:55:47,073 - __main__ - ERROR - Invalid credentials
