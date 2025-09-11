@@ -1,7 +1,7 @@
 import os
 import secrets
 import shutil
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import sqlite3
@@ -585,8 +585,6 @@ def phonics_game():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
-
-
 
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
