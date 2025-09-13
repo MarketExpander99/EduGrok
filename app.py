@@ -1,7 +1,7 @@
 import os
 import secrets
 import shutil
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g, send_from_directory, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import sqlite3
@@ -48,11 +48,10 @@ def get_db():
             db_path = '/data/edugrok.db'
             print("Using Render persistent DB path: /data/edugrok.db")
             logger.info("Using Render persistent DB path: /data/edugrok.db")
-            # Check if DB file is writable; create if missing within /data (assuming /data exists)
             if not os.path.exists(db_path):
                 print(f"DB not found at {db_path} - attempting to create")
                 try:
-                    with open(db_path, 'a'):  # Create empty file if it doesn't exist
+                    with open(db_path, 'a'):
                         pass
                     print(f"Created DB file at {db_path}")
                     logger.info(f"Created DB file at {db_path}")
@@ -77,7 +76,7 @@ def close_db(error):
     if db is not None:
         db.close()
 
-# Force DB Reset/Migration (temporary for local fix)
+# Force DB Reset/Migration
 def reset_db():
     conn = get_db()
     c = conn.cursor()
@@ -118,7 +117,7 @@ def check_db_schema():
     expected = {
         'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
         'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER DEFAULT 0',
-        'handle': 'TEXT'
+        'handle': 'TEXT', 'language': 'TEXT'
     }
     for col, col_type in expected.items():
         if col not in columns:
@@ -148,19 +147,19 @@ def init_db():
             logger.debug("Creating users table")
             c.execute('''CREATE TABLE users 
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT)''')
+                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, language TEXT DEFAULT 'en')''')
         else:
-            missing_cols = [col for col in ['grade', 'theme', 'subscribed', 'handle'] if col not in columns]
+            missing_cols = [col for col in ['grade', 'theme', 'subscribed', 'handle', 'language'] if col not in columns]
             if missing_cols:
                 logger.debug(f"Migrating users table to add columns: {missing_cols}")
                 c.execute("DROP TABLE IF EXISTS users_new")
                 c.execute('''CREATE TABLE users_new 
                              (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT)''')
+                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, language TEXT DEFAULT 'en')''')
                 old_cols = [col for col in columns if col != 'id']
                 insert_cols = old_cols + missing_cols
                 insert_cols_str = ', '.join(insert_cols)
-                select_cols = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' if col == 'subscribed' else "email" for col in insert_cols])
+                select_cols = ', '.join([col if col in old_cols else 'NULL' if col == 'grade' else "'astronaut'" if col == 'theme' else '0' if col == 'subscribed' else "email" if col == 'handle' else "'en'" for col in insert_cols])
                 c.execute(f"INSERT INTO users_new (id, {insert_cols_str}) SELECT id, {select_cols} FROM users")
                 c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
                 for user_id, plaintext in c.fetchall():
@@ -198,18 +197,12 @@ def init_db():
 
         # Seed bot users
         bots = [
-            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz'),
-            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu'),
+            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en'),
+            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en'),
         ]
-        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle) VALUES (?, ?, ?, ?, ?, ?)", bots)
+        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language) VALUES (?, ?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
         print("Bot users seeded")
-
-        # Get bot IDs
-        c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
-        skykidz_id = c.fetchone()[0]
-        c.execute("SELECT id FROM users WHERE email = 'grokedu@example.com'")
-        grokedu_id = c.fetchone()[0]
 
         # Seed bot posts
         bot_posts = [
@@ -231,17 +224,17 @@ def init_db():
         conn.rollback()
         raise
 
-# Seed CAPS-aligned lessons
+# Seed CAPS-aligned lessons with bilingual content
 def seed_lessons():
     conn = get_db()
     c = conn.cursor()
     lessons = [
-        (None, 1, 'math', 'Grade 1: Farm Addition<br>Solve: 2 + 3 = ?<br>Explanation: Imagine 2 apples + 3 more = 5!<br><video controls><source src="/static/mock-farm-video.mp4" type="video/mp4"></video>', 0),
-        (None, 1, 'language', 'Grade 1: Farm Spelling<br>Spell "cat".<br>Hint: Sounds like /k/ /a/ /t/.<br><img src="/static/cat.png">', 0),
-        (None, 1, 'language', 'Grade 1: Phonics - M Sounds<br>Match words starting with M!<br>After this, play the Mars Memory Match game.', 0),
-        (None, 2, 'science', 'Grade 2: Solar System<br>Name a planet in our solar system.<br>Explanation: Earth is our home!<br><iframe width="560" height="315" src="https://www.youtube.com/embed/mock-video" title="Planet Explanation" frameborder="0" allowfullscreen></iframe>', 0),
-        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br><video controls><source src="/static/mock-sub-video.mp4" type="video/mp4"></video>', 0),
-        (None, 3, 'language', 'Grade 3: Write a Story<br>Write a short sentence about the sun.<br>Example: The sun is bright and warm.', 0),
+        (None, 1, 'math', 'Grade 1: Farm Addition<br>Solve: 2 + 3 = ?<br>Explanation: Imagine 2 apples + 3 more = 5!<br>Afrikaans: Graad 1: Plaas Optelling<br>Oplos: 2 + 3 = ?<br>Verduideliking: Stel jou voor 2 appels + 3 meer = 5!', 0),
+        (None, 1, 'language', 'Grade 1: Farm Spelling<br>Spell "cat".<br>Hint: Sounds like /k/ /a/ /t/.<br>Afrikaans: Graad 1: Plaas Spelling<br>Spel "kat".<br>Wenk: Klink soos /k/ /a/ /t/.', 0),
+        (None, 1, 'language', 'Grade 1: Phonics - M Sounds<br>Match words starting with M!<br>Afrikaans: Graad 1: Fonika - M Klanke<br>Pas woorde wat met M begin!<br>After this, play the Mars Memory Match game.', 0),
+        (None, 2, 'science', 'Grade 2: Solar System<br>Name a planet in our solar system.<br>Explanation: Earth is our home!<br>Afrikaans: Graad 2: Sonnestelsel<br>Noem ’n planeet in ons sonnestelsel.<br>Verduideliking: Aarde is ons huis!', 0),
+        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0),
+        (None, 3, 'language', 'Grade 3: Write a Story<br>Write a short sentence about the sun.<br>Example: The sun is bright and warm.<br>Afrikaans: Graad 3: Skryf ’n Storie<br>Skryf ’n kort sin oor die son.<br>Voorbeeld: Die son is helder en warm.', 0),
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
@@ -310,7 +303,11 @@ def home():
     test_row = c.fetchone()
     test = dict(test_row) if test_row else None
     print(f"Fetched test: {test['score'] if test else 'None'}")
-    return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'))
+    return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=session.get('subscribed', False), theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+
+@app.route('/landing')
+def landing():
+    return render_template('landing.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -319,26 +316,28 @@ def register():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         theme = request.form.get('theme', 'astronaut')
+        language = request.form.get('language', 'en')
         hashed_password = generate_password_hash(password)
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password, theme, handle) VALUES (?, ?, ?, ?)", (email, hashed_password, theme, email))
+            c.execute("INSERT INTO users (email, password, theme, handle, language) VALUES (?, ?, ?, ?, ?)", (email, hashed_password, theme, email, language))
             conn.commit()
             user_id = c.lastrowid
             session['user_id'] = user_id
             session['email'] = email
             session['theme'] = theme
+            session['language'] = language
             logger.debug(f"Registered user: {email}")
             return redirect(url_for('assess'))
         except sqlite3.IntegrityError:
             logger.error("Email already in use")
-            return render_template('register.html.j2', error="Email already in use", theme=theme)
+            return render_template('register.html.j2', error="Email already in use", theme=theme, language=language)
         except Exception as e:
             logger.error(f"Register failed: {e}")
             conn.rollback()
-            return render_template('register.html.j2', error="Server error", theme=theme)
-    return render_template('register.html.j2', theme=session.get('theme', 'astronaut'))
+            return render_template('register.html.j2', error="Server error", theme=theme, language=language)
+    return render_template('register.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -349,7 +348,7 @@ def login():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("SELECT id, password, grade, theme, subscribed FROM users WHERE email = ?", (email,))
+            c.execute("SELECT id, password, grade, theme, subscribed, language FROM users WHERE email = ?", (email,))
             user = c.fetchone()
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = user['id']
@@ -357,31 +356,76 @@ def login():
                 session['theme'] = user['theme']
                 session['subscribed'] = bool(user['subscribed'])
                 session['email'] = email
+                session['language'] = user['language']
                 logger.debug(f"Logged in user: {email}")
                 return redirect(url_for('home'))
             logger.error("Invalid credentials")
-            return render_template('login.html.j2', error="Invalid credentials", theme=session.get('theme', 'astronaut'))
+            return render_template('login.html.j2', error="Invalid credentials", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         except Exception as e:
             logger.error(f"Login failed: {e}")
             conn.rollback()
-            return render_template('login.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
-    return render_template('login.html.j2', theme=session.get('theme', 'astronaut'))
+            return render_template('login.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    return render_template('login.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/logout')
 def logout():
     logger.debug("Logging out")
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('landing'))
+
+@app.route('/set_theme', methods=['POST'])
+def set_theme():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    theme = request.form.get('theme')
+    if theme not in ['farm', 'space', 'astronaut']:
+        flash('Invalid theme', 'error')
+        return redirect(request.referrer or url_for('home'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session['user_id']))
+        conn.commit()
+        session['theme'] = theme
+        logger.info(f"Theme updated to {theme} for user {session['user_id']}")
+        return redirect(request.referrer or url_for('home'))
+    except Exception as e:
+        logger.error(f"Theme update failed: {e}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(request.referrer or url_for('home'))
+
+@app.route('/set_language', methods=['POST'])
+def set_language():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    language = request.form.get('language')
+    if language not in ['en', 'bilingual']:
+        flash('Invalid language', 'error')
+        return redirect(request.referrer or url_for('home'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE users SET language = ? WHERE id = ?", (language, session['user_id']))
+        conn.commit()
+        session['language'] = language
+        logger.info(f"Language updated to {language} for user {session['user_id']}")
+        return redirect(request.referrer or url_for('home'))
+    except Exception as e:
+        logger.error(f"Language update failed: {e}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(request.referrer or url_for('home'))
 
 @app.route('/post', methods=['POST'])
 def create_post():
     logger.debug("Creating post")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     content = filter_content(request.form.get('content', ''))
     subject = request.form.get('subject', '')
     if not content or not subject:
-        return render_template('home.html.j2', error="Content and subject are required", theme=session.get('theme', 'astronaut'))
+        return render_template('home.html.j2', error="Content and subject are required", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -391,19 +435,19 @@ def create_post():
     except Exception as e:
         logger.error(f"Create post failed: {e}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/like/<int:post_id>')
 def like_post(post_id):
     logger.debug(f"Liking post {post_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
         if c.fetchone():
-            return render_template('home.html.j2', error="Already liked", theme=session.get('theme', 'astronaut'))
+            return render_template('home.html.j2', error="Already liked", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         c.execute("INSERT INTO user_likes (user_id, post_id) VALUES (?, ?)", (session['user_id'], post_id))
         c.execute("UPDATE posts SET likes = likes + 1 WHERE id = ?", (post_id,))
         conn.commit()
@@ -411,13 +455,13 @@ def like_post(post_id):
     except Exception as e:
         logger.error(f"Like post failed: {e}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/report/<int:post_id>')
 def report_post(post_id):
     logger.debug(f"Reporting post {post_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -427,7 +471,7 @@ def report_post(post_id):
     except Exception as e:
         logger.error(f"Report post failed: {e}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/assess', methods=['GET', 'POST'])
 def assess():
@@ -448,7 +492,7 @@ def assess():
         except Exception as e:
             logger.error(f"Assess failed: {e}")
             conn.rollback()
-            return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'))
+            return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
         {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
         {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
@@ -461,13 +505,13 @@ def assess():
         {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
         {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"},
     ]
-    return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'))
+    return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/complete_lesson/<int:lesson_id>')
 def complete_lesson(lesson_id):
     logger.debug(f"Completing lesson {lesson_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -478,7 +522,7 @@ def complete_lesson(lesson_id):
     except Exception as e:
         logger.error(f"Complete lesson failed: {e}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/test', methods=['GET', 'POST'])
 def take_test():
@@ -500,7 +544,7 @@ def take_test():
         except Exception as e:
             logger.error(f"Test failed: {e}")
             conn.rollback()
-            return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'))
+            return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
         {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
         {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
@@ -508,7 +552,7 @@ def take_test():
         {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
         {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
     ]
-    return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'))
+    return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/game')
 def game():
@@ -517,7 +561,7 @@ def game():
         return redirect(url_for('login'))
     score = int(request.args.get('score', 0))
     difficulty = 'easy' if score < 3 else 'hard'
-    return render_template('game.html.j2', difficulty=difficulty, theme=session.get('theme', 'astronaut'), score=score)
+    return render_template('game.html.j2', difficulty=difficulty, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'), score=score)
 
 @app.route('/profile')
 def profile():
@@ -544,11 +588,36 @@ def profile():
                                avg_score=avg_score,
                                grade=grade_letter,
                                theme=session['theme'],
+                               language=session.get('language', 'en'),
                                points=points)
     except Exception as e:
         logger.error(f"Profile route failed: {e} - Session: {session}")
         print(f"Profile error: {e}")
-        return render_template('error.html.j2', error="Failed to load profile. Try resetting DB."), 500
+        return render_template('error.html.j2', error="Failed to load profile. Try resetting DB.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+
+@app.route('/parent_dashboard')
+def parent_dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        c.execute("""
+            SELECT 
+                COUNT(*) as total_lessons,
+                SUM(CASE WHEN completed=1 THEN 1 ELSE 0 END) as completed_lessons,
+                AVG(t.score) as avg_test_score,
+                COALESCE(p.points, 0) as total_points
+            FROM lessons l 
+            LEFT JOIN tests t ON l.user_id = t.user_id AND l.grade = t.grade
+            LEFT JOIN user_points p ON l.user_id = p.user_id
+            WHERE l.user_id = ? AND l.grade = ?
+        """, (session['user_id'], session['grade']))
+        stats = c.fetchone()
+        return render_template('parent_dashboard.html.j2', stats=stats, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    except Exception as e:
+        logger.error(f"Parent dashboard failed: {e}")
+        return render_template('error.html.j2', error="Failed to load dashboard.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/lessons')
 def lessons():
@@ -558,44 +627,45 @@ def lessons():
     c = conn.cursor()
     c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
     lessons_list = [dict(row) for row in c.fetchall()]
-    return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'))
+    return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
-@app.route('/update_points')
+@app.route('/update_points', methods=['POST'])
 def update_points():
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
-    points_award = int(request.args.get('points', 0))
-    if points_award <= 0 or points_award > 20:
-        return render_template('home.html.j2', error="Invalid points", theme=session.get('theme', 'astronaut'))
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     try:
+        data = request.get_json()
+        points_award = int(data.get('points', 0))
+        if points_award <= 0 or points_award > 20:
+            return jsonify({'success': False, 'error': 'Invalid points'}), 400
         conn = get_db()
         c = conn.cursor()
         c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", 
                   (session['user_id'], session['user_id'], points_award))
         conn.commit()
-        return "Points updated", 200
+        logger.info(f"Awarded {points_award} points to user {session['user_id']}")
+        return jsonify({'success': True}), 200
     except Exception as e:
         logger.error(f"Update points failed: {e}")
-        conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/phonics_game')
 def phonics_game():
     logger.debug("Accessing phonics game route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('phonics_game.html.j2', theme=session['theme'], grade=session['grade'])
+    return render_template('phonics_game.html.j2', theme=session.get('theme', 'astronaut'), grade=session.get('grade', 1), language=session.get('language', 'en'))
 
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
     logger.debug("Accessing generate_lesson route")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'))
+        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     grade = request.form.get('grade')
     subject = request.form.get('subject')
     if not grade or not subject or not grade.isdigit() or int(grade) not in [1, 2, 3]:
         logger.error("Invalid grade or subject")
-        return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'))
+        return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
         api_url = "https://x.ai/api"
         headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}
@@ -607,6 +677,8 @@ def generate_lesson():
         response = requests.post(api_url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
         lesson_content = response.json().get("content", f"Generated {subject} lesson for Grade {grade}")
+        if session.get('language') == 'bilingual':
+            lesson_content += f"<br>Afrikaans: Gegenereerde {subject} les vir Graad {grade}"
         conn = get_db()
         c = conn.cursor()
         c.execute("INSERT INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, 0)", 
@@ -616,24 +688,28 @@ def generate_lesson():
         return redirect(url_for('lessons'))
     except requests.exceptions.RequestException as e:
         logger.error(f"API call failed: {e}")
-        return render_template('lessons.html.j2', error="Failed to generate lesson - check API", theme=session.get('theme', 'astronaut'))
+        return render_template('lessons.html.j2', error="Failed to generate lesson - check API", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Generate lesson failed: {e}")
         conn.rollback()
-        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'))
+        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 # Enhanced error handling
 @app.errorhandler(500)
 def internal_error(error):
     logger.error(f"Internal Server Error: {error} - Request: {request.url} - Session: {session}")
     print(f"Internal Error: {error}")
-    return render_template('error.html.j2', error="Failed to load feed. Please try again."), 500
+    return render_template('error.html.j2', error="Failed to load feed. Please try again.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.errorhandler(404)
 def not_found_error(error):
     logger.error(f"404 Not Found: {request.url}")
     print(f"404 Not Found: {request.url}")
-    return render_template('error.html.j2', error="Page not found."), 404
+    return render_template('error.html.j2', error="Page not found.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 404
 
 # Log all requests
 @app.before_request

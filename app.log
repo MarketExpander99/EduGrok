@@ -45,3 +45,4 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-09-10 11:41:24,165 - __main__ - ERROR - Profile route failed: 'user_stats' is undefined - Session: <SecureCookieSession {'email': 'test@test.com', 'grade': 1, 'theme': 'astronaut', 'user_id': 15}>
 2025-09-11 10:55:44,562 - __main__ - ERROR - 404 Not Found: http://localhost:5000/favicon.ico
 2025-09-11 10:55:47,073 - __main__ - ERROR - Invalid credentials
+2025-09-11 12:31:00,040 - __main__ - ERROR - 404 Not Found: http://localhost:5000/set_theme
