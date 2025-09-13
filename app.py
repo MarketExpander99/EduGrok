@@ -202,13 +202,26 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language) VALUES (?, ?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
-        print("Bot users seeded")
+        print("Bot users inserted")
 
         # Fetch bot user IDs
         c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
-        skykidz_id = c.fetchone()[0] if c.fetchone() else 1
+        skykidz_row = c.fetchone()
+        skykidz_id = skykidz_row['id'] if skykidz_row else None
         c.execute("SELECT id FROM users WHERE email = 'grokedu@example.com'")
-        grokedu_id = c.fetchone()[0] if c.fetchone() else 2
+        grokedu_row = c.fetchone()
+        grokedu_id = grokedu_row['id'] if grokedu_row else None
+
+        # Check if bot users were inserted successfully
+        if skykidz_id is None or grokedu_id is None:
+            logger.error("Failed to retrieve bot user IDs. SkyKidz ID: %s, GrokEdu ID: %s", skykidz_id, grokedu_id)
+            c.execute("SELECT email, id FROM users")
+            users = c.fetchall()
+            logger.debug("Current users in DB: %s", [(row['email'], row['id']) for row in users])
+            raise ValueError(f"Bot user insertion failed. SkyKidz ID: {skykidz_id}, GrokEdu ID: {grokedu_id}")
+
+        print(f"Bot user IDs retrieved: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
+        logger.debug("Bot user IDs retrieved: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
 
         # Seed bot posts
         bot_posts = [
