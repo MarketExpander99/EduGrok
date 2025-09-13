@@ -10,9 +10,13 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import requests
+import stripe  # For premium subs
 
 # Load .env file for local development
 load_dotenv()
+
+# Stripe setup (for future monetization)
+stripe.api_key = os.environ.get('STRIPE_KEY')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
@@ -81,6 +85,7 @@ def reset_db():
     conn = get_db()
     c = conn.cursor()
     try:
+        c.execute("DROP TABLE IF EXISTS badges")
         c.execute("DROP TABLE IF EXISTS user_points")
         c.execute("DROP TABLE IF EXISTS user_likes")
         c.execute("DROP TABLE IF EXISTS tests")
@@ -126,7 +131,7 @@ def check_db_schema():
         if columns[col] != col_type.split()[0]:
             logger.error(f"Users table column {col} has wrong type: expected {col_type}, got {columns[col]}")
             raise ValueError(f"Users table column {col} type mismatch")
-    for table in ['posts', 'lessons', 'tests', 'user_likes', 'user_points']:
+    for table in ['posts', 'lessons', 'tests', 'user_likes', 'user_points', 'badges']:
         c.execute(f"PRAGMA table_info({table})")
         if not c.fetchall():
             logger.error(f"Table {table} does not exist")
@@ -189,6 +194,9 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS user_points 
                      (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS badges 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_reported_id ON posts(reported, id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
@@ -243,7 +251,7 @@ def init_db():
         conn.rollback()
         raise
 
-# Seed CAPS-aligned lessons with bilingual content
+# Seed CAPS-aligned lessons with bilingual content (20 total for beta)
 def seed_lessons():
     conn = get_db()
     c = conn.cursor()
@@ -254,6 +262,20 @@ def seed_lessons():
         (None, 2, 'science', 'Grade 2: Solar System<br>Name a planet in our solar system.<br>Explanation: Earth is our home!<br>Afrikaans: Graad 2: Sonnestelsel<br>Noem ’n planeet in ons sonnestelsel.<br>Verduideliking: Aarde is ons huis!', 0),
         (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0),
         (None, 3, 'language', 'Grade 3: Write a Story<br>Write a short sentence about the sun.<br>Example: The sun is bright and warm.<br>Afrikaans: Graad 3: Skryf ’n Storie<br>Skryf ’n kort sin oor die son.<br>Voorbeeld: Die son is helder en warm.', 0),
+        (None, 1, 'science', 'Grade 1: Animals on the Farm<br>What sound does a cow make?<br>Afrikaans: Graad 1: Diere op die Plaas<br>Watter klank maak \'n koei?', 0),
+        (None, 1, 'math', 'Grade 1: Counting Chickens<br>Count 1-5 chickens.<br>Afrikaans: Graad 1: Tel Hoenders<br>Tell 1-5 hoenders.', 0),
+        (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0),
+        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0),
+        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0),
+        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0),
+        (None, 1, 'science', 'Grade 1: Colors in Nature<br>Name red things.<br>Afrikaans: Graad 1: Kleure in die Natuur<br>Noem rooi dinge.', 0),
+        (None, 2, 'math', 'Grade 2: Shapes Around Us<br>Find circles.<br>Afrikaans: Graad 2: Vorms Om Ons<br>Vind sirkels.', 0),
+        (None, 3, 'science', 'Grade 3: Human Body Basics<br>What do lungs do?<br>Afrikaans: Graad 3: Basiese Menslike Liggaam<br>Wat doen longe?', 0),
+        (None, 1, 'language', 'Grade 1: Rhyming Words<br>Cat-hat.<br>Afrikaans: Graad 1: Rymwoorde<br>Kat-hoed.', 0),
+        (None, 2, 'language', 'Grade 2: Vocabulary Builder<br>What is "happy"?<br>Afrikaans: Graad 2: Woordeskat Bouer<br>Wat is "gelukkig"?', 0),
+        (None, 3, 'math', 'Grade 3: Fractions Intro<br>Half of a pizza.<br>Afrikaans: Graad 3: Breuke Inleiding<br>Die helfte van \'n pizza.', 0),
+        (None, 1, 'math', 'Grade 1: Number Recognition<br>Point to 4.<br>Afrikaans: Graad 1: Getal Herkenning<br>Wys na 4.', 0),
+        (None, 2, 'science', 'Grade 2: Plants Grow<br>What do plants need?<br>Afrikaans: Graad 2: Plante Groei<br>Wat het plante nodig?', 0),
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
@@ -536,12 +558,18 @@ def complete_lesson(lesson_id):
         c = conn.cursor()
         c.execute("UPDATE lessons SET completed = 1 WHERE id = ? AND (user_id IS NULL OR user_id = ?)", (lesson_id, session['user_id']))
         c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + 5)", (session['user_id'], session['user_id']))
+        # Award 'Lesson Master' badge if first 5 lessons
+        c.execute("SELECT COUNT(*) FROM badges WHERE user_id = ? AND badge_name = 'Lesson Master'", (session['user_id'],))
+        if c.fetchone()[0] == 0:
+            c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = ? AND completed = 1", (session['user_id'],))
+            if c.fetchone()[0] >= 5:
+                c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, 'Lesson Master', ?)", (session['user_id'], datetime.now().isoformat()))
         conn.commit()
-        return redirect(url_for('home'))
+        return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {e}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/test', methods=['GET', 'POST'])
 def take_test():
@@ -601,14 +629,17 @@ def profile():
         c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
         result = c.fetchone()
         points = result['points'] if result else 0
+        c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ?", (session['user_id'],))
+        badges = [dict(row) for row in c.fetchall()]
         return render_template('profile.html.j2', 
-                               lessons_completed=f"{lessons_completed}/{total_lessons}",
-                               games_played=games_played,
-                               avg_score=avg_score,
-                               grade=grade_letter,
-                               theme=session['theme'],
-                               language=session.get('language', 'en'),
-                               points=points)
+                              lessons_completed=f"{lessons_completed}/{total_lessons}",
+                              games_played=games_played,
+                              avg_score=avg_score,
+                              grade=grade_letter,
+                              theme=session['theme'],
+                              language=session.get('language', 'en'),
+                              points=points,
+                              badges=badges)
     except Exception as e:
         logger.error(f"Profile route failed: {e} - Session: {session}")
         print(f"Profile error: {e}")
@@ -626,12 +657,13 @@ def parent_dashboard():
                 COUNT(*) as total_lessons,
                 SUM(CASE WHEN completed=1 THEN 1 ELSE 0 END) as completed_lessons,
                 AVG(t.score) as avg_test_score,
-                COALESCE(p.points, 0) as total_points
+                COALESCE(p.points, 0) as total_points,
+                (SELECT COUNT(*) FROM badges WHERE user_id = ?) as badges_count
             FROM lessons l 
             LEFT JOIN tests t ON l.user_id = t.user_id AND l.grade = t.grade
             LEFT JOIN user_points p ON l.user_id = p.user_id
             WHERE l.user_id = ? AND l.grade = ?
-        """, (session['user_id'], session['grade']))
+        """, (session['user_id'], session['user_id'], session['grade']))
         stats = c.fetchone()
         return render_template('parent_dashboard.html.j2', stats=stats, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
@@ -712,6 +744,60 @@ def generate_lesson():
         logger.error(f"Generate lesson failed: {e}")
         conn.rollback()
         return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+
+@app.route('/beta', methods=['GET', 'POST'])
+def beta():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        if email:
+            logger.info(f"Beta invite requested: {email}")
+            flash('Thanks! You\'re on the beta list. Check your email soon.', 'success')
+        return redirect(url_for('landing'))
+    return render_template('beta.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+
+@app.route('/award_badge/<badge_name>')
+def award_badge(badge_name):
+    if 'user_id' not in session:
+        return jsonify({'success': False}), 401
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
+                  (session['user_id'], badge_name, datetime.now().isoformat()))
+        conn.commit()
+        logger.info(f"Awarded badge '{badge_name}' to user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Award badge failed: {e}")
+        return jsonify({'success': False}), 500
+
+@app.route('/subscribe', methods=['GET', 'POST'])
+def subscribe():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        try:
+            # Stub: Create Stripe checkout session
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'zar',
+                        'product_data': {'name': 'EduGrok Premium'},
+                        'unit_amount': 7900,  # R79.00
+                    },
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=url_for('home', _external=True),
+                cancel_url=url_for('parent_dashboard', _external=True),
+            )
+            return redirect(session.url, code=303)
+        except Exception as e:
+            logger.error(f"Stripe checkout failed: {e}")
+            flash('Subscription failed. Try again.', 'error')
+            return redirect(url_for('parent_dashboard'))
+    return render_template('subscribe.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/favicon.ico')
 def favicon():
