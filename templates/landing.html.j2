@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'EduGrok: Fun Learning for Kids' if language == 'en' else 'EduGrok: Lekker Leer vir Kinders' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{{ theme }} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col p-4">
+    <header class="w-full bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">EduGrok</h1>
+        <div class="flex items-center space-x-4">
+            <a href="/login" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">{{ 'Login' if language == 'en' else 'Teken in' }}</a>
+            <a href="/register" class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600">{{ 'Sign Up' if language == 'en' else 'Registreer' }}</a>
+        </div>
+    </header>
+    <main class="flex-1 p-4">
+        <section class="w-full max-w-4xl mx-auto text-center">
+            <h2 class="text-3xl font-bold mb-4">{{ 'Fun, Free Learning for Grades 1-3!' if language == 'en' else 'Lekker, Gratis Leer vir Graad 1-3!' }}</h2>
+            <p class="text-lg mb-6">{{ 'CAPS-aligned lessons in Math, Language, and Science with interactive games.' if language == 'en' else 'CAPS-gebaseerde lesse in Wiskunde, Taal en Wetenskap met interaktiewe speletjies.' }}</p>
+            <a href="/register" class="inline-block bg-green-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-green-600">{{ 'Get Started Free!' if language == 'en' else 'Begin Gratis!' }}</a>
+            <div class="mt-8 space-y-4">
+                <h3 class="text-xl font-semibold">{{ 'Features' if language == 'en' else 'Kenmerke' }}</h3>
+                <ul class="text-left list-disc pl-6">
+                    <li>{{ 'Interactive phonics and handwriting practice' if language == 'en' else 'Interaktiewe fonika en handskrif-oefening' }}</li>
+                    <li>{{ 'Bilingual (English/Afrikaans) support' if language == 'en' else 'Tweetalige (Engels/Afrikaans) ondersteuning' }}</li>
+                    <li>{{ 'Progress tracking for parents' if language == 'en' else 'Vorderingsnasioming vir ouers' }}</li>
+                    <li>{{ 'Fun themes: Farm, Space, Astronaut' if language == 'en' else 'Vrolike temas: Plaas, Ruimte, Ruimtevaarder' }}</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+    <footer class="mt-auto p-4 text-center text-sm text-gray-500">
+        {{ '&copy; 2025 EduGrok. All rights reserved.' if language == 'en' else '&copy; 2025 EduGrok. Alle regte voorbehou.' }}
+    </footer>
+</body>
+</html>

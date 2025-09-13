@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phonics Memory Match</title>
+    <title>{{ 'Phonics Memory Match' if language == 'en' else 'Fonika Geheue Wedstryd' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         .card {
@@ -67,51 +67,79 @@
 </head>
 <body class="{{ theme }} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
     <header class="w-full max-w-4xl bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center rounded-t-lg">
-        <h1 class="text-2xl font-bold">Phonics Memory Match (Grade {{ grade }})</h1>
+        <h1 class="text-2xl font-bold">{{ 'Phonics Memory Match (Grade %s)'|format(grade) if language == 'en' else 'Fonika Geheue Wedstryd (Graad %s)'|format(grade) }}</h1>
         <div class="flex items-center space-x-4">
             <form action="/set_theme" method="POST" class="flex items-center">
-                <label for="theme" class="mr-2">Theme:</label>
+                <label for="theme" class="mr-2">{{ 'Theme' if language == 'en' else 'Tema' }}:</label>
                 <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
                     <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
                     <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                 </select>
-                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
+                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">{{ 'Apply' if language == 'en' else 'Pas toe' }}</button>
+            </form>
+            <form action="/set_language" method="POST" class="flex items-center">
+                <label for="language" class="mr-2">{{ 'Lang' if language == 'en' else 'Taal' }}:</label>
+                <select id="language" name="language" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
+                    <option value="en" {% if language == 'en' %}selected{% endif %}>EN</option>
+                    <option value="bilingual" {% if language == 'bilingual' %}selected{% endif %}>EN/AF</option>
+                </select>
+                <button type="submit" class="ml-2 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600">{{ 'Apply' if language == 'en' else 'Pas toe' }}</button>
             </form>
         </div>
     </header>
     <main class="w-full max-w-4xl flex-1 bg-white dark:bg-gray-800 p-6 rounded-b-lg shadow-lg flex flex-col items-center">
-        <p class="text-lg mb-4">Match words that start with the same sound!</p>
+        <p class="text-lg mb-4">{{ 'Match words that start with the same sound!' if language == 'en' else 'Pas woorde wat met dieselfde klank begin!' }}</p>
         <div id="game-board" class="grid grid-cols-4 gap-4 mb-4"></div>
         <div id="message" class="text-xl font-semibold"></div>
     </main>
     <script>
-        const theme = '{{ theme }}';
+        const theme = '{{ theme | e }}';
         const grade = {{ grade }};
+        const language = '{{ language | e }}';
 
         let wordPairs = [];
         if (theme === 'farm') {
             wordPairs = [
-                { word: 'mule', sound: 'm' }, { word: 'mouse', sound: 'm' },
-                { word: 'sheep', sound: 's' }, { word: 'sow', sound: 's' },
-                { word: 'cow', sound: 'c' }, { word: 'chicken', sound: 'c' }
+                { word: language === 'bilingual' ? 'muil/mule' : 'mule', sound: 'm' }, 
+                { word: language === 'bilingual' ? 'muis/mouse' : 'mouse', sound: 'm' },
+                { word: language === 'bilingual' ? 'skaap/sheep' : 'sheep', sound: 's' }, 
+                { word: language === 'bilingual' ? 'sog/sow' : 'sow', sound: 's' },
+                { word: language === 'bilingual' ? 'koei/cow' : 'cow', sound: 'c' }, 
+                { word: language === 'bilingual' ? 'hoender/chicken' : 'chicken', sound: 'c' }
             ];
             if (grade >= 2) {
-                wordPairs.push({ word: 'pig', sound: 'p' }, { word: 'pony', sound: 'p' });
+                wordPairs.push(
+                    { word: language === 'bilingual' ? 'varken/pig' : 'pig', sound: 'p' }, 
+                    { word: language === 'bilingual' ? 'ponie/pony' : 'pony', sound: 'p' }
+                );
             }
             if (grade >= 3) {
-                wordPairs.push({ word: 'duck', sound: 'd' }, { word: 'dog', sound: 'd' });
+                wordPairs.push(
+                    { word: language === 'bilingual' ? 'eend/duck' : 'duck', sound: 'd' }, 
+                    { word: language === 'bilingual' ? 'hond/dog' : 'dog', sound: 'd' }
+                );
             }
-        } else { // space
+        } else { // space or astronaut
             wordPairs = [
-                { word: 'moon', sound: 'm' }, { word: 'mars', sound: 'm' },
-                { word: 'star', sound: 's' }, { word: 'saturn', sound: 's' },
-                { word: 'comet', sound: 'c' }, { word: 'cosmos', sound: 'c' }
+                { word: language === 'bilingual' ? 'maan/moon' : 'moon', sound: 'm' }, 
+                { word: language === 'bilingual' ? 'mars/mars' : 'mars', sound: 'm' },
+                { word: language === 'bilingual' ? 'ster/star' : 'star', sound: 's' }, 
+                { word: language === 'bilingual' ? 'saturn/saturn' : 'saturn', sound: 's' },
+                { word: language === 'bilingual' ? 'komeet/comet' : 'comet', sound: 'c' }, 
+                { word: language === 'bilingual' ? 'kosmos/cosmos' : 'cosmos', sound: 'c' }
             ];
             if (grade >= 2) {
-                wordPairs.push({ word: 'planet', sound: 'p' }, { word: 'pluto', sound: 'p' });
+                wordPairs.push(
+                    { word: language === 'bilingual' ? 'planeet/planet' : 'planet', sound: 'p' }, 
+                    { word: language === 'bilingual' ? 'pluto/pluto' : 'pluto', sound: 'p' }
+                );
             }
             if (grade >= 3) {
-                wordPairs.push({ word: 'dark', sound: 'd' }, { word: 'dust', sound: 'd' });
+                wordPairs.push(
+                    { word: language === 'bilingual' ? 'donker/dark' : 'dark', sound: 'd' }, 
+                    { word: language === 'bilingual' ? 'stof/dust' : 'dust', sound: 'd' }
+                );
             }
         }
 
@@ -136,14 +164,14 @@
             card.classList.add('card');
             card.dataset.sound = item.sound;
             card.tabIndex = 0;
-            card.setAttribute('aria-label', 'Memory card, unflipped');
+            card.setAttribute('aria-label', language === 'bilingual' ? 'Geheuekaart, nie omgedraai nie' : 'Memory card, unflipped');
 
             const inner = document.createElement('div');
             inner.classList.add('card-inner');
 
             const front = document.createElement('div');
             front.classList.add('card-front');
-            front.textContent = '?'; // Simple placeholder for low-bandwidth
+            front.textContent = '?';
 
             const back = document.createElement('div');
             back.classList.add('card-back');
@@ -178,7 +206,7 @@
             if (lockBoard || this === firstCard || this.classList.contains('flipped')) return;
 
             this.classList.add('flipped');
-            this.setAttribute('aria-label', 'Memory card, flipped, showing ' + this.querySelector('.card-back').textContent);
+            this.setAttribute('aria-label', language === 'bilingual' ? 'Geheuekaart, omgedraai, wys ' + this.querySelector('.card-back').textContent : 'Memory card, flipped, showing ' + this.querySelector('.card-back').textContent);
 
             if (!firstCard) {
                 firstCard = this;
@@ -215,8 +243,8 @@
             setTimeout(() => {
                 firstCard.classList.remove('flipped');
                 secondCard.classList.remove('flipped');
-                firstCard.setAttribute('aria-label', 'Memory card, unflipped');
-                secondCard.setAttribute('aria-label', 'Memory card, unflipped');
+                firstCard.setAttribute('aria-label', language === 'bilingual' ? 'Geheuekaart, nie omgedraai nie' : 'Memory card, unflipped');
+                secondCard.setAttribute('aria-label', language === 'bilingual' ? 'Geheuekaart, nie omgedraai nie' : 'Memory card, unflipped');
                 resetBoard();
             }, 1000);
         }
@@ -227,7 +255,7 @@
         }
 
         function winGame() {
-            message.textContent = 'You won! +10 points';
+            message.textContent = language === 'bilingual' ? 'Jy het gewen! +10 punte' : 'You won! +10 points';
             fetch('/update_points', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

@@ -31,38 +31,49 @@
         }
     </style>
 </head>
-<body class="{% if session.theme == 'farm' %}farm{% elif session.theme == 'space' %}space{% elif session.theme == 'astronaut' %}astronaut{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+<body class="{% if theme == 'farm' %}farm{% elif theme == 'space' %}space{% elif theme == 'astronaut' %}astronaut{% else %}bg-white dark:bg-gray-800{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
     <header class="w-full bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold">Your Lessons</h1>
+        <h1 class="text-2xl font-bold">{{ 'Your Lessons' if language == 'en' else 'Jou Lesse' }}</h1>
         <div class="flex items-center space-x-4">
             <form action="/set_theme" method="POST" class="flex items-center">
-                <label for="theme" class="mr-2">Theme:</label>
+                <label for="theme" class="mr-2">{{ 'Theme' if language == 'en' else 'Tema' }}:</label>
                 <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
-                    <option value="farm" {% if session.theme == 'farm' %}selected{% endif %}>Farm</option>
-                    <option value="space" {% if session.theme == 'space' %}selected{% endif %}>Space</option>
-                    <option value="astronaut" {% if session.theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
+                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                 </select>
-                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
+                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">{{ 'Apply' if language == 'en' else 'Pas toe' }}</button>
+            </form>
+            <form action="/set_language" method="POST" class="flex items-center">
+                <label for="language" class="mr-2">{{ 'Lang' if language == 'en' else 'Taal' }}:</label>
+                <select id="language" name="language" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
+                    <option value="en" {% if language == 'en' %}selected{% endif %}>EN</option>
+                    <option value="bilingual" {% if language == 'bilingual' %}selected{% endif %}>EN/AF</option>
+                </select>
+                <button type="submit" class="ml-2 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600">{{ 'Apply' if language == 'en' else 'Pas toe' }}</button>
             </form>
         </div>
     </header>
     <main class="flex-1 p-4">
         <section class="w-full max-w-4xl mx-auto">
-            <h2 class="text-xl font-semibold mb-4">Lesson List</h2>
+            <h2 class="text-xl font-semibold mb-4">{{ 'Lesson List' if language == 'en' else 'Lys van Lesse' }}</h2>
+            {% if error %}
+            <p class="text-red-500 mb-4">{{ error }}</p>
+            {% endif %}
             <div class="space-y-4">
                 {% for lesson in lessons %}
                 <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
                     <h3 class="text-lg font-bold">{{ lesson.subject }}</h3>
                     <p class="mb-2">{{ lesson.content | safe }}</p>
                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Status: {{ 'Completed' if lesson.completed else 'In Progress' }}
-                        {% if session.language == 'bilingual' %}
-                        | Status: {{ 'Voltooi' if lesson.completed else 'In vordering' }}
+                        {{ 'Status' if language == 'en' else 'Status' }}: {{ 'Completed' if lesson.completed else 'In Progress' }}
+                        {% if language == 'bilingual' %}
+                        | {{ 'Status' if language == 'en' else 'Status' }}: {{ 'Voltooi' if lesson.completed else 'In vordering' }}
                         {% endif %}
                     </p>
                     {% if lesson.subject.lower() == 'language' and not lesson.completed %}
                     <div class="mt-4">
-                        <h4 class="text-md font-semibold">Handwriting Practice / Handskrif-oefening</h4>
+                        <h4 class="text-md font-semibold">{{ 'Handwriting Practice' if language == 'en' else 'Handskrif-oefening' }}</h4>
                         <div class="flex flex-wrap gap-4 mt-2" id="tracing-area-{{ lesson.id }}">
                             {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
                             <div class="svg-container" data-letter="{{ letter }}">
@@ -76,9 +87,9 @@
                     </div>
                     {% endif %}
                     {% if lesson.completed == 0 %}
-                        <button onclick="completeLesson('{{ lesson.id }}')" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete</button>
+                        <button onclick="completeLesson('{{ lesson.id }}')" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{{ 'Complete' if language == 'en' else 'Voltooi' }}</button>
                     {% else %}
-                        <p class="text-green-500 mt-2">Completed!</p>
+                        <p class="text-green-500 mt-2">{{ 'Completed!' if language == 'en' else 'Voltooi!' }}</p>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -142,7 +153,7 @@
 
                     ctx.beginPath();
                     ctx.moveTo(lastX, lastY);
-                    ctx.lineTo(x, y)
+                    ctx.lineTo(x, y);
                     ctx.stroke();
                     [lastX, lastY] = [x, y];
                 }
@@ -159,10 +170,9 @@
                     for (let i = 3; i < pixels.length; i += 4) {
                         if (pixels[i] > 0) coloredPixels++;
                     }
-                    if (coloredPixels > (canvas.width * canvas.height * 0.8)) {  // 80% coverage threshold for completion
+                    if (coloredPixels > (canvas.width * canvas.height * 0.8)) {
                         canvas.style.pointerEvents = 'none';
                         console.log('Letter tracing complete');
-                        // If all letters complete, call completeLesson
                         if (Array.from(canvases).every(c => c.style.pointerEvents === 'none')) {
                             completeLesson(lessonId);
                         }
