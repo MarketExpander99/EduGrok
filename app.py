@@ -204,6 +204,12 @@ def init_db():
         conn.commit()
         print("Bot users seeded")
 
+        # Fetch bot user IDs
+        c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
+        skykidz_id = c.fetchone()[0] if c.fetchone() else 1
+        c.execute("SELECT id FROM users WHERE email = 'grokedu@example.com'")
+        grokedu_id = c.fetchone()[0] if c.fetchone() else 2
+
         # Seed bot posts
         bot_posts = [
             (skykidz_id, 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 5, 0),
