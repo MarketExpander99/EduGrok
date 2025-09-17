@@ -16,7 +16,7 @@ import requests
 load_dotenv()
 
 # Stripe setup (for future monetization)
-stripe.api_key = os.environ.get('STRIPE_KEY')
+#stripe.api_key = os.environ.get('STRIPE_KEY')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
