@@ -778,20 +778,20 @@ def subscribe():
     if request.method == 'POST':
         try:
             # Stub: Create Stripe checkout session
-            session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price_data': {
-                        'currency': 'zar',
-                        'product_data': {'name': 'EduGrok Premium'},
-                        'unit_amount': 7900,  # R79.00
-                    },
-                    'quantity': 1,
-                }],
-                mode='subscription',
-                success_url=url_for('home', _external=True),
-                cancel_url=url_for('parent_dashboard', _external=True),
-            )
+            #session = stripe.checkout.Session.create(
+            #    payment_method_types=['card'],
+            #    line_items=[{
+            #        'price_data': {
+            #            'currency': 'zar',
+            ####            'product_data': {'name': 'EduGrok Premium'},
+            #            'unit_amount': 7900,  # R79.00
+             #       },
+              #      'quantity': 1,
+             #   }],
+             #   mode='subscription',
+             #   success_url=url_for('home', _external=True),
+             #   cancel_url=url_for('parent_dashboard', _external=True),
+            #)
             return redirect(session.url, code=303)
         except Exception as e:
             logger.error(f"Stripe checkout failed: {e}")
