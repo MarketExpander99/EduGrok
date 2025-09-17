@@ -10,7 +10,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import requests
-import stripe  # For premium subs
+#import stripe  # For premium subs
 
 # Load .env file for local development
 load_dotenv()
