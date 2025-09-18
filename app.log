@@ -64,3 +64,6 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-09-18 11:45:21,370 - __main__ - ERROR - Internal error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application. - http://localhost:5000/lessons - Session: <SecureCookieSession {'email': 'a@a.com', 'grade': 1, 'language': 'en', 'theme': 'astronaut', 'user_id': 57}>
 2025-09-18 11:45:32,822 - __main__ - ERROR - Home route failed: 'NoneType' object is not iterable
 2025-09-18 11:45:32,823 - __main__ - ERROR - Internal error: 500 Internal Server Error: The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application. - http://localhost:5000/ - Session: <SecureCookieSession {'email': 'a@a.com', 'grade': 1, 'language': 'en', 'theme': 'astronaut', 'user_id': 57}>
+2025-09-18 11:50:38,028 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
+2025-09-18 11:50:54,704 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
+2025-09-18 11:51:04,378 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
