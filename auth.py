@@ -6,7 +6,7 @@ from db import get_db
 logger = logging.getLogger(__name__)
 
 def register():
-    logger.debug("Register route")
+    logger.debug(f"Register route - Session: {session}")
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -22,19 +22,19 @@ def register():
             session['email'] = email
             session['theme'] = theme
             session['language'] = language
-            logger.debug(f"Registered: {email}")
+            logger.info(f"Registered: {email} - User ID: {session['user_id']}")
             return redirect(url_for('assess'))
         except Exception as e:
             if "UNIQUE constraint failed: users.email" in str(e):
-                logger.error("Email in use")
+                logger.error(f"Email in use: {email}")
                 return render_template('register.html.j2', error="Email already in use", theme=theme, language=language)
-            logger.error(f"Register failed: {e}")
+            logger.error(f"Register failed: {str(e)}")
             conn.rollback()
-            return render_template('register.html.j2', error="Server error", theme=theme, language=language)
+            return render_template('register.html.j2', error=f"Server error: {str(e)}", theme=theme, language=language)
     return render_template('register.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def login():
-    logger.debug("Login route")
+    logger.debug(f"Login route - Session: {session}")
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
@@ -50,26 +50,30 @@ def login():
                 session['subscribed'] = bool(user['subscribed'])
                 session['email'] = email
                 session['language'] = user['language']
-                logger.debug(f"Logged in: {email}")
+                logger.info(f"Logged in: {email} - User ID: {user['id']}")
                 return redirect(url_for('home'))
-            logger.error("Invalid credentials")
+            logger.error(f"Invalid credentials for email: {email}")
             return render_template('login.html.j2', error="Invalid credentials", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         except Exception as e:
-            logger.error(f"Login failed: {e}")
+            logger.error(f"Login failed: {str(e)}")
             conn.rollback()
-            return render_template('login.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+            return render_template('login.html.j2', error=f"Server error: {str(e)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     return render_template('login.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def logout():
-    logger.debug("Logout")
+    logger.debug(f"Logout route - Session before clear: {session}")
     session.clear()
+    logger.info("Session cleared")
     return redirect(url_for('landing'))
 
 def set_theme():
+    logger.debug(f"Set theme route - Session: {session}")
     if 'user_id' not in session:
+        logger.error("Unauthorized access to set_theme")
         return redirect(url_for('login'))
     theme = request.form.get('theme')
     if theme not in ['farm', 'space', 'astronaut']:
+        logger.error(f"Invalid theme: {theme}")
         flash('Invalid theme', 'error')
         return redirect(request.referrer or url_for('home'))
     try:
@@ -81,16 +85,19 @@ def set_theme():
         logger.info(f"Theme updated to {theme} for user {session['user_id']}")
         return redirect(request.referrer or url_for('home'))
     except Exception as e:
-        logger.error(f"Theme update failed: {e}")
+        logger.error(f"Theme update failed: {str(e)}")
         conn.rollback()
         flash('Server error', 'error')
         return redirect(request.referrer or url_for('home'))
 
 def set_language():
+    logger.debug(f"Set language route - Session: {session}")
     if 'user_id' not in session:
+        logger.error("Unauthorized access to set_language")
         return redirect(url_for('login'))
     language = request.form.get('language')
     if language not in ['en', 'bilingual']:
+        logger.error(f"Invalid language: {language}")
         flash('Invalid language', 'error')
         return redirect(request.referrer or url_for('home'))
     try:
@@ -102,7 +109,7 @@ def set_language():
         logger.info(f"Language updated to {language} for user {session['user_id']}")
         return redirect(request.referrer or url_for('home'))
     except Exception as e:
-        logger.error(f"Language update failed: {e}")
+        logger.error(f"Language update failed: {str(e)}")
         conn.rollback()
         flash('Server error', 'error')
         return redirect(request.referrer or url_for('home'))

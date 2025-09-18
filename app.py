@@ -51,9 +51,17 @@ def teardown_db(error):
 @app.route('/reset_db')
 def reset_db_route():
     if 'user_id' not in session:
+        logger.error("Unauthorized access to /reset_db")
         return "Login required", 401
     reset_db()
     return redirect(url_for('home'))
+
+# Explicitly register auth routes
+app.add_url_rule('/register', 'register', register, methods=['GET', 'POST'])
+app.add_url_rule('/login', 'login', login, methods=['GET', 'POST'])
+app.add_url_rule('/logout', 'logout', logout)
+app.add_url_rule('/set_theme', 'set_theme', set_theme, methods=['POST'])
+app.add_url_rule('/set_language', 'set_language', set_language, methods=['POST'])
 
 # Initialize app
 def init_app():
@@ -62,49 +70,59 @@ def init_app():
             init_db()
             check_db_schema()
             seed_lessons()
-            print("App initialized - DB ready")
             logger.info("App initialized - DB ready")
+            print("App initialized - DB ready")
         except Exception as e:
+            logger.error(f"App init failed: {str(e)}")
             print(f"App init failed: {e}")
-            logger.error(f"App init failed: {e}")
             raise
 
-init_app()
+try:
+    init_app()
+except Exception as e:
+    logger.critical(f"Failed to initialize app: {str(e)}")
+    raise
 
 @app.route('/')
 def home():
-    logger.debug("Home route")
+    logger.debug(f"Home route - Session: {session}")
     if 'user_id' not in session:
+        logger.debug("No user_id in session, redirecting to login")
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
-    posts_data = c.fetchall()
-    posts = []
-    user_id = session.get('user_id')
-    for row in posts_data:
-        post = dict(
-            id=row['id'],
-            content=filter_content(row['content']),
-            subject=row['subject'],
-            likes=row['likes'] or 0,
-            handle=row['handle'],
-            reported=row['reported']
-        )
-        if user_id:
-            c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
-            post['liked_by_user'] = c.fetchone() is not None
-        else:
-            post['liked_by_user'] = False
-        posts.append(post)
-    c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
-    lesson = dict(c.fetchone()) if c.fetchone() else None
-    c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
-    test = dict(c.fetchone()) if c.fetchone() else None
-    return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=False, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
+        posts_data = c.fetchall()
+        posts = []
+        user_id = session.get('user_id')
+        for row in posts_data:
+            post = dict(
+                id=row['id'],
+                content=filter_content(row['content']),
+                subject=row['subject'],
+                likes=row['likes'] or 0,
+                handle=row['handle'],
+                reported=row['reported']
+            )
+            if user_id:
+                c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
+                post['liked_by_user'] = c.fetchone() is not None
+            else:
+                post['liked_by_user'] = False
+            posts.append(post)
+        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
+        lesson = dict(c.fetchone()) if c.fetchone() else None
+        c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
+        test = dict(c.fetchone()) if c.fetchone() else None
+        return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=False, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    except Exception as e:
+        logger.error(f"Home route failed: {str(e)}")
+        raise
 
 @app.route('/landing')
 def landing():
+    logger.debug("Landing route")
     return render_template('landing.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/post', methods=['POST'])
@@ -123,7 +141,7 @@ def create_post():
         conn.commit()
         return redirect(url_for('home'))
     except Exception as e:
-        logger.error(f"Create post failed: {e}")
+        logger.error(f"Create post failed: {str(e)}")
         conn.rollback()
         return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -143,7 +161,7 @@ def like_post(post_id):
         conn.commit()
         return redirect(url_for('home'))
     except Exception as e:
-        logger.error(f"Like post failed: {e}")
+        logger.error(f"Like post failed: {str(e)}")
         conn.rollback()
         return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -159,7 +177,7 @@ def report_post(post_id):
         conn.commit()
         return redirect(url_for('home'))
     except Exception as e:
-        logger.error(f"Report post failed: {e}")
+        logger.error(f"Report post failed: {str(e)}")
         conn.rollback()
         return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -180,7 +198,7 @@ def assess():
             session['grade'] = grade
             return redirect(url_for('home'))
         except Exception as e:
-            logger.error(f"Assess failed: {e}")
+            logger.error(f"Assess failed: {str(e)}")
             conn.rollback()
             return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
@@ -223,7 +241,7 @@ def complete_lesson(lesson_id):
         }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return redirect(url_for('lessons'))
     except Exception as e:
-        logger.error(f"Complete lesson failed: {e}")
+        logger.error(f"Complete lesson failed: {str(e)}")
         conn.rollback()
         return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -249,7 +267,7 @@ def take_test():
             }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
             return redirect(url_for('game', score=score))
         except Exception as e:
-            logger.error(f"Test failed: {e}")
+            logger.error(f"Test failed: {str(e)}")
             conn.rollback()
             return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
@@ -301,7 +319,7 @@ def profile():
                               points=points,
                               badges=badges)
     except Exception as e:
-        logger.error(f"Profile failed: {e} - Session: {session}")
+        logger.error(f"Profile failed: {str(e)} - Session: {session}")
         print(f"Profile error: {e}")
         return render_template('error.html.j2', error="Failed to load profile. Try resetting DB.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
@@ -327,7 +345,7 @@ def parent_dashboard():
         stats = c.fetchone()
         return render_template('parent_dashboard.html.j2', stats=stats, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
-        logger.error(f"Parent dashboard failed: {e}")
+        logger.error(f"Parent dashboard failed: {str(e)}")
         return render_template('error.html.j2', error="Failed to load dashboard.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/lessons')
@@ -357,7 +375,7 @@ def update_points():
         logger.info(f"Awarded {points_award} points to user {session['user_id']}")
         return jsonify({'success': True}), 200
     except Exception as e:
-        logger.error(f"Update points failed: {e}")
+        logger.error(f"Update points failed: {str(e)}")
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/phonics_game')
@@ -398,10 +416,10 @@ def generate_lesson():
         logger.info(f"Generated lesson for user {session['user_id']}: {subject}")
         return redirect(url_for('lessons'))
     except requests.exceptions.RequestException as e:
-        logger.error(f"API call failed: {e}")
+        logger.error(f"API call failed: {str(e)}")
         return render_template('lessons.html.j2', error="Failed to generate lesson - check API", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
-        logger.error(f"Generate lesson failed: {e}")
+        logger.error(f"Generate lesson failed: {str(e)}")
         conn.rollback()
         return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -433,7 +451,7 @@ def feedback():
         flash('Thanks for your feedback!', 'success')
         return redirect(url_for('profile'))
     except Exception as e:
-        logger.error(f"Feedback failed: {e}")
+        logger.error(f"Feedback failed: {str(e)}")
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
@@ -454,7 +472,7 @@ def award_badge(badge_name):
         }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return jsonify({'success': True})
     except Exception as e:
-        logger.error(f"Award badge failed: {e}")
+        logger.error(f"Award badge failed: {str(e)}")
         return jsonify({'success': False}), 500
 
 # @app.route('/subscribe', methods=['GET', 'POST'])
@@ -490,19 +508,19 @@ def favicon():
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"Internal error: {error} - {request.url} - Session: {session}")
+    logger.error(f"Internal error: {str(error)} - {request.url} - Session: {session}")
     print(f"Internal error: {error}")
-    return render_template('error.html.j2', error="Failed to load feed. Try again.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+    return render_template('error.html.j2', error=f"Server error: {str(error)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.errorhandler(404)
 def not_found_error(error):
-    logger.error(f"404: {request.url}")
+    logger.error(f"404: {request.url} - Session: {session}")
     print(f"404: {request.url}")
     return render_template('error.html.j2', error="Page not found.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 404
 
 @app.before_request
 def log_request():
-    logger.debug(f"Request: {request.method} {request.url} - User ID: {session.get('user_id', 'None')}")
+    logger.debug(f"Request: {request.method} {request.url} - User ID: {session.get('user_id', 'None')} - Session: {session}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

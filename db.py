@@ -12,26 +12,32 @@ def get_db():
     if 'db' not in g:
         if 'RENDER' in os.environ:
             db_path = '/data/edugrok.db'
+            logger.debug(f"Using Render DB path: {db_path}")
             print(f"Using Render DB path: {db_path}")
-            logger.info(f"Using Render DB path: {db_path}")
             if not os.path.exists(db_path):
+                logger.info(f"DB not found at {db_path} - creating")
                 print(f"DB not found at {db_path} - creating")
                 try:
                     with open(db_path, 'a'):
                         pass
-                    print(f"Created DB at {db_path}")
                     logger.info(f"Created DB at {db_path}")
+                    print(f"Created DB at {db_path}")
                 except PermissionError as e:
+                    logger.error(f"Permission denied at {db_path}: {str(e)}")
                     print(f"Permission denied at {db_path}: {e}")
-                    logger.error(f"Permission denied at {db_path}: {e}")
                     raise
         else:
             db_path = 'edugrok.db'
+            logger.debug(f"Using local DB path: {db_path}")
             print(f"Using local DB path: {db_path}")
-            logger.info(f"Using local DB path: {db_path}")
-        g.db = sqlite3.connect(db_path, timeout=10)
-        g.db.execute('PRAGMA journal_mode=WAL;')
-        g.db.row_factory = sqlite3.Row
+        try:
+            g.db = sqlite3.connect(db_path, timeout=10)
+            g.db.execute('PRAGMA journal_mode=WAL;')
+            g.db.row_factory = sqlite3.Row
+        except sqlite3.OperationalError as e:
+            logger.error(f"Failed to connect to DB at {db_path}: {str(e)}")
+            print(f"Failed to connect to DB at {db_path}: {e}")
+            raise
     return g.db
 
 def close_db(error):
@@ -53,16 +59,16 @@ def reset_db():
         c.execute("DROP TABLE IF EXISTS posts")
         c.execute("DROP TABLE IF EXISTS users")
         conn.commit()
-        print("Dropped all tables")
         logger.info("Force reset: Dropped all tables")
+        print("Dropped all tables")
         init_db()
         seed_lessons()
         check_db_schema()
-        print("DB reset complete")
         logger.info("Force reset complete")
+        print("DB reset complete")
     except Exception as e:
+        logger.error(f"DB reset failed: {str(e)}")
         print(f"DB reset failed: {e}")
-        logger.error(f"DB reset failed: {e}")
         conn.rollback()
         raise
 
@@ -98,6 +104,7 @@ def init_db():
     c = conn.cursor()
     try:
         db_path = conn.execute("PRAGMA database_list").fetchall()[0][2]
+        logger.debug(f"Initializing DB at {db_path}")
         print(f"Initializing DB at {db_path}")
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col for col in c.fetchall()}
@@ -146,18 +153,19 @@ def init_db():
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (post_id) REFERENCES posts(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS user_points 
-                     (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0,
+                     (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS badges 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT,
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT,
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_reported_id ON posts(reported, id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         conn.commit()
+        logger.info("Tables created/updated")
         print("Tables created/updated")
 
         # Seed bot users
@@ -167,6 +175,7 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language) VALUES (?, ?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
+        logger.info("Bot users inserted")
         print("Bot users inserted")
 
         # Fetch bot user IDs
@@ -184,8 +193,8 @@ def init_db():
             logger.debug("Current users in DB: %s", [(row[0], row[1]) for row in users])
             raise ValueError(f"Bot user insertion failed. SkyKidz ID: {skykidz_id}, GrokEdu ID: {grokedu_id}")
 
-        print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
         logger.debug("Bot user IDs: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
+        print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
 
         # Seed bot posts
         bot_posts = [
@@ -194,16 +203,17 @@ def init_db():
         ]
         c.executemany("INSERT OR IGNORE INTO posts (user_id, content, subject, likes, reported) VALUES (?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
+        logger.info("Bot posts seeded")
         print("Bot posts seeded")
 
     except sqlite3.Error as e:
+        logger.error(f"SQLite error in init_db: {str(e)}")
         print(f"SQLite error in init_db: {e}")
-        logger.error(f"SQLite error in init_db: {e}")
         conn.rollback()
         raise
     except Exception as e:
+        logger.error(f"DB init failed: {str(e)}")
         print(f"DB init failed: {e}")
-        logger.error(f"DB init failed: {e}")
         conn.rollback()
         raise
 
@@ -240,7 +250,7 @@ def seed_lessons():
         logger.debug("Seeded lessons")
         print("Lessons seeded")
     except sqlite3.OperationalError as e:
+        logger.error(f"Seed lessons failed: {str(e)}")
         print(f"Seed lessons failed: {e}")
-        logger.error(f"Seed lessons failed: {e}")
         conn.rollback()
         raise

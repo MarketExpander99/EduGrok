@@ -4,3 +4,5 @@ app.log
 edugrok.db
 edugrok.db
 edugrok.db
+__pycache__/auth.cpython-312.pyc
+__pycache__/db.cpython-312.pyc
