@@ -94,6 +94,9 @@ def home():
         c = conn.cursor()
         c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
         posts_data = c.fetchall()
+        if posts_data is None:
+            logger.warning("posts_data is None in home route")
+            posts_data = []
         posts = []
         user_id = session.get('user_id')
         for row in posts_data:
@@ -107,14 +110,17 @@ def home():
             )
             if user_id:
                 c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
-                post['liked_by_user'] = c.fetchone() is not None
+                like_result = c.fetchone()
+                post['liked_by_user'] = like_result is not None
             else:
                 post['liked_by_user'] = False
             posts.append(post)
         c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
-        lesson = dict(c.fetchone()) if c.fetchone() else None
+        lesson_result = c.fetchone()
+        lesson = dict(lesson_result) if lesson_result else None
         c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
-        test = dict(c.fetchone()) if c.fetchone() else None
+        test_result = c.fetchone()
+        test = dict(test_result) if test_result else None
         return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=False, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Home route failed: {str(e)}")
@@ -350,13 +356,22 @@ def parent_dashboard():
 
 @app.route('/lessons')
 def lessons():
+    logger.debug("Lessons route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
-    lessons_list = [dict(row) for row in c.fetchall()]
-    return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
+        lessons_data = c.fetchall()
+        if lessons_data is None:
+            logger.warning("lessons_data is None in lessons route")
+            lessons_data = []
+        lessons_list = [dict(row) for row in lessons_data]
+        return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    except Exception as e:
+        logger.error(f"Lessons route failed: {str(e)}")
+        return render_template('error.html.j2', error="Failed to load lessons.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/update_points', methods=['POST'])
 def update_points():
