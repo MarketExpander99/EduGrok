@@ -313,8 +313,13 @@ def profile():
         c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
         result = c.fetchone()
         points = result['points'] if result else 0
+        c.execute("SELECT star_coins FROM users WHERE id = ?", (session['user_id'],))
+        coins_result = c.fetchone()
+        star_coins = coins_result['star_coins'] if coins_result else 0
         c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ?", (session['user_id'],))
         badges = [dict(row) for row in c.fetchall()]
+        c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (session['user_id'],))
+        feedbacks = [dict(row) for row in c.fetchall()]
         return render_template('profile.html.j2', 
                               lessons_completed=f"{lessons_completed}/{total_lessons}",
                               games_played=games_played,
@@ -323,7 +328,9 @@ def profile():
                               theme=session['theme'],
                               language=session.get('language', 'en'),
                               points=points,
-                              badges=badges)
+                              star_coins=star_coins,
+                              badges=badges,
+                              feedbacks=feedbacks)
     except Exception as e:
         logger.error(f"Profile failed: {str(e)} - Session: {session}")
         print(f"Profile error: {e}")
@@ -367,7 +374,7 @@ def lessons():
         if lessons_data is None:
             logger.warning("lessons_data is None in lessons route")
             lessons_data = []
-        lessons_list = [dict(row) for row in lessons_data]
+        lessons_list = [dict(row) for row in c.fetchall()]
         return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Lessons route failed: {str(e)}")
@@ -392,6 +399,26 @@ def update_points():
     except Exception as e:
         logger.error(f"Update points failed: {str(e)}")
         return jsonify({'success': False, 'error': 'Server error'}), 500
+
+@app.route('/update_coins', methods=['POST'])
+def update_coins():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Not logged in'}), 401
+    data = request.get_json()
+    coins = data.get('coins', 0)
+    user_id = session['user_id']
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (coins, user_id))
+        conn.commit()
+        logger.info(f"Awarded {coins} Star Coins to user {user_id}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error updating coins: {e}")
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    finally:
+        conn.close()
 
 @app.route('/phonics_game')
 def phonics_game():
@@ -448,27 +475,31 @@ def beta():
         return redirect(url_for('landing'))
     return render_template('beta.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
-@app.route('/feedback', methods=['POST'])
+@app.route('/feedback', methods=['GET', 'POST'])
 def feedback():
     if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    try:
-        rating = int(request.form.get('rating', 0))
-        comments = request.form.get('comments', '')
-        if rating < 1 or rating > 5:
-            return jsonify({'success': False, 'error': 'Invalid rating'}), 400
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("INSERT INTO feedback (user_id, rating, comments, submitted_date) VALUES (?, ?, ?, ?)", 
-                  (session['user_id'], rating, comments, datetime.now().isoformat()))
-        conn.commit()
-        logger.info(f"Feedback submitted by user {session['user_id']}: rating={rating}")
-        flash('Thanks for your feedback!', 'success')
-        return redirect(url_for('profile'))
-    except Exception as e:
-        logger.error(f"Feedback failed: {str(e)}")
-        conn.rollback()
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        try:
+            rating = int(request.form.get('rating', 0))
+            comments = request.form.get('comments', '')
+            if rating < 1 or rating > 5:
+                flash('Rating must be between 1 and 5.', 'error')
+                return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+            conn = get_db()
+            c = conn.cursor()
+            c.execute("INSERT INTO feedback (user_id, rating, comments, submitted_date) VALUES (?, ?, ?, ?)", 
+                      (session['user_id'], rating, comments, datetime.now().isoformat()))
+            conn.commit()
+            logger.info(f"Feedback submitted by user {session['user_id']}: rating={rating}")
+            flash('Thanks for your feedback!', 'success')
+            return redirect(url_for('profile'))
+        except Exception as e:
+            logger.error(f"Feedback failed: {str(e)}")
+            conn.rollback()
+            flash('Failed to submit feedback.', 'error')
+            return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/award_badge/<badge_name>')
 def award_badge(badge_name):

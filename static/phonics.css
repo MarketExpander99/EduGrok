@@ -1,0 +1,20 @@
+.card {
+  transition: all 0.3s ease;
+  transform-style: preserve-3d;
+}
+.card.flipped {
+  transform: rotateY(180deg);
+}
+.card.matched {
+  cursor: default;
+}
+.card:focus {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .card {
+    height: 20vw;
+    font-size: 0.9rem;
+  }
+}
