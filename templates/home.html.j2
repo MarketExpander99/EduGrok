@@ -49,44 +49,28 @@
         }
     </script>
 </head>
-<body class="min-h-screen {{ session.theme|default('astronaut') }} bg-gray-100 
-
-dark:bg-gray-800 text-gray-900 dark:text-white">
+<body class="min-h-screen {{ session.theme|default('astronaut') }} bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
     <header class="bg-white dark:bg-gray-700 p-4 shadow">
         <h1 class="text-3xl font-bold">EduGrok</h1>
         <nav class="mt-2">
-            <a href="{{ url_for('home') }}" class="mr-4 text-blue-500 
-
-hover:underline">Home</a>
-            <a href="{{ url_for('lessons') }}" class="mr-4 text-blue-500 
-
-hover:underline">Lessons</a>
-            <a href="{{ url_for('phonics_game') }}" class="mr-4 text-blue-500 
-
-hover:underline">Phonics Game</a>
-            <a href="{{ url_for('profile') }}" class="text-blue-500 
-
-hover:underline">Profile</a>
+            <a href="{{ url_for('home') }}" class="mr-4 text-blue-500 hover:underline">Home</a>
+            <a href="{{ url_for('lessons') }}" class="mr-4 text-blue-500 hover:underline">Lessons</a>
+            <a href="{{ url_for('profile') }}" class="mr-4 text-blue-500 hover:underline">Profile</a>
+            <a href="{{ url_for('phonics_game') }}" class="mr-4 text-blue-500 hover:underline">Phonics Game</a>
+            <a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a>
         </nav>
     </header>
 
     <div class="container mx-auto p-4">
-        <!-- Phonics Game Link -->
-        <div class="flex justify-center mb-4">
-            <a href="{{ url_for('phonics_game') }}" class="bg-blue-500 text-white 
-
-px-4 py-2 rounded hover:bg-blue-600">Play Phonics Game</a>
-        </div>
         <!-- Welcome Message -->
         <div class="bg-white dark:bg-gray-700 p-4 mb-6 rounded shadow">
-            <h2 class="text-xl font-semibold">Welcome, {{ session.get('email', 
-
-'Guest') }}!</h2>
+            <h2 class="text-xl font-semibold">Welcome, {{ session.get('email', 'Guest') }}!</h2>
             {% if subscribed %}
-                <p class="text-green-600 dark:text-green-300 mt-2">Subscribed to 
-
-Premium</p>
+                <p class="text-green-600 dark:text-green-300 mt-2">Subscribed to Premium</p>
             {% endif %}
+            <div class="mt-4">
+                <a href="{{ url_for('phonics_game') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Play Phonics Game</a>
+            </div>
         </div>
 
         <!-- Active Lesson -->
@@ -94,11 +78,7 @@ Premium</p>
             <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
                 <h2 class="text-xl font-semibold">{{ lesson.subject }}</h2>
                 <div class="mt-2">{{ lesson.content|safe }}</div>
-                <button onclick="completeLesson('{{ lesson.id }}')" class="mt-2 
-
-bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete 
-
-Lesson</button>
+                <button onclick="completeLesson('{{ lesson.id }}')" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete Lesson</button>
             </div>
         {% endif %}
 
@@ -106,9 +86,7 @@ Lesson</button>
         {% if test %}
             <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
                 <h2 class="text-xl font-semibold">Latest Test</h2>
-                <p>Grade: {{ test.grade }}, Score: {{ test.score }}, Date: {{ 
-
-test.date }}</p>
+                <p>Grade: {{ test.grade }}, Score: {{ test.score }}, Date: {{ test.date }}</p>
             </div>
         {% endif %}
 
@@ -119,45 +97,27 @@ test.date }}</p>
                     <div class="bg-white dark:bg-gray-700 p-4 rounded shadow">
                         <div class="flex justify-between items-center mb-2">
                             <span class="font-semibold">{{ post.handle }}</span>
-                            <span class="text-sm text-gray-500 dark:text-gray-
-
-400">{{ post.subject }}</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ post.subject }}</span>
                         </div>
                         <p class="mb-2">{{ post.content|safe }}</p>
                         <div class="flex space-x-4">
-                            <button onclick="likePost('{{ post.id }}')" 
-
-class="flex items-center {% if post.liked_by_user is defined and 
-
-post.liked_by_user %}text-red-500{% else %}text-gray-500{% endif %} hover:text-
-
-red-600">
-                                ❤️ <span id="likes-{{ post.id }}" class="ml-1">{{ 
-
-post.likes|default(0) }}</span>
+                            <button onclick="likePost('{{ post.id }}')" class="flex items-center {% if post.liked_by_user is defined and post.liked_by_user %}text-red-500{% else %}text-gray-500{% endif %} hover:text-red-600">
+                                ❤️ <span id="likes-{{ post.id }}" class="ml-1">{{ post.likes|default(0) }}</span>
                             </button>
-                            <button onclick="reportPost('{{ post.id }}')" 
-
-class="text-gray-500 hover:text-yellow-500">
+                            <button onclick="reportPost('{{ post.id }}')" class="text-gray-500 hover:text-yellow-500">
                                 🚩 Report
                             </button>
                         </div>
                     </div>
                 {% endfor %}
             {% else %}
-                <p class="text-red-500">Failed to load feed. Please try 
-
-again.</p>
-                <script>console.error('No posts loaded - check server 
-
-logs');</script>
+                <p class="text-red-500">Failed to load feed. Please try again.</p>
+                <script>console.error('No posts loaded - check server logs');</script>
             {% endif %}
         </div>
     </div>
 
-    <footer class="bg-white dark:bg-gray-700 p-4 mt-6 text-center text-gray-500 
-
-dark:text-gray-400">
+    <footer class="bg-white dark:bg-gray-700 p-4 mt-6 text-center text-gray-500 dark:text-gray-400">
         <p>&copy; 2025 EduGrok. All rights reserved.</p>
     </footer>
 </body>
