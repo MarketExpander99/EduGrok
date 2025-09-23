@@ -2,6 +2,7 @@ from flask import request, render_template, redirect, url_for, session, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_db
 import logging
+import sqlite3
 
 logger = logging.getLogger(__name__)
 
