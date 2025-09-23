@@ -1,4 +1,4 @@
-from flask import request, render_template, redirect, url_for, session, flash
+from flask import jsonify, request, render_template, redirect, url_for, session, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_db
 import logging
@@ -81,5 +81,47 @@ def login():
             logger.error(f"Login failed: {str(e)}")
             flash("Server error during login", "error")
             return render_template('login.html.j2', error="Server error", 
-                                 theme=session.get('theme', 'astronaut'), login=session.get('language', 'en'))
+                                 theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     return render_template('login.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+
+def logout():
+    session.clear()
+    logger.info("User logged out")
+    flash("Logged out successfully", "success")
+    return redirect(url_for('landing'))
+
+def set_theme():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    theme = request.form.get('theme')
+    if theme not in ['astronaut', 'farm', 'space']:
+        return jsonify({'success': False, 'error': 'Invalid theme'}), 400
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session['user_id']))
+        conn.commit()
+        session['theme'] = theme
+        logger.info(f"Theme updated to {theme} for user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Set theme failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+def set_language():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    language = request.form.get('language')
+    if language not in ['en', 'bilingual']:
+        return jsonify({'success': False, 'error': 'Invalid language'}), 400
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE users SET language = ? WHERE id = ?", (language, session['user_id']))
+        conn.commit()
+        session['language'] = language
+        logger.info(f"Language updated to {language} for user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Set language failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
