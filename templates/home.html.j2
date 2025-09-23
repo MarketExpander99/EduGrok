@@ -13,11 +13,11 @@
     <button type="submit" class="btn-success">Post</button>
 </form>
 
-<h2 class="text-2xl font-semibold mb-4">Recent Posts</h2>
+<h2 class="text-2xl font-semibold mb-4">Social Feed</h2>
 {% if posts %}
     {% for post in posts %}
         <div class="post-card">
-            <p><strong>{{ post.handle }}</strong> (Grade {{ post.grade }}) - {{ post.created_at }}</p>
+            <h3>{{ post.handle }} (Grade {{ post.grade }}) - {{ post.created_at }}</h3>
             <p>{{ post.content }}</p>
             <p>Subject: {{ post.subject }}</p>
             <p>Likes: {{ post.likes }}</p>

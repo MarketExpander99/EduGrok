@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body class="theme-{{ theme | default('astronaut') }}">
-    <nav class="bg-blue-600 text-white p-4 shadow-md">
+    <nav class="nav-bar">
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold">EduGrok - Dino Cowboy Adventures!</h1>
             {% if session.user_id %}

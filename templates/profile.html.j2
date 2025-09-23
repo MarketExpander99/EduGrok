@@ -4,7 +4,7 @@
 <h2 class="text-2xl font-semibold mb-4">Your Profile, Dino Cowboy!</h2>
 
 {% if user %}
-    <div class="lesson-card">
+    <div class="post-card">  <!-- Using post-card for user info to vary style -->
         <h3>User Info</h3>
         <p><strong>Handle:</strong> {{ user.handle | default('User') }}</p>
         <p><strong>Grade:</strong> {{ grade }}</p>
@@ -12,14 +12,14 @@
         <p><strong>Points:</strong> {{ points | default(0) }}</p>
     </div>
 
-    <div class="lesson-card">
+    <div class="lesson-card">  <!-- Using lesson-card for progress */
         <h3>Progress</h3>
         <p><strong>Lessons Completed:</strong> {{ lessons_completed }}</p>
         <p><strong>Games Played:</strong> {{ games_played }}</p>
         <p><strong>Average Test Score:</strong> {{ avg_score }}</p>
     </div>
 
-    <div class="lesson-card">
+    <div class="post-card">  <!-- Using post-card for badges */
         <h3>Badges</h3>
         {% if badges %}
             {% for badge in badges %}
@@ -30,7 +30,7 @@
         {% endif %}
     </div>
 
-    <div class="lesson-card">
+    <div class="lesson-card">  <!-- Using lesson-card for feedback */
         <h3>Feedback History</h3>
         {% if feedbacks %}
             {% for feedback in feedbacks %}
@@ -41,7 +41,7 @@
         {% endif %}
     </div>
 
-    <div class="lesson-card">
+    <div class="post-card">  <!-- Using post-card for settings */
         <h3>Settings</h3>
         <form action="{{ url_for('set_theme') }}" method="POST" class="mb-4">
             <label for="theme" class="block mb-2">Theme:</label>
@@ -61,8 +61,6 @@
         </form>
     </div>
 {% else %}
-    <div class="lesson-card">
-        <p class="text-red-500">Unable to load user information. Please <a href="{{ url_for('login') }}" class="btn-primary">log in again</a>.</p>
-    </div>
+    <p class="text-red-500">Unable to load user information. Please log in again.</p>
 {% endif %}
 {% endblock %}
