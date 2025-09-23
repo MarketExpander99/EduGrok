@@ -1,115 +1,112 @@
-{% extends "base.html.j2" %}
+{% extends 'base.html.j2' %}
+{% block title %}Phonics Game - EduGrok{% endblock %}
 {% block content %}
-<div class="container mx-auto px-4 py-8 max-w-4xl">
-  <h1 class="text-3xl font-bold text-center mb-6 {{ theme.text_color | default('text-gray-800') }}">Phonics Memory Match: M Sounds</h1>
-  <p class="text-lg text-center mb-8 {{ theme.text_color | default('text-gray-600') }}">Match the M-sound words to earn Star Coins!</p>
-  <div id="game-board" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4" role="grid" aria-label="Memory match game board">
-    <!-- Cards rendered by JS -->
-  </div>
-  <div id="game-status" class="text-center mt-6 text-lg font-semibold {{ theme.text_color | default('text-gray-800') }}" role="status" aria-live="polite"></div>
-  <div class="flex justify-center mt-6">
-    <button id="reset-game" class="bg-{{ theme.button_bg | default('blue-500') }} text-white px-6 py-3 rounded-lg shadow-md hover:bg-{{ theme.button_hover | default('blue-600') }} transition duration-200" aria-label="Reset game">Play Again</button>
+<div class="container mx-auto p-4 game-container">
+  <h1 class="text-3xl font-bold mb-4 text-center">Mars Memory Match: Phonics Pirate Raid</h1>
+  <div id="timer" class="text-2xl font-bold text-center mb-4 text-green-500">Time: 30s</div>
+  <p class="text-center mb-4">Match the M-sound words before the space pirates steal them!</p>
+  <div id="taunt" class="text-center mb-4 text-red-500 hidden"></div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {% for word in ['moon', 'mars', 'mug', 'mat', 'moon', 'mars', 'mug', 'mat'] %}
+      <div class="card bg-gray-100 dark:bg-gray-800 p-4 rounded cursor-pointer game-input transform transition-transform duration-300" data-word="{{ word }}" onclick="flipCard(this)">
+        <span class="front text-center text-xl">{{ word }}</span>
+        <span class="back hidden text-center text-xl">?</span>
+      </div>
+    {% endfor %}
   </div>
 </div>
-
 <script>
-  const wordPairs = [
-    { word: 'moon', id: 1 }, { word: 'moon', id: 1 },
-    { word: 'mug', id: 2 }, { word: 'mug', id: 2 },
-    { word: 'mouse', id: 3 }, { word: 'mouse', id: 3 },
-    { word: 'milk', id: 4 }, { word: 'milk', id: 4 },
-    { word: 'map', id: 5 }, { word: 'map', id: 5 }
-  ];
+const taunts = [
+  "Argh, ye missed me treasure!",
+  "Shiver me timbers, try again!",
+  "Ye'll never catch me words!"
+];
+let flippedCards = [];
+let matchedPairs = 0;
+let timeLeft = 30;
+let timerId = null;
+const timerDisplay = document.getElementById('timer');
+const tauntDisplay = document.getElementById('taunt');
 
-  function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+function startTimer() {
+  timerId = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = `Time: ${timeLeft}s`;
+    timerDisplay.className = `text-2xl font-bold text-center mb-4 ${timeLeft <= 10 ? 'text-red-500' : 'text-green-500'}`;
+    if (timeLeft <= 0) {
+      clearInterval(timerId);
+      alert("Time's up! The pirates stole your words!");
+      document.querySelectorAll('.game-input').forEach(input => input.classList.add('cursor-not-allowed'));
+      document.querySelectorAll('.card').forEach(card => card.onclick = null);
     }
-    return array;
-  }
+  }, 1000);
+}
 
-  let flippedCards = [];
-  let matchedPairs = 0;
-  const totalPairs = wordPairs.length / 2;
-
-  function initGame() {
-    const gameBoard = document.getElementById('game-board');
-    gameBoard.innerHTML = '';
-    flippedCards = [];
-    matchedPairs = 0;
-    document.getElementById('game-status').textContent = 'Find the matching M-sound words!';
-    
-    const shuffledCards = shuffle([...wordPairs]);
-    shuffledCards.forEach((card, index) => {
-      const cardElement = document.createElement('div');
-      cardElement.className = 'card bg-{{ theme.card_bg | default('gray-200') }} p-4 rounded-lg shadow-md cursor-pointer text-center h-24 flex items-center justify-center';
-      cardElement.dataset.id = card.id;
-      cardElement.dataset.word = card.word;
-      cardElement.setAttribute('role', 'button');
-      cardElement.setAttribute('aria-label', `Card ${index + 1}, face down`);
-      cardElement.setAttribute('tabindex', '0');
-      cardElement.innerHTML = '<span class="card-face hidden text-xl font-semibold">{{ theme.card_back | default('?') }}</span>';
-      cardElement.addEventListener('click', () => flipCard(cardElement));
-      cardElement.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') flipCard(cardElement);
-      });
-      gameBoard.appendChild(cardElement);
-    });
-  }
-
-  function flipCard(cardElement) {
-    if (flippedCards.length < 2 && !flippedCards.includes(cardElement) && !cardElement.classList.contains('matched')) {
-      cardElement.classList.add('flipped', '{{ theme.card_flipped_bg | default('bg-green-500') }}', 'text-white');
-      cardElement.querySelector('.card-face').classList.remove('hidden');
-      cardElement.querySelector('.card-face').textContent = cardElement.dataset.word;
-      cardElement.setAttribute('aria-label', `Card showing ${cardElement.dataset.word}`);
-      flippedCards.push(cardElement);
-
-      if (flippedCards.length === 2) {
-        checkMatch();
-      }
-    }
-  }
-
-  function checkMatch() {
+function flipCard(card) {
+  if (timeLeft <= 0 || flippedCards.length >= 2 || card.classList.contains('matched')) return;
+  card.classList.add('rotate-y-180');
+  card.querySelector('.front').classList.add('hidden');
+  card.querySelector('.back').classList.remove('hidden');
+  flippedCards.push(card);
+  if (flippedCards.length === 2) {
     const [card1, card2] = flippedCards;
-    if (card1.dataset.id === card2.dataset.id) {
-      card1.classList.add('matched', '{{ theme.card_matched_bg | default('bg-green-600') }}');
-      card2.classList.add('matched', '{{ theme.card_matched_bg | default('bg-green-600') }}');
-      card1.setAttribute('aria-label', `Matched card: ${card1.dataset.word}`);
-      card2.setAttribute('aria-label', `Matched card: ${card2.dataset.word}`);
+    if (card1.dataset.word === card2.dataset.word) {
+      card1.classList.add('matched', 'bg-green-200', 'dark:bg-green-700');
+      card2.classList.add('matched', 'bg-green-200', 'dark:bg-green-700');
       matchedPairs++;
-      document.getElementById('game-status').textContent = `Match found! ${matchedPairs}/${totalPairs} pairs matched.`;
-      flippedCards = [];
-
-      if (matchedPairs === totalPairs) {
-        document.getElementById('game-status').textContent = 'You won! All pairs matched!';
-        fetch('/update_coins', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ coins: 10 })
-        }).then(response => response.json()).then(data => {
-          if (data.success) {
-            document.getElementById('game-status').textContent += ` Earned 10 Star Coins!`;
-          }
-        });
+      if (matchedPairs === 4) {
+        completeGame();
       }
     } else {
-      document.getElementById('game-status').textContent = 'No match, try again!';
+      tauntDisplay.textContent = taunts[Math.floor(Math.random() * taunts.length)];
+      tauntDisplay.classList.remove('hidden');
       setTimeout(() => {
-        flippedCards.forEach(card => {
-          card.classList.remove('flipped', '{{ theme.card_flipped_bg | default('bg-green-500') }}', 'text-white');
-          card.querySelector('.card-face').classList.add('hidden');
-          card.setAttribute('aria-label', `Card face down`);
-        });
-        flippedCards = [];
-        document.getElementById('game-status').textContent = 'Find the matching M-sound words!';
+        card1.classList.remove('rotate-y-180');
+        card2.classList.remove('rotate-y-180');
+        card1.querySelector('.front').classList.remove('hidden');
+        card1.querySelector('.back').classList.add('hidden');
+        card2.querySelector('.front').classList.remove('hidden');
+        card2.querySelector('.back').classList.add('hidden');
+        tauntDisplay.classList.add('hidden');
       }, 1000);
     }
+    flippedCards = [];
   }
+}
 
-  document.getElementById('reset-game').addEventListener('click', initGame);
-  initGame();
+function completeGame() {
+  if (timeLeft > 0) {
+    clearInterval(timerId);
+    fetch('/update_coins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coins: 5 })
+    }).then(response => response.json()).then(data => {
+      if (data.success) {
+        alert('You beat the pirates! +5 Star Coins');
+        window.location.href = '/profile';
+      } else {
+        alert('Failed to award coins: ' + (data.error || 'Unknown error'));
+      }
+    }).catch(error => {
+      alert('Error completing game');
+      console.error(error);
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  startTimer();
+  const cards = document.querySelectorAll('.card');
+  const shuffled = [...cards].sort(() => Math.random() - 0.5);
+  const container = document.querySelector('.grid');
+  container.innerHTML = '';
+  shuffled.forEach(card => container.appendChild(card));
+});
 </script>
+<style>
+.card { transition: transform 0.3s; }
+.card.matched { pointer-events: none; }
+.rotate-y-180 { transform: rotateY(180deg); }
+</style>
 {% endblock %}
