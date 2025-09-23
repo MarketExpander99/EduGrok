@@ -7,26 +7,32 @@
     <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
     <script>
         function redeemCoins() {
-            const pointsSpan = document.getElementById('points-display');
-            let currentPoints = parseInt(pointsSpan.textContent) || 0;
-            if (currentPoints < 10) {
+            const coinsSpan = document.getElementById('coins-display');
+            let currentCoins = parseInt(coinsSpan.textContent) || 0;
+            if (currentCoins < 10) {
                 alert('Not enough Star Coins! Need 10 to redeem.');
                 return;
             }
-            fetch('/update_points?points=-10', { method: 'GET' })
-                .then(response => {
-                    if (response.ok) {
-                        currentPoints -= 10;
-                        pointsSpan.textContent = currentPoints;
-                        alert('Badge unlocked! Star Coins updated.');
-                    } else {
-                        alert('Redemption failed - try again.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Redemption error:', error);
-                    alert('Error - check console.');
-                });
+            fetch('/update_coins', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({coins: -10})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentCoins -= 10;
+                    coinsSpan.textContent = currentCoins;
+                    alert('Badge unlocked! Star Coins updated.');
+                    location.reload(); // Refresh to show new badge
+                } else {
+                    alert('Redemption failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Redemption error:', error);
+                alert('Error - check console.');
+            });
         }
     </script>
 </head>
@@ -63,10 +69,20 @@
             </div>
             <div class="mt-6 p-4 bg-purple-50 dark:bg-purple-900 rounded">
                 <h3 class="font-medium">Star Coins</h3>
-                <p class="text-3xl mb-2" id="points-display">{{ points|default(0) }}</p>
+                <p class="text-3xl mb-2" id="coins-display">{{ star_coins|default(0) }}</p>
                 <button onclick="redeemCoins()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Redeem 10 Coins for Badge</button>
                 <p class="text-sm mt-2">Unlock a virtual badge or premium lesson!</p>
             </div>
+            {% if badges %}
+            <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded">
+                <h3 class="font-medium">Your Badges</h3>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    {% for badge in badges %}
+                    <span class="bg-blue-200 dark:bg-blue-700 text-sm px-3 py-1 rounded-full">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

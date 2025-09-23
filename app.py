@@ -20,6 +20,9 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
 
+# Set explicit database path for PythonAnywhere
+app.config['DATABASE'] = os.environ.get('DB_PATH', '/home/Edugrok/EduGrok-main/edugrok.db')
+
 # Secure session settings
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -27,8 +30,8 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax'
 )
 
-# Configure logging
-handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=1)
+# Configure logging to writable /tmp directory
+handler = RotatingFileHandler('/tmp/app.log', maxBytes=10000, backupCount=1)
 handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -67,6 +70,10 @@ app.add_url_rule('/set_language', 'set_language', set_language, methods=['POST']
 def init_app():
     with app.app_context():
         try:
+            # Ensure DB directory exists
+            db_dir = os.path.dirname(app.config['DATABASE'])
+            if not os.path.exists(db_dir):
+                os.makedirs(db_dir)
             init_db()
             check_db_schema()
             seed_lessons()
@@ -236,15 +243,17 @@ def complete_lesson(lesson_id):
             c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = ? AND completed = 1", (session['user_id'],))
             if c.fetchone()[0] >= 5:
                 c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, 'Lesson Master', ?)", (session['user_id'], datetime.now().isoformat()))
-                requests.post('https://www.google-analytics.com/mp/collect', json={
-                    'client_id': str(session['user_id']),
-                    'events': [{'name': 'badge_earned', 'params': {'badge_name': 'Lesson Master'}}]
-                }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
+                # Commented out Google Analytics call due to placeholder values
+                # requests.post('https://www.google-analytics.com/mp/collect', json={
+                #     'client_id': str(session['user_id']),
+                #     'events': [{'name': 'badge_earned', 'params': {'badge_name': 'Lesson Master'}}]
+                # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         conn.commit()
-        requests.post('https://www.google-analytics.com/mp/collect', json={
-            'client_id': str(session['user_id']),
-            'events': [{'name': 'lesson_completed', 'params': {'lesson_id': lesson_id}}]
-        }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
+        # Commented out Google Analytics call due to placeholder values
+        # requests.post('https://www.google-analytics.com/mp/collect', json={
+        #     'client_id': str(session['user_id']),
+        #     'events': [{'name': 'lesson_completed', 'params': {'lesson_id': lesson_id}}]
+        # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {str(e)}")
@@ -267,10 +276,11 @@ def take_test():
             points_award = score * 2
             c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
             conn.commit()
-            requests.post('https://www.google-analytics.com/mp/collect', json={
-                'client_id': str(session['user_id']),
-                'events': [{'name': 'test_completed', 'params': {'score': score}}]
-            }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
+            # Commented out Google Analytics call due to placeholder values
+            # requests.post('https://www.google-analytics.com/mp/collect', json={
+            #     'client_id': str(session['user_id']),
+            #     'events': [{'name': 'test_completed', 'params': {'score': score}}]
+            # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
             return redirect(url_for('game', score=score))
         except Exception as e:
             logger.error(f"Test failed: {str(e)}")
@@ -438,16 +448,18 @@ def generate_lesson():
         logger.error("Invalid grade or subject")
         return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
-        api_url = "https://x.ai/api"
-        headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}
-        payload = {
-            "grade": int(grade),
-            "subject": subject,
-            "language": "en"
-        }
-        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
-        lesson_content = response.json().get("content", f"Generated {subject} lesson for Grade {grade}")
+        # Commented out API call due to placeholder key
+        # api_url = "https://x.ai/api"
+        # headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}
+        # payload = {
+        #     "grade": int(grade),
+        #     "subject": subject,
+        #     "language": "en"
+        # }
+        # response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        # response.raise_for_status()
+        # lesson_content = response.json().get("content", f"Generated {subject} lesson for Grade {grade}")
+        lesson_content = f"Generated {subject} lesson for Grade {grade}"  # Fallback content
         if session.get('language') == 'bilingual':
             lesson_content += f"<br>Afrikaans: Gegenereerde {subject} les vir Graad {grade}"
         conn = get_db()
@@ -512,10 +524,11 @@ def award_badge(badge_name):
                   (session['user_id'], badge_name, datetime.now().isoformat()))
         conn.commit()
         logger.info(f"Awarded badge '{badge_name}' to user {session['user_id']}")
-        requests.post('https://www.google-analytics.com/mp/collect', json={
-            'client_id': str(session['user_id']),
-            'events': [{'name': 'badge_earned', 'params': {'badge_name': badge_name}}]
-        }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
+        # Commented out Google Analytics call due to placeholder values
+        # requests.post('https://www.google-analytics.com/mp/collect', json={
+        #     'client_id': str(session['user_id']),
+        #     'events': [{'name': 'badge_earned', 'params': {'badge_name': badge_name}}]
+        # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Award badge failed: {str(e)}")

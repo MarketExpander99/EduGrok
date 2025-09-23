@@ -254,3 +254,4 @@ def seed_lessons():
         print(f"Seed lessons failed: {e}")
         conn.rollback()
         raise
+    
