@@ -1,93 +1,68 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile - EduGrok</title>
-    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
-    <script>
-        function redeemCoins() {
-            const coinsSpan = document.getElementById('coins-display');
-            let currentCoins = parseInt(coinsSpan.textContent) || 0;
-            if (currentCoins < 10) {
-                alert('Not enough Star Coins! Need 10 to redeem.');
-                return;
-            }
-            fetch('/update_coins', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({coins: -10})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentCoins -= 10;
-                    coinsSpan.textContent = currentCoins;
-                    alert('Badge unlocked! Star Coins updated.');
-                    location.reload(); // Refresh to show new badge
-                } else {
-                    alert('Redemption failed: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Redemption error:', error);
-                alert('Error - check console.');
-            });
-        }
-    </script>
-</head>
-<body class="min-h-screen {{ theme }} bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
-    <header class="bg-white dark:bg-gray-700 p-4 shadow">
-        <h1 class="text-3xl font-bold">EduGrok Profile</h1>
-        <nav class="mt-2">
-            <a href="{{ url_for('home') }}" class="mr-4 text-blue-500 hover:underline">Home</a>
-            <a href="{{ url_for('lessons') }}" class="mr-4 text-blue-500 hover:underline">Lessons</a>
-            <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline">Logout</a>
-        </nav>
-    </header>
+{% extends "base.html.j2" %}
 
-    <div class="container mx-auto p-4">
-        <div class="bg-white dark:bg-gray-700 p-6 rounded shadow">
-            <h2 class="text-2xl font-semibold mb-4">Your Progress</h2>
-            <div class="grid md:grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-50 dark:bg-gray-600 rounded">
-                    <h3 class="font-medium">Lessons Completed</h3>
-                    <p class="text-2xl">{{ lessons_completed }}</p>
-                </div>
-                <div class="p-4 bg-gray-50 dark:bg-gray-600 rounded">
-                    <h3 class="font-medium">Games Played</h3>
-                    <p class="text-2xl">{{ games_played }}</p>
-                </div>
-                <div class="p-4 bg-gray-50 dark:bg-gray-600 rounded">
-                    <h3 class="font-medium">Average Score</h3>
-                    <p class="text-2xl">{{ avg_score }}%</p>
-                </div>
-                <div class="p-4 bg-gray-50 dark:bg-gray-600 rounded">
-                    <h3 class="font-medium">Grade</h3>
-                    <p class="text-2xl">{{ grade }}</p>
-                </div>
-            </div>
-            <div class="mt-6 p-4 bg-purple-50 dark:bg-purple-900 rounded">
-                <h3 class="font-medium">Star Coins</h3>
-                <p class="text-3xl mb-2" id="coins-display">{{ star_coins|default(0) }}</p>
-                <button onclick="redeemCoins()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Redeem 10 Coins for Badge</button>
-                <p class="text-sm mt-2">Unlock a virtual badge or premium lesson!</p>
-            </div>
-            {% if badges %}
-            <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded">
-                <h3 class="font-medium">Your Badges</h3>
-                <div class="flex flex-wrap gap-2 mt-2">
-                    {% for badge in badges %}
-                    <span class="bg-blue-200 dark:bg-blue-700 text-sm px-3 py-1 rounded-full">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Your Profile, Dino Cowboy!</h2>
+
+{% if user %}
+    <div class="lesson-card">
+        <h3>User Info</h3>
+        <p><strong>Handle:</strong> {{ user.handle | default('User') }}</p>
+        <p><strong>Grade:</strong> {{ grade }}</p>
+        <p><strong>Star Coins:</strong> {{ star_coins | default(0) }}</p>
+        <p><strong>Points:</strong> {{ points | default(0) }}</p>
     </div>
 
-    <footer class="bg-white dark:bg-gray-700 p-4 mt-6 text-center text-gray-500 dark:text-gray-400">
-        <p>&copy; 2025 EduGrok. All rights reserved.</p>
-    </footer>
-</body>
-</html>
+    <div class="lesson-card">
+        <h3>Progress</h3>
+        <p><strong>Lessons Completed:</strong> {{ lessons_completed }}</p>
+        <p><strong>Games Played:</strong> {{ games_played }}</p>
+        <p><strong>Average Test Score:</strong> {{ avg_score }}</p>
+    </div>
+
+    <div class="lesson-card">
+        <h3>Badges</h3>
+        {% if badges %}
+            {% for badge in badges %}
+                <span class="badge">{{ badge.badge_name }} ({{ badge.awarded_date }})</span>
+            {% endfor %}
+        {% else %}
+            <p>No badges yet. Keep learning to earn some!</p>
+        {% endif %}
+    </div>
+
+    <div class="lesson-card">
+        <h3>Feedback History</h3>
+        {% if feedbacks %}
+            {% for feedback in feedbacks %}
+                <p><strong>Rating:</strong> {{ feedback.rating }} - <strong>Comments:</strong> {{ feedback.comments | default('None') }} - <strong>Date:</strong> {{ feedback.submitted_date }}</p>
+            {% endfor %}
+        {% else %}
+            <p>No feedback submitted yet. <a href="{{ url_for('feedback') }}" class="btn-primary">Submit Feedback</a></p>
+        {% endif %}
+    </div>
+
+    <div class="lesson-card">
+        <h3>Settings</h3>
+        <form action="{{ url_for('set_theme') }}" method="POST" class="mb-4">
+            <label for="theme" class="block mb-2">Theme:</label>
+            <select name="theme" id="theme" class="p-2 border rounded">
+                <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
+                <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
+            </select>
+            <button type="submit" class="btn-primary mt-2">Update Theme</button>
+        </form>
+        <form action="{{ url_for('set_language') }}" method="POST">
+            <label for="language" class="block mb-2">Language:</label>
+            <select name="language" id="language" class="p-2 border rounded">
+                <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
+                <option value="bilingual" {% if language == 'bilingual' %}selected{% endif %}>Bilingual (English/Afrikaans)</option>
+            </select>
+            <button type="submit" class="btn-primary mt-2">Update Language</button>
+        </form>
+    </div>
+{% else %}
+    <div class="lesson-card">
+        <p class="text-red-500">Unable to load user information. Please <a href="{{ url_for('login') }}" class="btn-primary">log in again</a>.</p>
+    </div>
+{% endif %}
+{% endblock %}

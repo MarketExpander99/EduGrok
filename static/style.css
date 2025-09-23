@@ -1,171 +1,111 @@
-/* Global Styles - Inspired by X dark mode + demo educational cards */
+/* Global Styles */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    margin: 0;
-    padding: 16px;
-    background-color: #1a1e2d;
-    color: #ffffff;
-    line-height: 1.5;
-}
-
-h1, h2 {
-    color: #00b7eb;
-    margin: 16px 0 8px;
-}
-
-a {
-    color: #00b7eb;
-    text-decoration: none;
-}
-
-a:hover {
-    text-decoration: underline;
-}
-
-/* Navigation - Aligned buttons like X sidebar/demo header */
-.nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
+    font-family: 'Arial', sans-serif;
 }
 
 /* Theme Classes */
-.astronaut {
-    background-color: #000022;
-    background-image: linear-gradient(to bottom, #000022, #1a1e2d);
+.theme-astronaut {
+    background-color: #1e3a8a;
+    color: white;
 }
 
-.farm {
-    background-color: #4caf50;
-    color: #000;
+.theme-farm {
+    background-color: #bef264;
+    color: black;
 }
 
-.farm h1, .farm h2, .farm a {
-    color: #ff5722;
+/* Lesson Card Styling (Consistent Across Pages) */
+.lesson-card {
+    @apply bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-yellow-500;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
-/* Feed and Posts */
-.feed-post {
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    padding: 16px;
-    margin: 16px 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+.lesson-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.feed-post:hover {
-    background-color: rgba(255, 255, 255, 0.15);
+.lesson-card h3 {
+    @apply text-xl font-semibold mb-2 text-gray-800;
 }
 
-/* Buttons */
-.btn {
-    background-color: #00b7eb;
-    color: #fff;
-    padding: 8px 16px;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+.lesson-card p {
+    @apply text-gray-700 mb-4;
 }
 
-.btn:hover {
-    background-color: #0095c4;
+/* Media Support in Lesson Cards */
+.lesson-card img, .lesson-card video {
+    @apply w-full max-w-xs rounded-lg shadow-sm mb-4;
+    max-height: 200px;
+    object-fit: cover;
 }
 
-.like-btn {
-    background: none;
-    color: #ff0000;
-    font-size: 1.2em;
-    padding: 8px;
+.lesson-card video {
+    max-width: 300px;
 }
 
-.like-btn:hover {
-    color: #cc0000;
+/* Post Card Styling */
+.post-card {
+    @apply bg-white p-4 rounded-lg shadow-md mb-4;
 }
 
-/* Lesson/Game Cards */
-.lesson-card, .game-container {
-    background-color: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
-    padding: 16px;
-    margin: 16px 0;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+.post-card h3 {
+    @apply text-lg font-semibold text-gray-800;
 }
 
-/* Profile Stats */
-.profile-stat {
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 8px 16px;
-    margin: 8px 0;
-    border-radius: 4px;
+.post-card p {
+    @apply text-gray-700;
 }
 
-/* Canvas for Games */
-#gameCanvas {
-    border: 2px solid #00b7eb;
-    box-shadow: 0 0 10px #00b7eb;
+/* Button Styling */
+.btn-primary {
+    @apply bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors;
 }
 
-/* Forms */
-form label {
-    margin: 8px 0;
-    display: block;
+.btn-success {
+    @apply bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors;
 }
 
-form input[type="email"], form input[type="password"], form select {
-    padding: 8px;
-    border: 1px solid #00b7eb;
-    border-radius: 4px;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    width: 200px;
-    box-sizing: border-box;
+.btn-warning {
+    @apply bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors;
 }
 
-form input[type="radio"] {
-    margin: 0 8px 0 0;
+/* Form Styling */
+form input, form select, form textarea {
+    @apply w-full p-2 border border-gray-300 rounded mb-2;
 }
 
-/* Radio Button Group */
-.radio-group {
-    margin: 8px 0;
-    padding: 8px;
-}
-
-.radio-group label {
-    display: flex;
-    align-items: center;
-    margin: 4px 0;
-}
-
-/* Error Messages */
-.error {
-    color: #ff0000;
-    margin: 8px 0;
-}
-
-/* Responsive */
+/* Responsive Design */
 @media (max-width: 768px) {
-    body {
-        padding: 8px;
+    .container {
+        padding: 1rem;
     }
-    .feed-post, .lesson-card, .game-container {
-        padding: 8px;
-        margin: 8px 0;
-    }
-    form input[type="email"], form input[type="password"], form select {
-        width: 100%;
-    }
-    .nav {
+    
+    nav div.flex {
         flex-direction: column;
-        gap: 4px;
+        gap: 1rem;
     }
 }
 
+/* Badge Styling */
+.badge {
+    @apply bg-yellow-200 text-black px-2 py-1 rounded inline-block mr-2 mb-2 font-semibold;
+}
+
+/* Timer Styling for Games */
+.timer {
+    @apply text-xl font-bold text-red-600 mb-4;
+}
+
+/* Game Card Styling */
+.game-card {
+    @apply bg-white p-4 rounded-lg shadow-md text-center cursor-pointer transition-transform transform hover:scale-105;
+}
+
+.game-card-flipped {
+    @apply bg-blue-500 text-white;
+}
+
+.game-card-matched {
+    @apply bg-green-500 text-white;
+}

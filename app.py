@@ -223,25 +223,6 @@ def like_post(post_id):
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
-@app.route('/report/<int:post_id>')
-def report_post(post_id):
-    logger.debug(f"Reporting post {post_id}")
-    if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('login'))
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("UPDATE posts SET reported = 1 WHERE id = ?", (post_id,))
-        conn.commit()
-        logger.info(f"User {session['user_id']} reported post {post_id}")
-        return redirect(url_for('home'))
-    except Exception as e:
-        logger.error(f"Report post failed: {str(e)}")
-        conn.rollback()
-        flash('Server error', 'error')
-        return redirect(url_for('home'))
-
 @app.route('/assess', methods=['GET', 'POST'])
 def assess():
     logger.debug("Assess route")
@@ -370,12 +351,20 @@ def game():
 def profile():
     logger.debug("Profile route")
     if 'user_id' not in session:
+        logger.debug("No user_id in session, redirecting to login")
+        flash('Login required', 'error')
         return redirect(url_for('login'))
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
         user = c.fetchone()
+        if not user:
+            logger.error(f"No user found for user_id {session['user_id']}")
+            flash('User not found. Please log in again.', 'error')
+            session.pop('user_id', None)
+            return redirect(url_for('login'))
+        
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
         lessons_completed = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ?", (session['user_id'], session['grade']))
@@ -397,16 +386,20 @@ def profile():
                               lessons_completed=f"{lessons_completed}/{total_lessons}",
                               games_played=games_played,
                               avg_score=avg_score,
-                              grade=session['grade'],
+                              grade=session.get('grade', 1),
                               theme=session.get('theme', 'astronaut'),
                               language=session.get('language', 'en'),
                               points=points,
-                              star_coins=user['star_coins'],
+                              star_coins=user['star_coins'] if user['star_coins'] is not None else 0,
                               badges=badges,
                               feedbacks=feedbacks)
     except Exception as e:
-        logger.error(f"Profile failed: {str(e)}")
-        return render_template('error.html.j2', error=f"Failed to load profile: {str(e)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+        logger.error(f"Profile route failed: {str(e)}")
+        flash('Failed to load profile. Try logging in again.', 'error')
+        return render_template('error.html.j2', 
+                              error=f"Failed to load profile: {str(e)}", 
+                              theme=session.get('theme', 'astronaut'), 
+                              language=session.get('language', 'en')), 500
 
 @app.route('/parent_dashboard')
 def parent_dashboard():
@@ -655,72 +648,6 @@ def feedback():
             flash('Server error', 'error')
             return redirect(url_for('feedback'))
     return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-
-@app.route('/set_theme', methods=['POST'])
-def set_theme():
-    if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('login'))
-    theme = request.form.get('theme')
-    if theme not in ['astronaut', 'farm']:
-        flash('Invalid theme', 'error')
-        return redirect(url_for('profile'))
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session['user_id']))
-        conn.commit()
-        session['theme'] = theme
-        flash('Theme updated', 'success')
-        logger.info(f"User {session['user_id']} set theme to {theme}")
-        return redirect(url_for('profile'))
-    except Exception as e:
-        logger.error(f"Set theme failed: {str(e)}")
-        conn.rollback()
-        flash('Server error', 'error')
-        return redirect(url_for('profile'))
-
-@app.route('/set_language', methods=['POST'])
-def set_language():
-    if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('login'))
-    language = request.form.get('language')
-    if language not in ['en', 'bilingual']:
-        flash('Invalid language', 'error')
-        return redirect(url_for('profile'))
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("UPDATE users SET language = ? WHERE id = ?", (language, session['user_id']))
-        conn.commit()
-        session['language'] = language
-        flash('Language updated', 'success')
-        logger.info(f"User {session['user_id']} set language to {language}")
-        return redirect(url_for('profile'))
-    except Exception as e:
-        logger.error(f"Set language failed: {str(e)}")
-        conn.rollback()
-        flash('Server error', 'error')
-        return redirect(url_for('profile'))
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
-
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"Internal error: {str(error)} - {request.url} - Session: {session}")
-    return render_template('error.html.j2', error=f"Server error: {str(error)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
-
-@app.errorhandler(404)
-def not_found_error(error):
-    logger.error(f"404: {request.url} - Session: {session}")
-    return render_template('error.html.j2', error="Page not found.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 404
-
-@app.before_request
-def log_request():
-    logger.debug(f"Request: {request.method} {request.url} - User ID: {session.get('user_id', 'None')} - Session: {session}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
