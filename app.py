@@ -1,6 +1,6 @@
 import os
 import secrets
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, send_from_directory, abort
 from dotenv import load_dotenv
 import logging
 from logging.handlers import RotatingFileHandler
@@ -8,6 +8,8 @@ import re
 from datetime import datetime
 from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lessons
 from auth import register, login, logout, set_theme, set_language
+from urllib.parse import urlparse
+import mimetypes
 
 # Load .env file
 load_dotenv()
@@ -61,8 +63,32 @@ app.add_url_rule('/set_language', 'set_language', set_language, methods=['POST']
 # Static file route to ensure CSS serves
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    logger.debug(f"Serving static file: {filename}")
-    return send_from_directory(app.static_folder, filename)
+    # Strip query params from filename (e.g., 'styles.css?v=1' -> 'styles.css')
+    parsed = urlparse(request.path)
+    clean_filename = os.path.basename(parsed.path)  # Grabs just the file, ignores query
+    
+    try:
+        # Ensure static dir exists
+        static_dir = app.static_folder
+        if not os.path.exists(static_dir):
+            os.makedirs(static_dir)
+        
+        # Guess MIME type
+        mime_type, _ = mimetypes.guess_type(clean_filename)
+        if mime_type is None:
+            mime_type = 'application/octet-stream'
+        
+        response = send_from_directory(static_dir, clean_filename)
+        response.headers['Content-Type'] = mime_type
+        
+        logger.debug(f"Serving static file: {clean_filename} (from req: {filename}, MIME: {mime_type})")
+        return response
+    except FileNotFoundError:
+        logger.debug(f"Static file not found: {clean_filename}")
+        abort(404)
+    except Exception as e:
+        logger.error(f"Static serve error for {clean_filename}: {e}")
+        abort(500)
 
 # Initialize app
 def init_app():
