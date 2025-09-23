@@ -58,6 +58,12 @@ app.add_url_rule('/logout', 'logout', logout)
 app.add_url_rule('/set_theme', 'set_theme', set_theme, methods=['POST'])
 app.add_url_rule('/set_language', 'set_language', set_language, methods=['POST'])
 
+# Static file route to ensure CSS serves
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    logger.debug(f"Serving static file: {filename}")
+    return send_from_directory(app.static_folder, filename)
+
 # Initialize app
 def init_app():
     with app.app_context():

@@ -1,188 +1,189 @@
 /* Global Styles */
 body {
     font-family: 'Arial', sans-serif;
+    margin: 0;
 }
 
 /* Theme Classes */
 .theme-astronaut {
-    background-color: #1e3a8a;
-    color: white;
+    background-color: #1e3a8a !important;
+    color: white !important;
 }
 
 .theme-farm {
-    background-color: #bef264;
-    color: black;
+    background-color: #bef264 !important;
+    color: black !important;
 }
 
-/* Nav Bar Styling (Consistent Across Pages) */
+/* Nav Bar Styling */
 .nav-bar {
-    background-color: #1D4ED8; /* Inspired by grok.com blue */
-    color: white;
-    padding: 1rem 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #1D4ED8 !important;
+    color: white !important;
+    padding: 1rem 0 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Lesson Card Styling (Warm, Educational) */
 .lesson-card {
-    background-color: #FEF9E7; /* Light yellow for warmth, inspired by Khan Academy content blocks */
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin-bottom: 1.5rem;
-    border-left: 4px solid #F59E0B; /* Orange accent for energy */
-    transition: transform 0.2s, box-shadow 0.2s;
+    background-color: #FEF9E7 !important; /* Light yellow, Khan Academy-inspired */
+    padding: 1.5rem !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    margin-bottom: 1.5rem !important;
+    border-left: 4px solid #F59E0B !important; /* Orange accent */
+    transition: transform 0.2s, box-shadow 0.2s !important;
 }
 
 .lesson-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-4px) !important;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 .lesson-card h3 {
-    color: #92400E; /* Dark brown for title, earthy feel */
-    font-size: 1.25rem;
-    margin-bottom: 0.5rem;
+    color: #92400E !important; /* Dark brown */
+    font-size: 1.25rem !important;
+    margin-bottom: 0.5rem !important;
 }
 
 .lesson-card p {
-    color: #4B5563; /* Gray for text */
-    margin-bottom: 1rem;
+    color: #4B5563 !important; /* Gray */
+    margin-bottom: 1rem !important;
 }
 
 /* Media in Lesson Cards */
 .lesson-card img, .lesson-card video {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    margin-bottom: 1rem;
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 8px !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Post Card Styling (Social, Cool) */
 .post-card {
-    background-color: #F0F9FF; /* Light blue for social vibe, inspired by Duolingo posts */
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin-bottom: 1.5rem;
-    border-left: 4px solid #3B82F6; /* Blue accent for trust, inspired by grok.com */
-    transition: transform 0.2s, box-shadow 0.2s;
+    background-color: #F0F9FF !important; /* Light blue, Duolingo-inspired */
+    padding: 1.5rem !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    margin-bottom: 1.5rem !important;
+    border-left: 4px solid #3B82F6 !important; /* Blue accent */
+    transition: transform 0.2s, box-shadow 0.2s !important;
 }
 
 .post-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-4px) !important;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 .post-card h3 {
-    color: #1E40AF; /* Dark blue for title */
-    font-size: 1.25rem;
-    margin-bottom: 0.5rem;
+    color: #1E40AF !important; /* Dark blue */
+    font-size: 1.25rem !important;
+    margin-bottom: 0.5rem !important;
 }
 
 .post-card p {
-    color: #4B5563; /* Gray for text */
-    margin-bottom: 1rem;
+    color: #4B5563 !important; /* Gray */
+    margin-bottom: 1rem !important;
 }
 
 /* Button Styling */
 .btn-primary {
-    background-color: #3B82F6; /* Blue, inspired by grok.com buttons */
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    transition: background-color 0.2s;
+    background-color: #3B82F6 !important;
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s !important;
 }
 
 .btn-primary:hover {
-    background-color: #1D4ED8;
+    background-color: #1D4ED8 !important;
 }
 
 .btn-success {
-    background-color: #48BB78; /* Green, inspired by Duolingo success */
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    transition: background-color 0.2s;
+    background-color: #48BB78 !important;
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s !important;
 }
 
 .btn-success:hover {
-    background-color: #38A169;
+    background-color: #38A169 !important;
 }
 
 .btn-warning {
-    background-color: #F59E0B; /* Orange for reset, inspired by Khan Academy warnings */
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    transition: background-color 0.2s;
+    background-color: #F59E0B !important;
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s !important;
 }
 
 .btn-warning:hover {
-    background-color: #D97706;
+    background-color: #D97706 !important;
 }
 
 /* Form Styling */
 form input, form select, form textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #D1D5DB;
-    border-radius: 6px;
-    margin-bottom: 1rem;
+    width: 100% !important;
+    padding: 0.5rem !important;
+    border: 1px solid #D1D5DB !important;
+    border-radius: 6px !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
-        padding: 1rem;
+        padding: 1rem !important;
     }
     
     .nav-bar .flex {
-        flex-direction: column;
-        gap: 0.5rem;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
     }
 }
 
 /* Badge Styling */
 .badge {
-    background-color: #FCD34D; /* Yellow for badges, inspired by award-winning designs */
-    color: #92400E;
-    padding: 0.25rem 0.5rem;
-    border-radius: 9999px; /* Pill shape */
-    font-size: 0.875rem;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-    display: inline-block;
+    background-color: #FCD34D !important;
+    color: #92400E !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 9999px !important;
+    font-size: 0.875rem !important;
+    margin-right: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    display: inline-block !important;
 }
 
 /* Timer Styling for Games */
 .timer {
-    color: #EF4444; /* Red for urgency */
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin-bottom: 1rem;
+    color: #EF4444 !important;
+    font-size: 1.25rem !important;
+    font-weight: bold !important;
+    margin-bottom: 1rem !important;
 }
 
 /* Game Card Styling */
 .game-card {
-    background-color: white;
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    cursor: pointer;
-    transition: transform 0.2s;
+    background-color: white !important;
+    padding: 1rem !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    text-align: center !important;
+    cursor: pointer !important;
+    transition: transform 0.2s !important;
 }
 
 .game-card:hover {
-    transform: scale(1.05);
+    transform: scale(1.05) !important;
 }
 
 .game-card-flipped {
-    background-color: #3B82F6;
-    color: white;
+    background-color: #3B82F6 !important;
+    color: white !important;
 }
 
 .game-card-matched {
-    background-color: #48BB78;
-    color: white;
+    background-color: #48BB78 !important;
+    color: white !important;
 }
