@@ -55,11 +55,16 @@
         <nav class="mt-2">
             <a href="{{ url_for('home') }}" class="mr-4 text-blue-500 hover:underline">Home</a>
             <a href="{{ url_for('lessons') }}" class="mr-4 text-blue-500 hover:underline">Lessons</a>
+            <a href="{{ url_for('phonics_game') }}" class="mr-4 text-blue-500 hover:underline">Phonics Game</a>
             <a href="{{ url_for('profile') }}" class="text-blue-500 hover:underline">Profile</a>
         </nav>
     </header>
 
     <div class="container mx-auto p-4">
+        <!-- Phonics Game Link -->
+        <div class="flex justify-center mb-4">
+            <a href="{{ url_for('phonics_game') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Play Phonics Game</a>
+        </div>
         <!-- Welcome Message -->
         <div class="bg-white dark:bg-gray-700 p-4 mb-6 rounded shadow">
             <h2 class="text-xl font-semibold">Welcome, {{ session.get('email', 'Guest') }}!</h2>
