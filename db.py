@@ -10,21 +10,28 @@ logger = logging.getLogger(__name__)
 # DB connection
 def get_db():
     if 'db' not in g:
-        # Determine DB path: Render > .env > local
+        # Determine DB path: Render > .env (if writable) > project root
+        default_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'edugrok.db')
         if 'RENDER' in os.environ:
             db_path = '/data/edugrok.db'
             logger.debug(f"Using Render DB path: {db_path}")
             print(f"Using Render DB path: {db_path}")
         else:
-            db_path = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'edugrok.db'))
-            logger.debug(f"Using DB path: {db_path}")
-            print(f"Using DB path: {db_path}")
+            db_path = os.environ.get('DB_PATH', default_db_path)
+            logger.debug(f"Using DB path: {db_path} (default: {default_db_path})")
+            print(f"Using DB path: {db_path} (default: {default_db_path})")
         
-        # Ensure DB directory exists
+        # Ensure DB directory exists (skip for project root)
         db_dir = os.path.dirname(db_path)
-        if db_dir and not os.path.exists(db_dir):
+        if db_dir and db_dir != os.path.dirname(os.path.abspath(__file__)) and not os.path.exists(db_dir):
             try:
-                os.makedirs(db_dir)
+                # Check if parent directory is writable
+                parent_dir = os.path.dirname(db_dir)
+                if parent_dir and not os.access(parent_dir, os.W_OK):
+                    logger.error(f"Parent directory not writable: {parent_dir}")
+                    print(f"Parent directory not writable: {parent_dir}")
+                    raise PermissionError(f"Cannot write to {parent_dir}")
+                os.makedirs(db_dir, exist_ok=True)
                 logger.info(f"Created DB directory: {db_dir}")
                 print(f"Created DB directory: {db_dir}")
             except PermissionError as e:
@@ -37,6 +44,10 @@ def get_db():
             logger.info(f"DB not found at {db_path} - creating")
             print(f"DB not found at {db_path} - creating")
             try:
+                if not os.access(os.path.dirname(db_path), os.W_OK):
+                    logger.error(f"Directory not writable: {os.path.dirname(db_path)}")
+                    print(f"Directory not writable: {os.path.dirname(db_path)}")
+                    raise PermissionError(f"Cannot write to {os.path.dirname(db_path)}")
                 with open(db_path, 'a'):
                     pass
                 logger.info(f"Created DB at {db_path}")
@@ -202,10 +213,10 @@ def init_db():
 
         # Seed bot users
         bots = [
-            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en'),
-            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en'),
+            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en', 0),
+            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en', 0),
         ]
-        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language) VALUES (?, ?, ?, ?, ?, ?, ?)", bots)
+        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language, star_coins) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
         logger.info("Bot users inserted")
         print("Bot users inserted")
