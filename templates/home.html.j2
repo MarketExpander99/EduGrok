@@ -1,124 +1,111 @@
-{% extends 'base.html.j2' %}
-{% block title %}Home - EduGrok{% endblock %}
-{% block content %}
-<div class="container mx-auto p-4">
-    <!-- Welcome Message -->
-    <div class="bg-white dark:bg-gray-700 p-4 mb-6 rounded shadow">
-        <h2 class="text-xl font-semibold">Welcome, {{ session.get('email', 'Guest') }}!</h2>
-        {% if subscribed %}
-            <p class="text-green-600 dark:text-green-300 mt-2">Subscribed to Premium</p>
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGrok - Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body { @apply bg-gray-100; }
+        .theme-astronaut { @apply bg-blue-900 text-white; }
+        .theme-farm { @apply bg-green-100 text-black; }
+        .post-card { @apply bg-white p-4 rounded-lg shadow-md mb-4; }
+        .like-button { @apply bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600; }
+        .lesson-card { @apply bg-yellow-100 p-4 rounded-lg shadow-md mb-4; }
+    </style>
+</head>
+<body class="theme-{{ theme }}">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">Welcome to EduGrok!</h1>
+        
+        {% if session.user_id %}
+            <p class="mb-4">Hello, {{ session.handle | default('User') }}! Grade: {{ session.grade | default(1) }}</p>
+            <nav class="mb-4">
+                <a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a>
+                <a href="{{ url_for('profile') }}" class="ml-4 text-blue-500 hover:underline">Profile</a>
+                <a href="{{ url_for('lessons') }}" class="ml-4 text-blue-500 hover:underline">Lessons</a>
+                <a href="{{ url_for('phonics_game') }}" class="ml-4 text-blue-500 hover:underline">Phonics Game</a>
+            </nav>
+        {% else %}
+            <nav class="mb-4">
+                <a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a>
+                <a href="{{ url_for('register') }}" class="ml-4 text-blue-500 hover:underline">Register</a>
+            </nav>
         {% endif %}
-        <div class="mt-4">
-            <a href="{{ url_for('phonics_game') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Play Phonics Game</a>
-        </div>
-    </div>
 
-    <!-- Create Post Form -->
-    <div class="bg-white dark:bg-gray-700 p-4 mb-6 rounded shadow">
-        <h2 class="text-xl font-semibold mb-2">Create a Post</h2>
-        <form action="{{ url_for('create_post') }}" method="POST">
-            <textarea name="content" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" rows="4" placeholder="What's on your mind?"></textarea>
-            <input type="text" name="subject" class="w-full p-2 mt-2 border rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" placeholder="Subject (e.g., Math, Phonics)">
-            <button type="submit" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Post</button>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 p-4 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h2 class="text-2xl font-semibold mt-6 mb-2">Create a Post</h2>
+        <form action="{{ url_for('create_post') }}" method="POST" class="mb-6">
+            <textarea name="content" class="w-full p-2 border rounded" placeholder="Share something..." required></textarea>
+            <select name="subject" class="p-2 border rounded">
+                <option value="math">Math</option>
+                <option value="science">Science</option>
+                <option value="language">Language</option>
+                <option value="General">General</option>
+            </select>
+            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Post</button>
         </form>
-    </div>
 
-    <!-- Active Lesson -->
-    {% if lesson and not lesson.completed %}
-        <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
-            <h2 class="text-xl font-semibold">{{ lesson.subject }}</h2>
-            <div class="mt-2">{{ lesson.content|safe }}</div>
-            <button onclick="completeLesson('{{ lesson.id }}')" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete Lesson</button>
-        </div>
-    {% endif %}
-
-    <!-- Recent Test -->
-    {% if test %}
-        <div class="bg-white dark:bg-gray-700 p-4 mb-4 rounded shadow">
-            <h2 class="text-xl font-semibold">Latest Test</h2>
-            <p>Grade: {{ test.grade }}, Score: {{ test.score }}, Date: {{ test.date }}</p>
-        </div>
-    {% endif %}
-
-    <!-- Feed of Posts -->
-    <div class="space-y-4">
+        <h2 class="text-2xl font-semibold mb-2">Recent Posts</h2>
         {% if posts %}
             {% for post in posts %}
-                <div class="bg-white dark:bg-gray-700 p-4 rounded shadow transform transition hover:scale-105">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-semibold">{{ post.handle }}</span>
-                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ post.subject }}</span>
-                    </div>
-                    <p class="mb-2">{{ post.content|safe }}</p>
-                    <div class="flex space-x-4">
-                        <button onclick="likePost('{{ post.id }}')" class="flex items-center {% if post.liked_by_user %}text-red-500{% else %}text-gray-500{% endif %} hover:text-red-600">
-                            ❤️ <span id="likes-{{ post.id }}" class="ml-1">{{ post.likes|default(0) }}</span>
+                <div class="post-card">
+                    <p><strong>{{ post.handle }}</strong> (Grade {{ post.grade }}) - {{ post.created_at }}</p>
+                    <p>{{ post.content }}</p>
+                    <p>Subject: {{ post.subject }}</p>
+                    <p>Likes: {{ post.likes }}</p>
+                    <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST">
+                        <button type="submit" class="like-button" {% if post.liked_by_user %}disabled{% endif %}>
+                            {{ 'Unlike' if post.liked_by_user else 'Like' }}
                         </button>
-                        <button onclick="reportPost('{{ post.id }}')" class="text-gray-500 hover:text-yellow-500">
-                            🚩 Report
-                        </button>
-                    </div>
+                    </form>
                 </div>
             {% endfor %}
         {% else %}
-            <p class="text-red-500">Failed to load feed. Please try again.</p>
-            <script>console.error('No posts loaded - check server logs');</script>
+            <p>No posts available.</p>
+        {% endif %}
+
+        <h2 class="text-2xl font-semibold mt-6 mb-2">Next Lesson</h2>
+        {% if lesson %}
+            <div class="lesson-card">
+                <h3>{{ lesson.subject }}</h3>
+                <div>{{ lesson.content | safe }}</div>
+                <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Complete Lesson</a>
+            </div>
+        {% else %}
+            <p>No lessons available. Try generating a new one!</p>
+        {% endif %}
+
+        <h2 class="text-2xl font-semibold mt-6 mb-2">Recent Test</h2>
+        {% if test %}
+            <p>Grade {{ test.grade }} - Score: {{ test.score }} - Date: {{ test.date }}</p>
+        {% else %}
+            <p>No tests taken yet.</p>
         {% endif %}
     </div>
-</div>
-<script>
-function likePost(postId) {
-    fetch('/like/' + postId, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-        .then(function(response) {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error('Error liking post');
-        })
-        .then(function(data) {
-            if (data.success) {
-                document.getElementById('likes-' + postId).textContent = parseInt(document.getElementById('likes-' + postId).textContent) + 1;
-                document.querySelector(`button[onclick="likePost('${postId}')"]`).classList.add('text-red-500');
-                document.querySelector(`button[onclick="likePost('${postId}')"]`).classList.remove('text-gray-500');
-            } else {
-                alert('Error liking post');
-            }
-        })
-        .catch(function(error) {
-            console.error('Error:', error);
-            alert('Error liking post');
-        });
-}
 
-function reportPost(postId) {
-    fetch('/report/' + postId, { method: 'GET' })
-        .then(function(response) {
-            if (response.redirected) {
-                window.location.reload();
-            } else {
-                alert('Error reporting post');
-            }
-        })
-        .catch(function(error) {
-            console.error('Error:', error);
+    <script>
+        document.querySelectorAll('form[action*="/like/"]').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const response = await fetch(form.action, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to like post');
+                }
+            });
         });
-}
-
-function completeLesson(lessonId) {
-    fetch('/complete_lesson/' + lessonId, { method: 'GET' })
-        .then(function(response) {
-            if (response.redirected) {
-                window.location.reload();
-            } else {
-                alert('Error completing lesson');
-            }
-        })
-        .catch(function(error) {
-            console.error('Error:', error);
-        });
-}
-</script>
-{% endblock %}
+    </script>
+</body>
+</html>

@@ -6,11 +6,11 @@ from flask import g
 
 # Configure logging
 logger = logging.getLogger(__name__)
+logging.basicConfig(filename='/tmp/db.log', level=logging.DEBUG)
 
 # DB connection
 def get_db():
     if 'db' not in g:
-        # Determine DB path: Render > .env (if writable) > project root
         default_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'edugrok.db')
         if 'RENDER' in os.environ:
             db_path = '/data/edugrok.db'
@@ -21,11 +21,9 @@ def get_db():
             logger.debug(f"Using DB path: {db_path} (default: {default_db_path})")
             print(f"Using DB path: {db_path} (default: {default_db_path})")
         
-        # Ensure DB directory exists (skip for project root)
         db_dir = os.path.dirname(db_path)
         if db_dir and db_dir != os.path.dirname(os.path.abspath(__file__)) and not os.path.exists(db_dir):
             try:
-                # Check if parent directory is writable
                 parent_dir = os.path.dirname(db_dir)
                 if parent_dir and not os.access(parent_dir, os.W_OK):
                     logger.error(f"Parent directory not writable: {parent_dir}")
@@ -39,7 +37,6 @@ def get_db():
                 print(f"Permission denied creating {db_dir}: {e}")
                 raise
         
-        # Create DB file if it doesn't exist
         if not os.path.exists(db_path):
             logger.info(f"DB not found at {db_path} - creating")
             print(f"DB not found at {db_path} - creating")
@@ -81,6 +78,8 @@ def reset_db():
         c.execute("DROP TABLE IF EXISTS badges")
         c.execute("DROP TABLE IF EXISTS user_points")
         c.execute("DROP TABLE IF EXISTS user_likes")
+        c.execute("DROP TABLE IF EXISTS post_likes")
+        c.execute("DROP TABLE IF EXISTS games")
         c.execute("DROP TABLE IF EXISTS tests")
         c.execute("DROP TABLE IF EXISTS lessons")
         c.execute("DROP TABLE IF EXISTS posts")
@@ -123,7 +122,7 @@ def check_db_schema():
         elif columns[col] != col_type.split()[0]:
             logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
             raise ValueError(f"Users table column {col} type mismatch")
-    for table in ['posts', 'lessons', 'tests', 'user_likes', 'user_points', 'badges', 'feedback']:
+    for table in ['posts', 'lessons', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
         c.execute(f"PRAGMA table_info({table})")
         if not c.fetchall():
             logger.error(f"Table {table} missing")
@@ -139,6 +138,17 @@ def init_db():
         db_path = conn.execute("PRAGMA database_list").fetchall()[0][2]
         logger.debug(f"Initializing DB at {db_path}")
         print(f"Initializing DB at {db_path}")
+        
+        # Drop and recreate posts table to ensure correct schema
+        c.execute("DROP TABLE IF EXISTS posts")
+        c.execute('''CREATE TABLE posts 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
+                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        logger.info("Created posts table with new schema")
+        print("Created posts table with new schema")
+        
+        # Users table
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col for col in c.fetchall()}
         if not columns:
@@ -149,7 +159,7 @@ def init_db():
                           language TEXT DEFAULT 'en', star_coins INTEGER DEFAULT 0)''')
         else:
             missing_cols = [col for col in ['grade', 'theme', 'subscribed', 'handle', 'language', 'star_coins'] 
-                          if col not in columns]
+                           if col not in columns]
             if missing_cols:
                 logger.debug(f"Migrating users table: {missing_cols}")
                 c.execute("DROP TABLE IF EXISTS users_new")
@@ -161,13 +171,13 @@ def init_db():
                 insert_cols = old_cols + missing_cols
                 insert_cols_str = ', '.join(insert_cols)
                 select_cols = ', '.join([col if col in old_cols else 
-                                       'NULL' if col == 'grade' else 
-                                       "'astronaut'" if col == 'theme' else 
-                                       '0' if col == 'subscribed' else 
-                                       "email" if col == 'handle' else 
-                                       "'en'" if col == 'language' else 
-                                       '0' if col == 'star_coins' else col 
-                                       for col in insert_cols])
+                                        'NULL' if col == 'grade' else 
+                                        "'astronaut'" if col == 'theme' else 
+                                        '0' if col == 'subscribed' else 
+                                        "email" if col == 'handle' else 
+                                        "'en'" if col == 'language' else 
+                                        '0' if col == 'star_coins' else col 
+                                        for col in insert_cols])
                 c.execute(f"INSERT INTO users_new (id, {insert_cols_str}) SELECT id, {select_cols} FROM users")
                 c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
                 for row in c.fetchall():
@@ -178,13 +188,11 @@ def init_db():
                 c.execute('ALTER TABLE users_new RENAME TO users')
                 logger.debug("Migration completed")
                 print("Users table migrated")
-        c.execute('''CREATE TABLE IF NOT EXISTS posts 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, subject TEXT, 
-                      likes INTEGER DEFAULT 0, reported INTEGER DEFAULT 0, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        
+        # Other tables
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
-                      subject TEXT, content TEXT, completed INTEGER DEFAULT 0, 
+                      subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS tests 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
@@ -195,6 +203,11 @@ def init_db():
                       PRIMARY KEY (user_id, post_id), 
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (post_id) REFERENCES posts(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS post_likes 
+                     (post_id INTEGER, user_id INTEGER, 
+                      PRIMARY KEY (post_id, user_id), 
+                      FOREIGN KEY (post_id) REFERENCES posts(id), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS user_points 
                      (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
@@ -204,7 +217,10 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_posts_reported_id ON posts(reported, id DESC)')
+        c.execute('''CREATE TABLE IF NOT EXISTS games 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, score INTEGER, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_posts_id ON posts(id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         conn.commit()
@@ -241,10 +257,10 @@ def init_db():
 
         # Seed bot posts
         bot_posts = [
-            (skykidz_id, 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 5, 0),
-            (grokedu_id, 'Explore the solar system: Name a planet close to the sun.', 'science', 10, 0),
+            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")'),
+            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")'),
         ]
-        c.executemany("INSERT OR IGNORE INTO posts (user_id, content, subject, likes, reported) VALUES (?, ?, ?, ?, ?)", bot_posts)
+        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
         logger.info("Bot posts seeded")
         print("Bot posts seeded")
@@ -260,31 +276,23 @@ def init_db():
         conn.rollback()
         raise
 
-# Seed lessons (20 total, CAPS-aligned)
+# Seed lessons with media
 def seed_lessons():
     conn = get_db()
     c = conn.cursor()
     lessons = [
-        (None, 1, 'math', 'Grade 1: Farm Addition<br>Solve: 2 + 3 = ?<br>Explanation: Imagine 2 apples + 3 more = 5!<br>Afrikaans: Graad 1: Plaas Optelling<br>Oplos: 2 + 3 = ?<br>Verduideliking: Stel jou voor 2 appels + 3 meer = 5!', 0),
-        (None, 1, 'language', 'Grade 1: Farm Spelling<br>Spell "cat".<br>Hint: Sounds like /k/ /a/ /t/.<br>Afrikaans: Graad 1: Plaas Spelling<br>Spel "kat".<br>Wenk: Klink soos /k/ /a/ /t/.', 0),
-        (None, 1, 'language', 'Grade 1: Phonics - M Sounds<br>Match words starting with M!<br>Afrikaans: Graad 1: Fonika - M Klanke<br>Pas woorde wat met M begin!<br>After this, play the Mars Memory Match game.', 0),
-        (None, 2, 'science', 'Grade 2: Solar System<br>Name a planet in our solar system.<br>Explanation: Earth is our home!<br>Afrikaans: Graad 2: Sonnestelsel<br>Noem ’n planeet in ons sonnestelsel.<br>Verduideliking: Aarde is ons huis!', 0),
+        (None, 1, 'Phonics: Letter M', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
+        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0),
+        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
+        (None, 1, 'Reading: Short Stories', '<p>Read a short story about a space adventure.</p>', 0),
+        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0),
+        (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0),
+        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
         (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0),
-        (None, 3, 'language', 'Grade 3: Write a Story<br>Write a short sentence about the sun.<br>Example: The sun is bright and warm.<br>Afrikaans: Graad 3: Skryf ’n Storie<br>Skryf ’n kort sin oor die son.<br>Voorbeeld: Die son is helder en warm.', 0),
-        (None, 1, 'science', 'Grade 1: Animals on the Farm<br>What sound does a cow make?<br>Afrikaans: Graad 1: Diere op die Plaas<br>Watter klank maak \'n koei?', 0),
-        (None, 1, 'math', 'Grade 1: Counting Chickens<br>Count 1-5 chickens.<br>Afrikaans: Graad 1: Tel Hoenders<br>Tell 1-5 hoenders.', 0),
         (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0),
         (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0),
         (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0),
-        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0),
-        (None, 1, 'science', 'Grade 1: Colors in Nature<br>Name red things.<br>Afrikaans: Graad 1: Kleure in die Natuur<br>Noem rooi dinge.', 0),
-        (None, 2, 'math', 'Grade 2: Shapes Around Us<br>Find circles.<br>Afrikaans: Graad 2: Vorms Om Ons<br>Vind sirkels.', 0),
-        (None, 3, 'science', 'Grade 3: Human Body Basics<br>What do lungs do?<br>Afrikaans: Graad 3: Basiese Menslike Liggaam<br>Wat doen longe?', 0),
-        (None, 1, 'language', 'Grade 1: Rhyming Words<br>Cat-hat.<br>Afrikaans: Graad 1: Rymwoorde<br>Kat-hoed.', 0),
-        (None, 2, 'language', 'Grade 2: Vocabulary Builder<br>What is "happy"?<br>Afrikaans: Graad 2: Woordeskat Bouer<br>Wat is "gelukkig"?', 0),
-        (None, 3, 'math', 'Grade 3: Fractions Intro<br>Half of a pizza.<br>Afrikaans: Graad 3: Breuke Inleiding<br>Die helfte van \'n pizza.', 0),
-        (None, 1, 'math', 'Grade 1: Number Recognition<br>Point to 4.<br>Afrikaans: Graad 1: Getal Herkenning<br>Wys na 4.', 0),
-        (None, 2, 'science', 'Grade 2: Plants Grow<br>What do plants need?<br>Afrikaans: Graad 2: Plante Groei<br>Wat het plante nodig?', 0),
+        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0)
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')

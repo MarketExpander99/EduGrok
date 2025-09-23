@@ -5,17 +5,12 @@ from dotenv import load_dotenv
 import logging
 from logging.handlers import RotatingFileHandler
 import re
-import requests
 from datetime import datetime
-# import stripe  # Commented out until launch
 from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lessons
 from auth import register, login, logout, set_theme, set_language
 
 # Load .env file
 load_dotenv()
-
-# Stripe setup - commented out until launch
-# stripe.api_key = os.environ.get('STRIPE_KEY')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
@@ -27,7 +22,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax'
 )
 
-# Configure logging to writable /tmp directory
+# Configure logging
 handler = RotatingFileHandler('/tmp/app.log', maxBytes=10000, backupCount=1)
 handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -56,7 +51,7 @@ def reset_db_route():
     reset_db()
     return redirect(url_for('home'))
 
-# Explicitly register auth routes
+# Auth routes
 app.add_url_rule('/register', 'register', register, methods=['GET', 'POST'])
 app.add_url_rule('/login', 'login', login, methods=['GET', 'POST'])
 app.add_url_rule('/logout', 'logout', logout)
@@ -84,115 +79,168 @@ except Exception as e:
     raise
 
 @app.route('/')
+def index():
+    return redirect(url_for('home'))
+
+@app.route('/home')
 def home():
     logger.debug(f"Home route - Session: {session}")
     if 'user_id' not in session:
         logger.debug("No user_id in session, redirecting to login")
         return redirect(url_for('login'))
-    if 'grade' not in session:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
-        user_grade = c.fetchone()
-        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
-        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
+    
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
+        
+        # Ensure session has grade
+        if 'grade' not in session:
+            c.execute("SELECT grade, handle FROM users WHERE id = ?", (session['user_id'],))
+            user = c.fetchone()
+            session['grade'] = user['grade'] if user and user['grade'] is not None else 1
+            session['handle'] = user['handle'] if user and user['handle'] is not None else 'User'
+            logger.debug(f"Set session['grade'] to {session['grade']} and session['handle'] to {session['handle']} for user {session['user_id']}")
+
+        user_id = session.get('user_id')
+        grade = session.get('grade', 1)
+
+        # Fetch posts
+        c.execute("""
+            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at 
+            FROM posts p 
+            WHERE p.grade = ? 
+            ORDER BY p.created_at DESC LIMIT 5
+        """, (grade,))
         posts_data = c.fetchall()
         posts = []
-        user_id = session.get('user_id')
         for row in posts_data:
-            post = dict(
-                id=row['id'],
-                content=filter_content(row['content']),
-                subject=row['subject'],
-                likes=row['likes'] or 0,
-                handle=row['handle'],
-                reported=row['reported']
-            )
-            if user_id:
-                c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
-                like_result = c.fetchone()
-                post['liked_by_user'] = like_result is not None
-            else:
-                post['liked_by_user'] = False
+            post = {
+                'id': row['id'],
+                'content': filter_content(row['content'] or ''),
+                'subject': row['subject'] or 'General',
+                'grade': row['grade'] or 1,
+                'likes': row['likes'] or 0,
+                'handle': row['handle'] or 'Unknown',
+                'created_at': row['created_at'] or 'Unknown'
+            }
+            c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
+            post['liked_by_user'] = c.fetchone() is not None
             posts.append(post)
-        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 LIMIT 1", (session['user_id'], session.get('grade', 1)))
+
+        # Fetch lesson
+        c.execute("""
+            SELECT id, subject, content, completed 
+            FROM lessons 
+            WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 
+            LIMIT 1
+        """, (user_id, grade))
         lesson_result = c.fetchone()
         lesson = dict(lesson_result) if lesson_result else None
-        c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
+
+        # Fetch test
+        c.execute("""
+            SELECT id, grade, score, date 
+            FROM tests 
+            WHERE user_id = ? 
+            ORDER BY date DESC LIMIT 1
+        """, (user_id,))
         test_result = c.fetchone()
         test = dict(test_result) if test_result else None
-        return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, 
-                             subscribed=session.get('subscribed', False), 
-                             theme=session.get('theme', 'astronaut'), 
-                             language=session.get('language', 'en'))
+
+        # Fetch subscription status
+        c.execute("SELECT subscribed FROM users WHERE id = ?", (user_id,))
+        result = c.fetchone()
+        subscribed = result['subscribed'] if result else 0
+
+        logger.info(f"User {user_id} accessed home with {len(posts)} posts")
+        return render_template('home.html.j2', 
+                            posts=posts, 
+                            lesson=lesson, 
+                            test=test, 
+                            subscribed=subscribed, 
+                            theme=session.get('theme', 'astronaut'), 
+                            language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Home route failed: {str(e)}")
-        raise
+        flash('Failed to load homepage. Try again or reset DB.', 'error')
+        return render_template('error.html.j2', 
+                            error=f"Failed to load homepage: {str(e)}", 
+                            theme=session.get('theme', 'astronaut'), 
+                            language=session.get('language', 'en')), 500
 
 @app.route('/landing')
 def landing():
     logger.debug("Landing route")
     return render_template('landing.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
-@app.route('/post', methods=['POST'])
+@app.route('/create_post', methods=['POST'])
 def create_post():
     logger.debug("Creating post")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-    content = filter_content(request.form.get('content', ''))
-    subject = request.form.get('subject', '')
-    if not content or not subject:
-        return render_template('home.html.j2', error="Content and subject required", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
+    content = filter_content(request.form.get('content'))
+    subject = request.form.get('subject', 'General')
+    if not content:
+        flash('Post content is required', 'error')
+        return redirect(url_for('home'))
     try:
         conn = get_db()
-        c = conn.cursor()
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (session['user_id'], content, subject))
+        user_id = session.get('user_id')
+        handle = session.get('handle', 'User')
+        grade = session.get('grade', 1)
+        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
+                     (user_id, handle, content, subject, grade))
         conn.commit()
+        flash('Post created successfully', 'success')
+        logger.info(f"User {user_id} created post: {content}")
         return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Create post failed: {str(e)}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Server error', 'error')
+        return redirect(url_for('home'))
 
-@app.route('/like/<int:post_id>')
+@app.route('/like/<int:post_id>', methods=['POST'])
 def like_post(post_id):
     logger.debug(f"Liking post {post_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Login required', 'error')
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT 1 FROM user_likes WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
+        c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
         if c.fetchone():
-            return render_template('home.html.j2', error="Already liked", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-        c.execute("INSERT INTO user_likes (user_id, post_id) VALUES (?, ?)", (session['user_id'], post_id))
+            return jsonify({'success': False, 'error': 'Already liked'}), 400
+        c.execute("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)", (post_id, session['user_id']))
         c.execute("UPDATE posts SET likes = likes + 1 WHERE id = ?", (post_id,))
         conn.commit()
-        return redirect(url_for('home'))
+        logger.info(f"User {session['user_id']} liked post {post_id}")
+        return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Like post failed: {str(e)}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/report/<int:post_id>')
 def report_post(post_id):
     logger.debug(f"Reporting post {post_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("UPDATE posts SET reported = 1 WHERE id = ?", (post_id,))
         conn.commit()
+        logger.info(f"User {session['user_id']} reported post {post_id}")
         return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Report post failed: {str(e)}")
         conn.rollback()
-        return render_template('home.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Server error', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/assess', methods=['GET', 'POST'])
 def assess():
@@ -209,10 +257,12 @@ def assess():
             c.execute("UPDATE users SET grade = ? WHERE id = ?", (grade, session['user_id']))
             conn.commit()
             session['grade'] = grade
+            flash('Assessment completed', 'success')
             return redirect(url_for('home'))
         except Exception as e:
             logger.error(f"Assess failed: {str(e)}")
             conn.rollback()
+            flash('Server error', 'error')
             return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
         {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
@@ -224,7 +274,7 @@ def assess():
         {"q": "Example Q7", "a": ["Example7", "Wrong", "Wrong"], "correct": "Example7"},
         {"q": "Example Q8", "a": ["Example8", "Wrong", "Wrong"], "correct": "Example8"},
         {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
-        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"},
+        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"}
     ]
     return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -232,7 +282,8 @@ def assess():
 def complete_lesson(lesson_id):
     logger.debug(f"Completing lesson {lesson_id}")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
     try:
         conn = get_db()
         c = conn.cursor()
@@ -244,11 +295,34 @@ def complete_lesson(lesson_id):
             if c.fetchone()[0] >= 5:
                 c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, 'Lesson Master', ?)", (session['user_id'], datetime.now().isoformat()))
         conn.commit()
-        return redirect(url_for('lessons'))
+        flash('Lesson completed', 'success')
+        logger.info(f"User {session['user_id']} completed lesson {lesson_id}")
+        return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {str(e)}")
         conn.rollback()
-        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Server error', 'error')
+        return redirect(url_for('lessons'))
+
+@app.route('/reset_lesson/<int:lesson_id>')
+def reset_lesson(lesson_id):
+    logger.debug(f"Resetting lesson {lesson_id}")
+    if 'user_id' not in session:
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE lessons SET completed = 0 WHERE id = ? AND (user_id IS NULL OR user_id = ?)", (lesson_id, session['user_id']))
+        conn.commit()
+        flash('Lesson reset for retry', 'success')
+        logger.info(f"User {session['user_id']} reset lesson {lesson_id}")
+        return redirect(url_for('lessons'))
+    except Exception as e:
+        logger.error(f"Reset lesson failed: {str(e)}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('lessons'))
 
 @app.route('/test', methods=['GET', 'POST'])
 def take_test():
@@ -266,17 +340,19 @@ def take_test():
             points_award = score * 2
             c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
             conn.commit()
+            flash('Test completed', 'success')
             return redirect(url_for('game', score=score))
         except Exception as e:
             logger.error(f"Test failed: {str(e)}")
             conn.rollback()
+            flash('Server error', 'error')
             return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     questions = [
         {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
         {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
         {"q": "Example Q3", "a": ["Example3", "Wrong", "Wrong"], "correct": "Example3"},
         {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
-        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
+        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"}
     ]
     return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -287,68 +363,56 @@ def game():
         return redirect(url_for('login'))
     score = int(request.args.get('score', 0))
     difficulty = 'easy' if score < 3 else 'hard'
+    logger.info(f"User {session['user_id']} accessed game with difficulty {difficulty}")
     return render_template('game.html.j2', difficulty=difficulty, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'), score=score)
 
 @app.route('/profile')
 def profile():
+    logger.debug("Profile route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if 'grade' not in session:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
-        user_grade = c.fetchone()
-        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
-        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
+        c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],))
+        user = c.fetchone()
+        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
         lessons_completed = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
+        c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ?", (session['user_id'], session['grade']))
         total_lessons = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM tests WHERE user_id = ?", (session['user_id'],))
+        c.execute("SELECT COUNT(*) FROM games WHERE user_id = ?", (session['user_id'],))
         games_played = c.fetchone()[0]
         c.execute("SELECT AVG(score) FROM tests WHERE user_id = ?", (session['user_id'],))
         avg_score = round(c.fetchone()[0] or 0, 1)
-        grade_letter = 'A' if session['grade'] >= 3 else 'B' if session['grade'] == 2 else 'C'
         c.execute("SELECT points FROM user_points WHERE user_id = ?", (session['user_id'],))
         result = c.fetchone()
         points = result['points'] if result else 0
-        c.execute("SELECT star_coins FROM users WHERE id = ?", (session['user_id'],))
-        coins_result = c.fetchone()
-        star_coins = coins_result['star_coins'] if coins_result else 0
         c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ? ORDER BY awarded_date DESC", (session['user_id'],))
         badges = [dict(row) for row in c.fetchall()]
         c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (session['user_id'],))
         feedbacks = [dict(row) for row in c.fetchall()]
+        logger.info(f"User {session['user_id']} accessed profile")
         return render_template('profile.html.j2', 
+                              user=user,
                               lessons_completed=f"{lessons_completed}/{total_lessons}",
                               games_played=games_played,
                               avg_score=avg_score,
-                              grade=grade_letter,
+                              grade=session['grade'],
                               theme=session.get('theme', 'astronaut'),
                               language=session.get('language', 'en'),
                               points=points,
-                              star_coins=star_coins,
+                              star_coins=user['star_coins'],
                               badges=badges,
                               feedbacks=feedbacks)
     except Exception as e:
-        logger.error(f"Profile failed: {str(e)} - Session: {session}")
-        print(f"Profile error: {e}")
-        return render_template('error.html.j2', error=f"Failed to load profile: {str(e)}. Try resetting DB.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+        logger.error(f"Profile failed: {str(e)}")
+        return render_template('error.html.j2', error=f"Failed to load profile: {str(e)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/parent_dashboard')
 def parent_dashboard():
+    logger.debug("Parent dashboard route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if 'grade' not in session:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
-        user_grade = c.fetchone()
-        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
-        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
@@ -365,6 +429,7 @@ def parent_dashboard():
             WHERE l.user_id = ? AND l.grade = ?
         """, (session['user_id'], session['user_id'], session['grade']))
         stats = c.fetchone()
+        logger.info(f"User {session['user_id']} accessed parent dashboard")
         return render_template('parent_dashboard.html.j2', stats=stats, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Parent dashboard failed: {str(e)}")
@@ -375,32 +440,26 @@ def lessons():
     logger.debug("Lessons route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    if 'grade' not in session:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
-        user_grade = c.fetchone()
-        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
-        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
+        c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 ORDER BY id", (session['user_id'], session['grade']))
         lessons_data = c.fetchall()
         lessons_list = [dict(row) for row in lessons_data]
         if not lessons_list:
             logger.warning(f"No lessons found for user {session['user_id']} and grade {session['grade']}")
             seed_lessons()
-            c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
+            c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 ORDER BY id", (session['user_id'], session['grade']))
             lessons_list = [dict(row) for row in c.fetchall()]
         logger.info(f"Retrieved {len(lessons_list)} lessons for user {session['user_id']}")
-        return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return render_template('lessons.html.j2', lessons=lessons_list, grade=session['grade'], theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Lessons route failed: {str(e)}")
         return render_template('error.html.j2', error=f"Failed to load lessons: {str(e)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/update_points', methods=['POST'])
 def update_points():
+    logger.debug("Update points route")
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     try:
@@ -421,6 +480,7 @@ def update_points():
 
 @app.route('/update_coins', methods=['POST'])
 def update_coins():
+    logger.debug("Update coins route")
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Not logged in'}), 401
     data = request.get_json()
@@ -434,7 +494,7 @@ def update_coins():
         if current_coins + coins < 0:
             return jsonify({'success': False, 'error': 'Not enough coins'}), 400
         c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (coins, user_id))
-        if coins == -10:  # Redeem coins for badge
+        if coins == -10:
             c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
                       (user_id, 'Coin Redeemer', datetime.now().isoformat()))
         conn.commit()
@@ -442,27 +502,104 @@ def update_coins():
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error updating coins: {e}")
+        conn.rollback()
         return jsonify({'success': False, 'error': 'Database error'}), 500
-    finally:
-        conn.close()
 
-@app.route('/phonics_game')
+@app.route('/phonics_game', methods=['GET', 'POST'])
 def phonics_game():
     logger.debug("Phonics game route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('phonics_game.html.j2', theme=session.get('theme', 'astronaut'), grade=session.get('grade', 1), language=session.get('language', 'en'))
+    try:
+        grade = session.get('grade', 1)
+        language = session.get('language', 'en')
+        # Define phonics word lists by grade
+        word_lists = {
+            1: {
+                'en': [
+                    {'word': 'cat', 'sound': '/kæt/'},
+                    {'word': 'dog', 'sound': '/dɒɡ/'},
+                    {'word': 'sun', 'sound': '/sʌn/'},
+                    {'word': 'moon', 'sound': '/muːn/'}
+                ],
+                'bilingual': [
+                    {'word': 'cat', 'sound': '/kæt/', 'af': 'kat', 'af_sound': '/kat/'},
+                    {'word': 'dog', 'sound': '/dɒɡ/', 'af': 'hond', 'af_sound': '/ɦɔnt/'},
+                    {'word': 'sun', 'sound': '/sʌn/', 'af': 'son', 'af_sound': '/sɔn/'},
+                    {'word': 'moon', 'sound': '/muːn/', 'af': 'maan', 'af_sound': '/mɑːn/'}
+                ]
+            },
+            2: {
+                'en': [
+                    {'word': 'ship', 'sound': '/ʃɪp/'},
+                    {'word': 'fish', 'sound': '/fɪʃ/'},
+                    {'word': 'tree', 'sound': '/triː/'},
+                    {'word': 'bird', 'sound': '/bɜːrd/'}
+                ],
+                'bilingual': [
+                    {'word': 'ship', 'sound': '/ʃɪp/', 'af': 'skip', 'af_sound': '/skɪp/'},
+                    {'word': 'fish', 'sound': '/fɪʃ/', 'af': 'vis', 'af_sound': '/fɪs/'},
+                    {'word': 'tree', 'sound': '/triː/', 'af': 'boom', 'af_sound': '/bʊəm/'},
+                    {'word': 'bird', 'sound': '/bɜːrd/', 'af': 'voël', 'af_sound': '/fuəl/'}
+                ]
+            },
+            3: {
+                'en': [
+                    {'word': 'house', 'sound': '/haʊs/'},
+                    {'word': 'cloud', 'sound': '/klaʊd/'},
+                    {'word': 'spoon', 'sound': '/spuːn/'},
+                    {'word': 'train', 'sound': '/treɪn/'}
+                ],
+                'bilingual': [
+                    {'word': 'house', 'sound': '/haʊs/', 'af': 'huis', 'af_sound': '/ɦœɪs/'},
+                    {'word': 'cloud', 'sound': '/klaʊd/', 'af': 'wolk', 'af_sound': '/vɔlk/'},
+                    {'word': 'spoon', 'sound': '/spuːn/', 'af': 'lepel', 'af_sound': '/lɪəpəl/'},
+                    {'word': 'train', 'sound': '/treɪn/', 'af': 'trein', 'af_sound': '/trɛɪn/'}
+                ]
+            }
+        }
+        timer_duration = 60 if grade == 1 else 45 if grade == 2 else 30
+        words = word_lists[grade][language]
+
+        if request.method == 'POST':
+            score = int(request.get_json().get('score', 0))
+            conn = get_db()
+            c = conn.cursor()
+            c.execute("INSERT INTO games (user_id, score) VALUES (?, ?)", (session['user_id'], score))
+            c.execute("SELECT COUNT(*) FROM games WHERE user_id = ?", (session['user_id'],))
+            game_count = c.fetchone()[0]
+            if game_count >= 5:
+                c.execute("INSERT OR IGNORE INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
+                         (session['user_id'], 'Phonics Pro', datetime.now().isoformat()))
+            conn.commit()
+            logger.info(f"User {session['user_id']} completed phonics game with score {score}")
+            return jsonify({'success': True})
+
+        logger.info(f"User {session['user_id']} accessed phonics game, grade {grade}, language {language}")
+        return render_template('phonics_game.html.j2', 
+                             theme=session.get('theme', 'astronaut'), 
+                             grade=grade, 
+                             language=language, 
+                             words=words, 
+                             timer_duration=timer_duration)
+    except Exception as e:
+        logger.error(f"Phonics game failed: {str(e)}")
+        return render_template('error.html.j2', error=f"Failed to load phonics game: {str(e)}", 
+                             theme=session.get('theme', 'astronaut'), 
+                             language=session.get('language', 'en')), 500
 
 @app.route('/generate_lesson', methods=['POST'])
 def generate_lesson():
     logger.debug("Generate lesson route")
     if 'user_id' not in session:
-        return render_template('login.html.j2', error="Unauthorized", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
     grade = request.form.get('grade')
     subject = request.form.get('subject')
     if not grade or not subject or not grade.isdigit() or int(grade) not in [1, 2, 3]:
         logger.error("Invalid grade or subject")
-        return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Invalid grade (1-3) or subject', 'error')
+        return redirect(url_for('lessons'))
     try:
         lesson_content = f"Generated {subject} lesson for Grade {grade}"
         if session.get('language') == 'bilingual':
@@ -473,14 +610,17 @@ def generate_lesson():
                   (session['user_id'], grade, subject, lesson_content))
         conn.commit()
         logger.info(f"Generated lesson for user {session['user_id']}: {subject}")
+        flash('Lesson generated', 'success')
         return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Generate lesson failed: {str(e)}")
         conn.rollback()
-        return render_template('lessons.html.j2', error="Server error", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        flash('Server error', 'error')
+        return redirect(url_for('lessons'))
 
 @app.route('/beta', methods=['GET', 'POST'])
 def beta():
+    logger.debug("Beta route")
     if request.method == 'POST':
         email = request.form.get('email')
         if email:
@@ -491,45 +631,78 @@ def beta():
 
 @app.route('/feedback', methods=['GET', 'POST'])
 def feedback():
+    logger.debug("Feedback route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if request.method == 'POST':
         try:
             rating = int(request.form.get('rating', 0))
-            comments = request.form.get('comments', '')
-            if rating < 1 or rating > 5:
-                flash('Rating must be between 1 and 5.', 'error')
-                return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+            comments = filter_content(request.form.get('comments', ''))
+            if not 1 <= rating <= 5:
+                flash('Rating must be between 1 and 5', 'error')
+                return redirect(url_for('feedback'))
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO feedback (user_id, rating, comments, submitted_date) VALUES (?, ?, ?, ?)", 
-                      (session['user_id'], rating, comments, datetime.now().isoformat()))
+            c.execute("INSERT INTO feedback (user_id, rating, comments, submitted_date) VALUES (?, ?, ?, ?)",
+                     (session['user_id'], rating, comments, datetime.now().isoformat()))
             conn.commit()
-            logger.info(f"Feedback submitted by user {session['user_id']}: rating={rating}")
-            flash('Thanks for your feedback!', 'success')
+            flash('Feedback submitted', 'success')
+            logger.info(f"User {session['user_id']} submitted feedback: rating={rating}")
             return redirect(url_for('profile'))
         except Exception as e:
-            logger.error(f"Feedback failed: {str(e)}")
+            logger.error(f"Feedback submission failed: {str(e)}")
             conn.rollback()
-            flash('Failed to submit feedback.', 'error')
-            return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+            flash('Server error', 'error')
+            return redirect(url_for('feedback'))
     return render_template('feedback.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
-@app.route('/award_badge/<badge_name>')
-def award_badge(badge_name):
+@app.route('/set_theme', methods=['POST'])
+def set_theme():
     if 'user_id' not in session:
-        return jsonify({'success': False}), 401
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
+    theme = request.form.get('theme')
+    if theme not in ['astronaut', 'farm']:
+        flash('Invalid theme', 'error')
+        return redirect(url_for('profile'))
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
-                  (session['user_id'], badge_name, datetime.now().isoformat()))
+        c.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session['user_id']))
         conn.commit()
-        logger.info(f"Awarded badge '{badge_name}' to user {session['user_id']}")
-        return jsonify({'success': True})
+        session['theme'] = theme
+        flash('Theme updated', 'success')
+        logger.info(f"User {session['user_id']} set theme to {theme}")
+        return redirect(url_for('profile'))
     except Exception as e:
-        logger.error(f"Award badge failed: {str(e)}")
-        return jsonify({'success': False}), 500
+        logger.error(f"Set theme failed: {str(e)}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('profile'))
+
+@app.route('/set_language', methods=['POST'])
+def set_language():
+    if 'user_id' not in session:
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
+    language = request.form.get('language')
+    if language not in ['en', 'bilingual']:
+        flash('Invalid language', 'error')
+        return redirect(url_for('profile'))
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE users SET language = ? WHERE id = ?", (language, session['user_id']))
+        conn.commit()
+        session['language'] = language
+        flash('Language updated', 'success')
+        logger.info(f"User {session['user_id']} set language to {language}")
+        return redirect(url_for('profile'))
+    except Exception as e:
+        logger.error(f"Set language failed: {str(e)}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('profile'))
 
 @app.route('/favicon.ico')
 def favicon():
@@ -538,13 +711,11 @@ def favicon():
 @app.errorhandler(500)
 def internal_error(error):
     logger.error(f"Internal error: {str(error)} - {request.url} - Session: {session}")
-    print(f"Internal error: {error}")
     return render_template('error.html.j2', error=f"Server error: {str(error)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.errorhandler(404)
 def not_found_error(error):
     logger.error(f"404: {request.url} - Session: {session}")
-    print(f"404: {request.url}")
     return render_template('error.html.j2', error="Page not found.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 404
 
 @app.before_request
@@ -552,4 +723,4 @@ def log_request():
     logger.debug(f"Request: {request.method} {request.url} - User ID: {session.get('user_id', 'None')} - Session: {session}")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=True, host='0.0.0.0')
