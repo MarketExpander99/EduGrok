@@ -103,10 +103,15 @@ def set_theme():
         conn.commit()
         session['theme'] = theme
         logger.info(f"Theme updated to {theme} for user {session['user_id']}")
-        return jsonify({'success': True})
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True})
+        return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Set theme failed: {str(e)}")
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Server error'}), 500
+        flash("Failed to update theme", "error")
+        return redirect(url_for('lessons'))
 
 def set_language():
     if 'user_id' not in session:
@@ -121,7 +126,12 @@ def set_language():
         conn.commit()
         session['language'] = language
         logger.info(f"Language updated to {language} for user {session['user_id']}")
-        return jsonify({'success': True})
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True})
+        return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Set language failed: {str(e)}")
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Server error'}), 500
+        flash("Failed to update language", "error")
+        return redirect(url_for('lessons'))

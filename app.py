@@ -70,8 +70,6 @@ def init_app():
             init_db()
             check_db_schema()
             seed_lessons()
-            if 'grade' not in session:
-                session['grade'] = 1
             logger.info("App initialized - DB ready")
             print("App initialized - DB ready")
         except Exception as e:
@@ -91,6 +89,13 @@ def home():
     if 'user_id' not in session:
         logger.debug("No user_id in session, redirecting to login")
         return redirect(url_for('login'))
+    if 'grade' not in session:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
@@ -289,11 +294,15 @@ def profile():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if 'grade' not in session:
-        session['grade'] = 1
-        logger.warning(f"Grade not set for user {session['user_id']}, defaulting to 1")
-    conn = get_db()
-    c = conn.cursor()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
+        conn = get_db()
+        c = conn.cursor()
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
         lessons_completed = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
@@ -334,11 +343,15 @@ def parent_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if 'grade' not in session:
-        session['grade'] = 1
-        logger.warning(f"Grade not set for user {session['user_id']}, defaulting to 1")
-    conn = get_db()
-    c = conn.cursor()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
+        conn = get_db()
+        c = conn.cursor()
         c.execute("""
             SELECT 
                 COUNT(*) as total_lessons,
@@ -363,8 +376,12 @@ def lessons():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if 'grade' not in session:
-        session['grade'] = 1
-        logger.warning(f"Grade not set for user {session['user_id']}, defaulting to 1")
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
@@ -421,7 +438,7 @@ def update_coins():
             c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
                       (user_id, 'Coin Redeemer', datetime.now().isoformat()))
         conn.commit()
-        logger.info(f"Awarded {coins} Star Coins to user {user_id}")
+        logger.info(f"Updated {coins} Star Coins for user {user_id}")
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error updating coins: {e}")
