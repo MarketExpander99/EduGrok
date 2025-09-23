@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # DB connection
 def get_db():
     if 'db' not in g:
-        # Determine DB path: Render > .env > local
+        # Determine DB path: Render > .env > project root
         if 'RENDER' in os.environ:
             db_path = '/data/edugrok.db'
             logger.debug(f"Using Render DB path: {db_path}")
@@ -24,7 +24,7 @@ def get_db():
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             try:
-                os.makedirs(db_dir)
+                os.makedirs(db_dir, exist_ok=True)
                 logger.info(f"Created DB directory: {db_dir}")
                 print(f"Created DB directory: {db_dir}")
             except PermissionError as e:
@@ -202,10 +202,10 @@ def init_db():
 
         # Seed bot users
         bots = [
-            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en'),
-            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en'),
+            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en', 0),
+            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en', 0),
         ]
-        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language) VALUES (?, ?, ?, ?, ?, ?, ?)", bots)
+        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language, star_coins) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", bots)
         conn.commit()
         logger.info("Bot users inserted")
         print("Bot users inserted")

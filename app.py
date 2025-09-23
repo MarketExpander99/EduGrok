@@ -20,9 +20,6 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
 
-# Set explicit database path for PythonAnywhere
-app.config['DATABASE'] = os.environ.get('DB_PATH', '/home/Edugrok/EduGrok-main/edugrok.db')
-
 # Secure session settings
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -70,10 +67,6 @@ app.add_url_rule('/set_language', 'set_language', set_language, methods=['POST']
 def init_app():
     with app.app_context():
         try:
-            # Ensure DB directory exists
-            db_dir = os.path.dirname(app.config['DATABASE'])
-            if not os.path.exists(db_dir):
-                os.makedirs(db_dir)
             init_db()
             check_db_schema()
             seed_lessons()
@@ -96,14 +89,18 @@ def home():
     if 'user_id' not in session:
         logger.debug("No user_id in session, redirecting to login")
         return redirect(url_for('login'))
+    if 'grade' not in session:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT p.id, p.content, p.subject, p.likes, u.handle, p.reported FROM posts p JOIN users u ON p.user_id = u.id WHERE p.reported = 0 ORDER BY p.id DESC LIMIT 5")
         posts_data = c.fetchall()
-        if posts_data is None:
-            logger.warning("posts_data is None in home route")
-            posts_data = []
         posts = []
         user_id = session.get('user_id')
         for row in posts_data:
@@ -128,7 +125,10 @@ def home():
         c.execute("SELECT id, grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (session['user_id'],))
         test_result = c.fetchone()
         test = dict(test_result) if test_result else None
-        return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, subscribed=False, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return render_template('home.html.j2', posts=posts, lesson=lesson, test=test, 
+                             subscribed=session.get('subscribed', False), 
+                             theme=session.get('theme', 'astronaut'), 
+                             language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Home route failed: {str(e)}")
         raise
@@ -243,17 +243,7 @@ def complete_lesson(lesson_id):
             c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = ? AND completed = 1", (session['user_id'],))
             if c.fetchone()[0] >= 5:
                 c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, 'Lesson Master', ?)", (session['user_id'], datetime.now().isoformat()))
-                # Commented out Google Analytics call due to placeholder values
-                # requests.post('https://www.google-analytics.com/mp/collect', json={
-                #     'client_id': str(session['user_id']),
-                #     'events': [{'name': 'badge_earned', 'params': {'badge_name': 'Lesson Master'}}]
-                # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         conn.commit()
-        # Commented out Google Analytics call due to placeholder values
-        # requests.post('https://www.google-analytics.com/mp/collect', json={
-        #     'client_id': str(session['user_id']),
-        #     'events': [{'name': 'lesson_completed', 'params': {'lesson_id': lesson_id}}]
-        # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {str(e)}")
@@ -276,11 +266,6 @@ def take_test():
             points_award = score * 2
             c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
             conn.commit()
-            # Commented out Google Analytics call due to placeholder values
-            # requests.post('https://www.google-analytics.com/mp/collect', json={
-            #     'client_id': str(session['user_id']),
-            #     'events': [{'name': 'test_completed', 'params': {'score': score}}]
-            # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
             return redirect(url_for('game', score=score))
         except Exception as e:
             logger.error(f"Test failed: {str(e)}")
@@ -308,9 +293,16 @@ def game():
 def profile():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
+    if 'grade' not in session:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
+        conn = get_db()
+        c = conn.cursor()
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND completed = 1 AND grade = ?", (session['user_id'], session['grade']))
         lessons_completed = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM lessons WHERE (user_id = ? OR user_id IS NULL) AND grade = ?", (session['user_id'], session['grade']))
@@ -326,7 +318,7 @@ def profile():
         c.execute("SELECT star_coins FROM users WHERE id = ?", (session['user_id'],))
         coins_result = c.fetchone()
         star_coins = coins_result['star_coins'] if coins_result else 0
-        c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ?", (session['user_id'],))
+        c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ? ORDER BY awarded_date DESC", (session['user_id'],))
         badges = [dict(row) for row in c.fetchall()]
         c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (session['user_id'],))
         feedbacks = [dict(row) for row in c.fetchall()]
@@ -335,7 +327,7 @@ def profile():
                               games_played=games_played,
                               avg_score=avg_score,
                               grade=grade_letter,
-                              theme=session['theme'],
+                              theme=session.get('theme', 'astronaut'),
                               language=session.get('language', 'en'),
                               points=points,
                               star_coins=star_coins,
@@ -344,15 +336,22 @@ def profile():
     except Exception as e:
         logger.error(f"Profile failed: {str(e)} - Session: {session}")
         print(f"Profile error: {e}")
-        return render_template('error.html.j2', error="Failed to load profile. Try resetting DB.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+        return render_template('error.html.j2', error=f"Failed to load profile: {str(e)}. Try resetting DB.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/parent_dashboard')
 def parent_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
+    if 'grade' not in session:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
+        conn = get_db()
+        c = conn.cursor()
         c.execute("""
             SELECT 
                 COUNT(*) as total_lessons,
@@ -376,19 +375,29 @@ def lessons():
     logger.debug("Lessons route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if 'grade' not in session:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT grade FROM users WHERE id = ?", (session['user_id'],))
+        user_grade = c.fetchone()
+        session['grade'] = user_grade['grade'] if user_grade and user_grade['grade'] else 1
+        logger.debug(f"Set session['grade'] to {session['grade']} for user {session['user_id']}")
     try:
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
         lessons_data = c.fetchall()
-        if lessons_data is None:
-            logger.warning("lessons_data is None in lessons route")
-            lessons_data = []
-        lessons_list = [dict(row) for row in c.fetchall()]
+        lessons_list = [dict(row) for row in lessons_data]
+        if not lessons_list:
+            logger.warning(f"No lessons found for user {session['user_id']} and grade {session['grade']}")
+            seed_lessons()
+            c.execute("SELECT id, subject, content, completed FROM lessons WHERE (user_id IS NULL OR user_id = ?) AND grade = ? ORDER BY completed", (session['user_id'], session['grade']))
+            lessons_list = [dict(row) for row in c.fetchall()]
+        logger.info(f"Retrieved {len(lessons_list)} lessons for user {session['user_id']}")
         return render_template('lessons.html.j2', lessons=lessons_list, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Lessons route failed: {str(e)}")
-        return render_template('error.html.j2', error="Failed to load lessons.", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+        return render_template('error.html.j2', error=f"Failed to load lessons: {str(e)}", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
 
 @app.route('/update_points', methods=['POST'])
 def update_points():
@@ -415,14 +424,21 @@ def update_coins():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Not logged in'}), 401
     data = request.get_json()
-    coins = data.get('coins', 0)
+    coins = int(data.get('coins', 0))
     user_id = session['user_id']
     try:
         conn = get_db()
         c = conn.cursor()
+        c.execute("SELECT star_coins FROM users WHERE id = ?", (user_id,))
+        current_coins = c.fetchone()['star_coins'] or 0
+        if current_coins + coins < 0:
+            return jsonify({'success': False, 'error': 'Not enough coins'}), 400
         c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (coins, user_id))
+        if coins == -10:  # Redeem coins for badge
+            c.execute("INSERT INTO badges (user_id, badge_name, awarded_date) VALUES (?, ?, ?)", 
+                      (user_id, 'Coin Redeemer', datetime.now().isoformat()))
         conn.commit()
-        logger.info(f"Awarded {coins} Star Coins to user {user_id}")
+        logger.info(f"Updated {coins} Star Coins for user {user_id}")
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error updating coins: {e}")
@@ -448,18 +464,7 @@ def generate_lesson():
         logger.error("Invalid grade or subject")
         return render_template('lessons.html.j2', error="Invalid grade (1-3) or subject", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     try:
-        # Commented out API call due to placeholder key
-        # api_url = "https://x.ai/api"
-        # headers = {"Authorization": "Bearer YOUR_API_KEY_HERE"}
-        # payload = {
-        #     "grade": int(grade),
-        #     "subject": subject,
-        #     "language": "en"
-        # }
-        # response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        # response.raise_for_status()
-        # lesson_content = response.json().get("content", f"Generated {subject} lesson for Grade {grade}")
-        lesson_content = f"Generated {subject} lesson for Grade {grade}"  # Fallback content
+        lesson_content = f"Generated {subject} lesson for Grade {grade}"
         if session.get('language') == 'bilingual':
             lesson_content += f"<br>Afrikaans: Gegenereerde {subject} les vir Graad {grade}"
         conn = get_db()
@@ -469,9 +474,6 @@ def generate_lesson():
         conn.commit()
         logger.info(f"Generated lesson for user {session['user_id']}: {subject}")
         return redirect(url_for('lessons'))
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API call failed: {str(e)}")
-        return render_template('lessons.html.j2', error="Failed to generate lesson - check API", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Generate lesson failed: {str(e)}")
         conn.rollback()
@@ -524,42 +526,10 @@ def award_badge(badge_name):
                   (session['user_id'], badge_name, datetime.now().isoformat()))
         conn.commit()
         logger.info(f"Awarded badge '{badge_name}' to user {session['user_id']}")
-        # Commented out Google Analytics call due to placeholder values
-        # requests.post('https://www.google-analytics.com/mp/collect', json={
-        #     'client_id': str(session['user_id']),
-        #     'events': [{'name': 'badge_earned', 'params': {'badge_name': badge_name}}]
-        # }, params={'measurement_id': 'YOUR_GA_MEASUREMENT_ID', 'api_secret': 'YOUR_GA_API_SECRET'})
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Award badge failed: {str(e)}")
         return jsonify({'success': False}), 500
-
-# @app.route('/subscribe', methods=['GET', 'POST'])
-# def subscribe():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-#     if request.method == 'POST':
-#         try:
-#             session = stripe.checkout.Session.create(
-#                 payment_method_types=['card'],
-#                 line_items=[{
-#                     'price_data': {
-#                         'currency': 'zar',
-#                         'product_data': {'name': 'EduGrok Premium'},
-#                         'unit_amount': 7900,
-#                     },
-#                     'quantity': 1,
-#                 }],
-#                 mode='subscription',
-#                 success_url=url_for('home', _external=True),
-#                 cancel_url=url_for('parent_dashboard', _external=True),
-#             )
-#             return redirect(session.url, code=303)
-#         except Exception as e:
-#             logger.error(f"Stripe checkout failed: {e}")
-#             flash('Subscription failed. Try again.', 'error')
-#             return redirect(url_for('parent_dashboard'))
-#     return render_template('subscribe.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/favicon.ico')
 def favicon():
