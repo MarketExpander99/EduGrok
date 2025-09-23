@@ -15,12 +15,54 @@ body {
     color: black !important;
 }
 
-/* Nav Bar Styling */
+/* Nav Bar Styling - X-Inspired: Sleek blue header w/ logo, search, profile */
 .nav-bar {
     background-color: #1D4ED8 !important;
     color: white !important;
-    padding: 1rem 0 !important;
+    padding: 0.5rem 1rem !important; /* Tighter X-like padding */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+}
+
+.nav-bar .logo {
+    font-size: 1.5rem !important;
+    font-weight: bold !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+.nav-bar .search-bar {
+    flex: 1 !important;
+    max-width: 400px !important;
+    margin: 0 1rem !important;
+}
+
+.nav-bar .search-bar input {
+    width: 100% !important;
+    padding: 0.5rem 1rem !important;
+    border: none !important;
+    border-radius: 20px !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    scrollbar-arrow-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.nav-bar .profile-icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background-color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #1D4ED8 !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
 }
 
 /* Lesson Card Styling (Warm, Educational) */
@@ -58,31 +100,87 @@ body {
     margin-bottom: 1rem !important;
 }
 
-/* Post Card Styling (Social, Cool) */
+/* Post Card Styling (Social, X-Like: Clean feed cards w/ handle, content, actions) */
 .post-card {
-    background-color: #F0F9FF !important; /* Light blue, Duolingo-inspired */
-    padding: 1.5rem !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
-    margin-bottom: 1.5rem !important;
-    border-left: 4px solid #3B82F6 !important; /* Blue accent */
+    background-color: #F0F9FF !important; /* Light blue, Duolingo-inspired but X-white vibe */
+    padding: 1rem !important; /* Slimmer X padding */
+    border-radius: 16px !important; /* Rounded X corners */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important; /* Subtle X shadow */
+    margin-bottom: 1rem !important;
+    border-left: 4px solid #3B82F6 !important; /* Blue accent, like X bird wing */
     transition: transform 0.2s, box-shadow 0.2s !important;
+    max-width: 600px !important; /* X feed width */
 }
 
 .post-card:hover {
-    transform: translateY(-4px) !important;
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-2px) !important; /* Subtle X lift */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-.post-card h3 {
-    color: #1E40AF !important; /* Dark blue */
-    font-size: 1.25rem !important;
+.post-card .post-header {
+    display: flex !important;
+    align-items: center !important;
     margin-bottom: 0.5rem !important;
 }
 
+.post-card .post-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background-color: #3B82F6 !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-right: 0.75rem !important;
+    font-weight: bold !important;
+}
+
+.post-card h3 {
+    color: #1E40AF !important; /* Dark blue, X handle blue */
+    font-size: 0.875rem !important; /* X handle size */
+    margin: 0 !important;
+    font-weight: 700 !important;
+}
+
+.post-card .post-meta {
+    color: #6B7280 !important; /* X gray timestamp */
+    font-size: 0.75rem !important;
+    margin-left: 0.5rem !important;
+}
+
 .post-card p {
-    color: #4B5563 !important; /* Gray */
+    color: #4B5563 !important; /* Gray content */
     margin-bottom: 1rem !important;
+    line-height: 1.4 !important; /* X readable lines */
+    word-wrap: break-word !important;
+}
+
+.post-card .post-actions {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-top: 0.5rem !important;
+    border-top: 1px solid #E5E7EB !important; /* X subtle divider */
+}
+
+.post-card .action-btn {
+    background: none !important;
+    border: none !important;
+    color: #6B7280 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    font-size: 0.875rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 20px !important;
+    transition: color 0.2s !important;
+}
+
+.post-card .action-btn:hover {
+    color: #3B82F6 !important; /* X blue on hover */
+    background-color: rgba(59, 130, 246, 0.1) !important;
 }
 
 /* Button Styling */
@@ -140,6 +238,20 @@ form input, form select, form textarea {
     .nav-bar .flex {
         flex-direction: column !important;
         gap: 0.5rem !important;
+    }
+
+    .post-card {
+        margin: 0 !important; /* Full-width X mobile feed */
+        border-radius: 0 !important; /* Edge-to-edge on mobile */
+    }
+
+    .nav-bar .search-bar {
+        max-width: 100% !important;
+        order: 3 !important; /* Search below logo on small screens */
+    }
+
+    .nav-bar {
+        padding: 0.75rem !important; /* Extra mobile padding */
     }
 }
 
