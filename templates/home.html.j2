@@ -13,16 +13,22 @@
     <button type="submit" class="btn-success">Post</button>
 </form>
 
-<h2 class="text-2xl font-semibold mb-4">Social Feed</h2>
 {% if posts %}
     {% for post in posts %}
-        <div class="post-card">
-            <h3>{{ post.handle }} (Grade {{ post.grade }}) - {{ post.created_at }}</h3>
-            <p>{{ post.content }}</p>
-            <p>Subject: {{ post.subject }}</p>
-            <p>Likes: {{ post.likes }}</p>
-            <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST">
-                <button type="submit" class="btn-primary" {% if post.liked_by_user %}disabled{% endif %}>
+        <div class="bg-white p-4 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition max-w-lg mx-auto mb-4">
+            <div class="flex items-center mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold">
+                    {{ post.handle[0] | upper }}
+                </div>
+                <h3 class="text-sm font-semibold text-blue-900">{{ post.handle }} (Grade {{ post.grade }}) - {{ post.created_at }}</h3>
+            </div>
+            <p class="text-gray-800 leading-relaxed mb-2">{{ post.content }}</p>
+            <div class="flex flex-wrap gap-2 mb-2">
+                <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full">Subject: {{ post.subject }}</span>
+                <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full">Likes: {{ post.likes }}</span>
+            </div>
+            <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST" class="flex justify-end">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition" {% if post.liked_by_user %}disabled{% endif %}>
                     {{ 'Unlike' if post.liked_by_user else 'Like' }}
                 </button>
             </form>
@@ -32,12 +38,13 @@
     <p>No posts available.</p>
 {% endif %}
 
-<h2 class="text-2xl font-semibold mt-6 mb-4">Next Lesson</h2>
 {% if lesson %}
-    <div class="lesson-card">
-        <h3>{{ lesson.subject }}</h3>
-        <div>{{ lesson.content | safe }}</div>
-        <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="btn-primary">Complete Lesson</a>
+    <div class="bg-yellow-100 p-4 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition max-w-lg mx-auto mb-4">
+        <h3 class="text-sm font-semibold text-orange-900 mb-2">{{ lesson.subject }}</h3>
+        <div class="text-gray-800 leading-relaxed mb-2">{{ lesson.content | safe }}</div>
+        <div class="flex justify-end">
+            <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Complete Lesson</a>
+        </div>
     </div>
 {% else %}
     <p>No lessons available. Try generating a new one!</p>

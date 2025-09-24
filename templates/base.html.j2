@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduGrok - {{ title | default('Home') }}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=1">
 </head>
 <body class="theme-{{ theme | default('astronaut') }}">
     <nav class="nav-bar">
@@ -52,7 +51,7 @@
         if (cssLink) {
             console.log('CSS loaded:', cssLink.href);
         } else {
-            console.error('CSS failed to load');
+           // console.error('CSS failed to load');
         }
     </script>
 </body>
