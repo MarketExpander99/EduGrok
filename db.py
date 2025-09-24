@@ -68,6 +68,7 @@ def close_db(error=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+        logger.debug("Database connection closed")
 
 # DB reset
 def reset_db():
@@ -81,6 +82,7 @@ def reset_db():
         c.execute("DROP TABLE IF EXISTS post_likes")
         c.execute("DROP TABLE IF EXISTS games")
         c.execute("DROP TABLE IF EXISTS tests")
+        c.execute("DROP TABLE IF EXISTS lesson_responses")
         c.execute("DROP TABLE IF EXISTS lessons")
         c.execute("DROP TABLE IF EXISTS posts")
         c.execute("DROP TABLE IF EXISTS users")
@@ -102,33 +104,37 @@ def reset_db():
 def check_db_schema():
     conn = get_db()
     c = conn.cursor()
-    c.execute("PRAGMA table_info(users)")
-    columns = {col[1]: col[2] for col in c.fetchall()}
-    expected = {
-        'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
-        'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER',
-        'handle': 'TEXT', 'language': 'TEXT', 'star_coins': 'INTEGER'
-    }
-    for col, col_type in expected.items():
-        if col not in columns:
-            if col == 'star_coins':
-                c.execute("ALTER TABLE users ADD COLUMN star_coins INTEGER DEFAULT 0")
-                conn.commit()
-                logger.info("Added star_coins column to users table")
-                print("Added star_coins column to users table")
-            else:
-                logger.error(f"Users table missing column: {col}")
-                raise ValueError(f"Users table missing column: {col}")
-        elif columns[col] != col_type.split()[0]:
-            logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
-            raise ValueError(f"Users table column {col} type mismatch")
-    for table in ['posts', 'lessons', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
-        c.execute(f"PRAGMA table_info({table})")
-        if not c.fetchall():
-            logger.error(f"Table {table} missing")
-            raise ValueError(f"Table {table} missing")
-    logger.debug("Schema check passed")
-    print("Schema check passed")
+    try:
+        c.execute("PRAGMA table_info(users)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        expected = {
+            'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
+            'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER',
+            'handle': 'TEXT', 'language': 'TEXT', 'star_coins': 'INTEGER'
+        }
+        for col, col_type in expected.items():
+            if col not in columns:
+                if col == 'star_coins':
+                    c.execute("ALTER TABLE users ADD COLUMN star_coins INTEGER DEFAULT 0")
+                    conn.commit()
+                    logger.info("Added star_coins column to users table")
+                    print("Added star_coins column to users table")
+                else:
+                    logger.error(f"Users table missing column: {col}")
+                    raise ValueError(f"Users table missing column: {col}")
+            elif columns[col] != col_type.split()[0]:
+                logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
+                raise ValueError(f"Users table column {col} type mismatch")
+        for table in ['posts', 'lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
+            c.execute(f"PRAGMA table_info({table})")
+            if not c.fetchall():
+                logger.error(f"Table {table} missing")
+                raise ValueError(f"Table {table} missing")
+        logger.debug("Schema check passed")
+        print("Schema check passed")
+    except Exception as e:
+        logger.error(f"Schema check failed: {str(e)}")
+        raise
 
 # Initialize DB
 def init_db():
@@ -147,6 +153,17 @@ def init_db():
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         logger.info("Created posts table with new schema")
         print("Created posts table with new schema")
+        
+        # Drop and recreate lessons table to ensure new columns are included
+        c.execute("DROP TABLE IF EXISTS lessons")
+        c.execute('''CREATE TABLE lessons 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
+                      subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
+                      trace_word TEXT, sound TEXT, spell_word TEXT, mc_question TEXT, 
+                      mc_options TEXT, mc_answer TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        logger.info("Created lessons table with new schema")
+        print("Created lessons table with new schema")
         
         # Users table
         c.execute("PRAGMA table_info(users)")
@@ -190,9 +207,10 @@ def init_db():
                 print("Users table migrated")
         
         # Other tables
-        c.execute('''CREATE TABLE IF NOT EXISTS lessons 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
-                      subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
+        c.execute('''CREATE TABLE IF NOT EXISTS lesson_responses 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, lesson_id INTEGER, user_id INTEGER, 
+                      activity_type TEXT, response TEXT, is_correct INTEGER, submitted_at TEXT,
+                      FOREIGN KEY (lesson_id) REFERENCES lessons(id), 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS tests 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
@@ -281,22 +299,25 @@ def seed_lessons():
     conn = get_db()
     c = conn.cursor()
     lessons = [
-        (None, 1, 'Phonics: Letter M', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
-        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0),
-        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
-        (None, 1, 'Reading: Short Stories', '<p>Read a short story about a space adventure.</p>', 0),
-        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0),
-        (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0),
-        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0),
-        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0),
-        (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0),
-        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0),
-        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0),
-        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0)
+        (None, 1, 'Phonics: Letter M', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/muːn/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
+        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, None, None, None),
+        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, None, None, None),
+        (None, 1, 'Reading: Short Stories', '<p>Read a short story about a space adventure.</p>', 0, None, None, None, None, None, None),
+        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, None, None, None),
+        (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/sʌn/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
+        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, None, None, None),
+        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0, None, None, None, None, None, None),
+        (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0, 'dog', '/dɒɡ/', 'dog', 'What is the correct spelling?', '["dog", "dawg", "dg", "dogg"]', 'dog'),
+        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0, None, None, None, None, None, None),
+        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0, None, None, None, None, None, None),
+        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0, 'cat', '/kæt/', 'cat', 'What is the correct spelling?', '["cat", "kat", "ct", "caat"]', 'cat')
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
-        c.executemany("INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, ?)", lessons)
+        c.executemany("""
+            INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, lessons)
         conn.commit()
         logger.debug("Seeded %d lessons", len(lessons))
         print(f"Seeded {len(lessons)} lessons")

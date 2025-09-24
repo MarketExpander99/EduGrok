@@ -161,13 +161,16 @@ def home():
 
         # Fetch lesson
         c.execute("""
-            SELECT id, subject, content, completed 
+            SELECT id, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer 
             FROM lessons 
             WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 
             LIMIT 1
         """, (user_id, grade))
         lesson_result = c.fetchone()
         lesson = dict(lesson_result) if lesson_result else None
+        if lesson and lesson['mc_options']:
+            import json
+            lesson['mc_options'] = json.loads(lesson['mc_options'])
 
         # Fetch test
         c.execute("""
@@ -252,6 +255,33 @@ def like_post(post_id):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Like post failed: {str(e)}")
+        conn.rollback()
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+@app.route('/save_lesson_response', methods=['POST'])
+def save_lesson_response():
+    logger.debug("Saving lesson response")
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        data = request.get_json()
+        lesson_id = data.get('lesson_id')
+        activity_type = data.get('activity_type')
+        response = data.get('response')
+        is_correct = data.get('is_correct')
+        if not all([lesson_id, activity_type, response is not None, is_correct is not None]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, submitted_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (lesson_id, session['user_id'], activity_type, response, 1 if is_correct else 0, datetime.now().isoformat()))
+        conn.commit()
+        logger.info(f"User {session['user_id']} saved response for lesson {lesson_id}, activity {activity_type}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Save lesson response failed: {str(e)}")
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
@@ -627,12 +657,32 @@ def generate_lesson():
         return redirect(url_for('lessons'))
     try:
         lesson_content = f"Generated {subject} lesson for Grade {grade}"
+        trace_word = None
+        sound = None
+        spell_word = None
+        mc_question = None
+        mc_options = None
+        mc_answer = None
+        if subject == 'language':
+            word_lists = {
+                1: {'word': 'cat', 'sound': '/kæt/'},
+                2: {'word': 'ship', 'sound': '/ʃɪp/'},
+                3: {'word': 'house', 'sound': '/haʊs/'}
+            }
+            trace_word = word_lists[int(grade)]['word']
+            sound = word_lists[int(grade)]['sound']
+            spell_word = trace_word
+            mc_question = 'What is the correct spelling?'
+            mc_options = f'["{trace_word}", "{trace_word[0]}a{trace_word[1:]}", "{trace_word[:2]}", "{trace_word}a"]'
+            mc_answer = trace_word
         if session.get('language') == 'bilingual':
             lesson_content += f"<br>Afrikaans: Gegenereerde {subject} les vir Graad {grade}"
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT INTO lessons (user_id, grade, subject, content, completed) VALUES (?, ?, ?, ?, 0)", 
-                  (session['user_id'], grade, subject, lesson_content))
+        c.execute("""
+            INSERT INTO lessons (user_id, grade, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (session['user_id'], grade, subject, lesson_content, 0, trace_word, sound, spell_word, mc_question, mc_options, mc_answer))
         conn.commit()
         logger.info(f"Generated lesson for user {session['user_id']}: {subject}")
         flash('Lesson generated', 'success')
