@@ -1,115 +1,128 @@
 {% extends "base.html.j2" %}
 
 {% block content %}
+
 <div id="post-form-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div id="post-form" class="hidden bg-white p-6 rounded-xl shadow-xl border border-blue-200 max-w-lg w-full mx-4 transform scale-95 transition-all duration-300">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-blue-900">Create a Post</h2>
-            <button id="close-post-form" class="text-gray-600 hover:text-gray-800 text-2xl">&times;</button>
+            <button id="close-post-form" class="text-gray-600 hover:text-gray-800 text-2xl font-bold">&times;</button>
         </div>
         <form action="{{ url_for('create_post') }}" method="POST">
-            <textarea name="content" class="w-full p-2 border rounded mb-4" placeholder="Share something..." required></textarea>
-            <select name="subject" class="w-full p-2 border rounded mb-4">
+            <textarea name="content" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Share something..." required rows="4"></textarea>
+            <select name="subject" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="math">Math</option>
                 <option value="science">Science</option>
                 <option value="language">Language</option>
                 <option value="General">General</option>
             </select>
-            <div class="flex justify-end">
+            <div class="flex justify-end space-x-3">
+                <button type="button" id="cancel-post" class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition">Cancel</button>
                 <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post</button>
             </div>
         </form>
     </div>
 </div>
 
-<button id="open-post-form" class="fixed bottom-6 right-6 bg-blue-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition z-40 text-xl">
+<button id="open-post-form" class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 z-40 text-2xl font-bold">
     +
 </button>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
-            <div class="bg-white p-4 rounded-lg shadow-md border {{ 'border-blue-200' if category == 'success' else 'border-red-200' }} mb-4 max-w-lg mx-auto">
-                <span class="text-{{ 'blue-800' if category == 'success' else 'red-800' }}">{{ message }}</span>
-            </div>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
-
 {% if posts %}
     {% for post in posts %}
-        <div class="bg-white p-4 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition max-w-lg mx-auto mb-4">
-            <div class="flex items-center mb-2">
-                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold">
-                    {{ post.handle[0] | upper }}
+        <div class="bg-white p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+            <div class="flex items-center mb-3">
+                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm">
+                    {{ post.handle[0] | upper if post.handle else 'U' }}
                 </div>
-                <h3 class="text-sm font-semibold text-blue-900">{{ post.handle }} (Grade {{ post.grade }}) - {{ post.created_at }}</h3>
+                <div>
+                    <h3 class="text-sm font-semibold text-blue-900">{{ post.handle }} (Grade {{ post.grade }})</h3>
+                    <p class="text-xs text-gray-500">{{ post.created_at }}</p>
+                </div>
             </div>
-            <p class="text-gray-800 leading-relaxed mb-2">{{ post.content }}</p>
-            <div class="flex flex-wrap gap-2 mb-2">
-                <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full">Subject: {{ post.subject }}</span>
-                <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full">Likes: {{ post.likes }}</span>
+            <p class="text-gray-800 leading-relaxed mb-3 text-base">{{ post.content }}</p>
+            <div class="flex flex-wrap gap-2 mb-3">
+                <span class="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
+                <span class="bg-gray-100 text-gray-800 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes }}</span>
             </div>
             <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST" class="flex justify-end">
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition" {% if post.liked_by_user %}disabled{% endif %}>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed" {% if post.liked_by_user %}disabled{% endif %}>
                     {{ 'Unlike' if post.liked_by_user else 'Like' }}
                 </button>
             </form>
         </div>
     {% endfor %}
 {% else %}
-    <p class="text-center text-gray-600">No posts available.</p>
+    <div class="text-center py-8">
+        <p class="text-gray-600 text-lg">No posts available yet. Be the first to share!</p>
+    </div>
 {% endif %}
 
 {% if lesson %}
-    <div class="bg-yellow-100 p-4 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition max-w-lg mx-auto mb-4">
-        <h3 class="text-sm font-semibold text-orange-900 mb-2">{{ lesson.subject }}</h3>
-        <div class="text-gray-800 leading-relaxed mb-2">{{ lesson.content | safe }}</div>
+    <div class="bg-yellow-50 p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-orange-900 mb-3">{{ lesson.subject }}</h3>
+        <div class="text-gray-800 leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
         <div class="flex justify-end">
-            <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Complete Lesson</a>
+            <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
+                Complete Lesson
+            </a>
         </div>
     </div>
 {% else %}
-    <p class="text-center text-gray-600">No lessons available. Try generating a new one!</p>
+    <div class="text-center py-8">
+        <p class="text-gray-600 text-lg">No lessons available. Try generating a new one!</p>
+    </div>
 {% endif %}
 
-<h2 class="text-2xl font-semibold mt-6 mb-4">Recent Test</h2>
-{% if test %}
-    <p>Grade {{ test.grade }} - Score: {{ test.score }} - Date: {{ test.date }}</p>
-{% else %}
-    <p class="text-center text-gray-600">No tests taken yet.</p>
-{% endif %}
-{% endblock %}
+<div class="mt-8 p-4 bg-gray-50 rounded-xl shadow-sm max-w-lg mx-auto">
+    <h2 class="text-xl font-semibold mb-3 text-gray-800">Recent Test</h2>
+    {% if test %}
+        <p class="text-gray-700 text-lg">Grade {{ test.grade }} - Score: {{ test.score }}/10 - Date: {{ test.date }}</p>
+    {% else %}
+        <p class="text-gray-600">No tests taken yet. Take one to get started!</p>
+    {% endif %}
+</div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     const openButton = document.getElementById('open-post-form');
     const closeButton = document.getElementById('close-post-form');
+    const cancelButton = document.getElementById('cancel-post');
     const postForm = document.getElementById('post-form');
     const backdrop = document.getElementById('post-form-backdrop');
 
-    openButton.addEventListener('click', () => {
+    if (!openButton || !postForm || !backdrop) {
+        console.error('Required elements not found for post form toggle');
+        return;
+    }
+
+    openButton.addEventListener('click', function() {
         postForm.classList.remove('hidden');
         backdrop.classList.remove('hidden');
-        postForm.classList.add('scale-100');
+        setTimeout(() => {
+            postForm.classList.remove('scale-95');
+            postForm.classList.add('scale-100');
+        }, 10);
     });
 
-    closeButton.addEventListener('click', () => {
+    function closePostForm() {
         postForm.classList.add('scale-95');
         setTimeout(() => {
+            postForm.classList.remove('scale-100');
             postForm.classList.add('hidden');
             backdrop.classList.add('hidden');
-            postForm.classList.remove('scale-95');
         }, 200);
-    });
+    }
 
-    backdrop.addEventListener('click', (e) => {
+    closeButton.addEventListener('click', closePostForm);
+    if (cancelButton) {
+        cancelButton.addEventListener('click', closePostForm);
+    }
+    backdrop.addEventListener('click', function(e) {
         if (e.target === backdrop) {
-            postForm.classList.add('scale-95');
-            setTimeout(() => {
-                postForm.classList.add('hidden');
-                backdrop.classList.add('hidden');
-                postForm.classList.remove('scale-95');
-            }, 200);
+            closePostForm();
         }
     });
+});
 </script>
+{% endblock %}
