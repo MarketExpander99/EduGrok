@@ -1,17 +1,40 @@
 {% extends "base.html.j2" %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">Create a Post</h2>
-<form action="{{ url_for('create_post') }}" method="POST" class="mb-6">
-    <textarea name="content" class="w-full p-2 border rounded" placeholder="Share something..." required></textarea>
-    <select name="subject" class="p-2 border rounded">
-        <option value="math">Math</option>
-        <option value="science">Science</option>
-        <option value="language">Language</option>
-        <option value="General">General</option>
-    </select>
-    <button type="submit" class="btn-success">Post</button>
-</form>
+<div id="post-form-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div id="post-form" class="hidden bg-white p-6 rounded-xl shadow-xl border border-blue-200 max-w-lg w-full mx-4 transform scale-95 transition-all duration-300">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-blue-900">Create a Post</h2>
+            <button id="close-post-form" class="text-gray-600 hover:text-gray-800 text-2xl">&times;</button>
+        </div>
+        <form action="{{ url_for('create_post') }}" method="POST">
+            <textarea name="content" class="w-full p-2 border rounded mb-4" placeholder="Share something..." required></textarea>
+            <select name="subject" class="w-full p-2 border rounded mb-4">
+                <option value="math">Math</option>
+                <option value="science">Science</option>
+                <option value="language">Language</option>
+                <option value="General">General</option>
+            </select>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<button id="open-post-form" class="fixed bottom-6 right-6 bg-blue-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition z-40 text-xl">
+    +
+</button>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="bg-white p-4 rounded-lg shadow-md border {{ 'border-blue-200' if category == 'success' else 'border-red-200' }} mb-4 max-w-lg mx-auto">
+                <span class="text-{{ 'blue-800' if category == 'success' else 'red-800' }}">{{ message }}</span>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 
 {% if posts %}
     {% for post in posts %}
@@ -35,7 +58,7 @@
         </div>
     {% endfor %}
 {% else %}
-    <p>No posts available.</p>
+    <p class="text-center text-gray-600">No posts available.</p>
 {% endif %}
 
 {% if lesson %}
@@ -47,13 +70,46 @@
         </div>
     </div>
 {% else %}
-    <p>No lessons available. Try generating a new one!</p>
+    <p class="text-center text-gray-600">No lessons available. Try generating a new one!</p>
 {% endif %}
 
 <h2 class="text-2xl font-semibold mt-6 mb-4">Recent Test</h2>
 {% if test %}
     <p>Grade {{ test.grade }} - Score: {{ test.score }} - Date: {{ test.date }}</p>
 {% else %}
-    <p>No tests taken yet.</p>
+    <p class="text-center text-gray-600">No tests taken yet.</p>
 {% endif %}
 {% endblock %}
+
+<script>
+    const openButton = document.getElementById('open-post-form');
+    const closeButton = document.getElementById('close-post-form');
+    const postForm = document.getElementById('post-form');
+    const backdrop = document.getElementById('post-form-backdrop');
+
+    openButton.addEventListener('click', () => {
+        postForm.classList.remove('hidden');
+        backdrop.classList.remove('hidden');
+        postForm.classList.add('scale-100');
+    });
+
+    closeButton.addEventListener('click', () => {
+        postForm.classList.add('scale-95');
+        setTimeout(() => {
+            postForm.classList.add('hidden');
+            backdrop.classList.add('hidden');
+            postForm.classList.remove('scale-95');
+        }, 200);
+    });
+
+    backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+            postForm.classList.add('scale-95');
+            setTimeout(() => {
+                postForm.classList.add('hidden');
+                backdrop.classList.add('hidden');
+                postForm.classList.remove('scale-95');
+            }, 200);
+        }
+    });
+</script>
