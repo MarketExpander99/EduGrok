@@ -1,18 +1,28 @@
 {% extends "base.html.j2" %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">Lessons (Grade {{ grade }})</h2>
+<div class="max-w-lg mx-auto mb-6">
+    <h2 class="text-2xl font-semibold mb-6 text-gray-800">Lessons (Grade {{ grade }})</h2>
+</div>
 
 {% if lessons %}
     {% for lesson in lessons %}
-        <div class="lesson-card">
-            <h3>{{ lesson.subject }}</h3>
-            <div>{{ lesson.content | safe }}</div>
-            <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="btn-primary">Complete Lesson</a>
-            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="btn-warning ml-2">Do Again</a>
+        <div class="bg-yellow-50 p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+            <h3 class="text-lg font-semibold text-orange-900 mb-3">{{ lesson.subject }}</h3>
+            <div class="text-gray-800 leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
+            <div class="flex justify-end space-x-3">
+                <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition inline-flex items-center text-sm">
+                    Do Again
+                </a>
+                <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
+                    Complete Lesson
+                </a>
+            </div>
         </div>
     {% endfor %}
 {% else %}
-    <p>No lessons available for your grade. Try generating a new one!</p>
+    <div class="text-center py-8 max-w-lg mx-auto">
+        <p class="text-gray-600 text-lg">No lessons available for your grade. Try generating a new one!</p>
+    </div>
 {% endif %}
 {% endblock %}
