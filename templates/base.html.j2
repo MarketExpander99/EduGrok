@@ -6,15 +6,14 @@
     <title>EduGrok - {{ title | default('Home') }}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="theme-{{ theme | default('astronaut') }}">
-    <nav class="nav-bar">
+<body class="{% if theme == 'astronaut' %}bg-blue-900 text-white{% elif theme == 'farm' %}bg-lime-200 text-black{% else %}bg-blue-900 text-white{% endif %}">
+    <nav class="bg-blue-700 text-white p-2 shadow-md flex justify-between items-center sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold">EduGrok - Dino Cowboy Adventures!</h1>
             {% if session.user_id %}
                 <div class="flex space-x-4">
                     <a href="{{ url_for('home') }}" class="hover:underline">Home</a>
                     <a href="{{ url_for('lessons') }}" class="hover:underline">Lessons</a>
-                    <a href="{{ url_for('phonics_game') }}" class="hover:underline">Phonics Game</a>
                     <a href="{{ url_for('profile') }}" class="hover:underline">Profile</a>
                     <a href="{{ url_for('logout') }}" class="hover:underline">Logout</a>
                 </div>
@@ -31,8 +30,9 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 p-4 rounded mb-4 border-l-4 border-{{ 'green' if category == 'success' else 'red' }}-500">
-                        {{ message }}
+                    <div id="notification-{{ loop.index }}" class="bg-white p-4 rounded-lg shadow-md border mb-4 max-w-lg mx-auto relative {{ 'border-green-200' if category == 'success' else 'border-red-200' }} {{ 'text-green-800' if category == 'success' else 'text-red-800' }}">
+                        <span class="block">{{ message }}</span>
+                        <button onclick="closeNotification('notification-{{ loop.index }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -46,13 +46,26 @@
     </footer>
 
     <script>
-        // Debug CSS loading
-        const cssLink = document.querySelector('link[href*="/static/styles.css"]');
-        if (cssLink) {
-            console.log('CSS loaded:', cssLink.href);
-        } else {
-           // console.error('CSS failed to load');
+        function closeNotification(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.opacity = '0';
+                element.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    element.remove();
+                }, 300);
+            }
         }
+
+        // Auto-dismiss notifications after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const notifications = document.querySelectorAll('[id^="notification-"]');
+            notifications.forEach((notif, index) => {
+                setTimeout(() => {
+                    closeNotification(notif.id);
+                }, (index + 1) * 5000); // Staggered auto-dismiss
+            });
+        });
     </script>
 </body>
 </html>
