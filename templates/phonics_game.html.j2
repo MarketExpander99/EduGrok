@@ -1,21 +1,21 @@
 {% extends 'base.html.j2' %}
 {% block title %}Phonics Game - EduGrok{% endblock %}
 {% block content %}
-<div class="container p-4">
-  <h1 class="display-4 font-weight-bold mb-4 text-center pirate-text">Mars Memory Match: Phonics Pirate Raid</h1>
-  <h2 id="timer" class="h3 font-weight-bold text-center mb-4 text-success">Time: 30s</h2>
-  <p class="text-center mb-4 lead">Match the M-sound words before the space pirates steal them!</p>
-  <div id="taunt" class="text-center mb-4 text-danger d-none"></div>
-  <div class="row justify-content-center">
+<div class="container mx-auto p-6 max-w-4xl">
+  <h1 class="text-4xl font-bold mb-6 text-center text-gray-800 pirate-text">Mars Memory Match: Phonics Pirate Raid</h1>
+  <h2 id="timer" class="text-2xl font-bold text-center mb-6 text-green-600">Time: 30s</h2>
+  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the M-sound words before the space pirates steal them!</p>
+  <div id="taunt" class="text-center mb-6 text-red-600 font-semibold hidden"></div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
     {% for word in ['moon', 'mars', 'mug', 'mat', 'moon', 'mars', 'mug', 'mat'] %}
-      <div class="col-6 col-md-3 mb-3">
-        <div class="card h-100 text-center border-0 shadow-sm game-input transform-transition" 
+      <div class="w-full max-w-xs">
+        <div class="card h-full text-center bg-white border-0 shadow-lg game-input transform-transition rounded-xl" 
              data-word="{{ word }}" 
              onclick="flipCard(this)"
              style="cursor: pointer; transition: transform 0.3s ease-in-out;">
-          <div class="card-body p-4">
-            <span class="front d-block text-xl font-weight-bold">{{ word }}</span>
-            <span class="back d-none text-xl font-weight-bold">?</span>
+          <div class="card-body p-6 flex items-center justify-center min-h-[120px]">
+            <span class="front block text-2xl font-bold text-gray-800">{{ word }}</span>
+            <span class="back hidden text-2xl font-bold text-gray-800">?</span>
           </div>
         </div>
       </div>
@@ -39,7 +39,7 @@ function startTimer() {
   timerId = setInterval(() => {
     timeLeft--;
     timerDisplay.textContent = `Time: ${timeLeft}s`;
-    timerDisplay.className = `h3 font-weight-bold text-center mb-4 ${timeLeft <= 10 ? 'text-danger' : 'text-success'}`;
+    timerDisplay.className = `text-2xl font-bold text-center mb-6 ${timeLeft <= 10 ? 'text-red-600' : 'text-green-600'}`;
     if (timeLeft <= 0) {
       clearInterval(timerId);
       alert("Time's up! The pirates stole your words!");
@@ -52,29 +52,29 @@ function startTimer() {
 function flipCard(card) {
   if (timeLeft <= 0 || flippedCards.length >= 2 || card.classList.contains('matched')) return;
   card.classList.add('rotate-y-180');
-  card.querySelector('.front').classList.add('d-none');
-  card.querySelector('.back').classList.remove('d-none');
+  card.querySelector('.front').classList.add('hidden');
+  card.querySelector('.back').classList.remove('hidden');
   flippedCards.push(card);
   if (flippedCards.length === 2) {
     const [card1, card2] = flippedCards;
     if (card1.dataset.word === card2.dataset.word) {
-      card1.classList.add('matched', 'bg-success', 'text-white');
-      card2.classList.add('matched', 'bg-success', 'text-white');
+      card1.classList.add('matched', 'bg-green-500', 'text-white');
+      card2.classList.add('matched', 'bg-green-500', 'text-white');
       matchedPairs++;
       if (matchedPairs === 4) {
         completeGame();
       }
     } else {
       tauntDisplay.textContent = taunts[Math.floor(Math.random() * taunts.length)];
-      tauntDisplay.classList.remove('d-none');
+      tauntDisplay.classList.remove('hidden');
       setTimeout(() => {
         card1.classList.remove('rotate-y-180');
         card2.classList.remove('rotate-y-180');
-        card1.querySelector('.front').classList.remove('d-none');
-        card1.querySelector('.back').classList.add('d-none');
-        card2.querySelector('.front').classList.remove('d-none');
-        card2.querySelector('.back').classList.add('d-none');
-        tauntDisplay.classList.add('d-none');
+        card1.querySelector('.front').classList.remove('hidden');
+        card1.querySelector('.back').classList.add('hidden');
+        card2.querySelector('.front').classList.remove('hidden');
+        card2.querySelector('.back').classList.add('hidden');
+        tauntDisplay.classList.add('hidden');
       }, 1000);
     }
     flippedCards = [];
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startTimer();
   const cards = document.querySelectorAll('.card');
   const shuffled = [...cards].sort(() => Math.random() - 0.5);
-  const container = document.querySelector('.row');
+  const container = document.querySelector('.grid');
   container.innerHTML = '';
   shuffled.forEach(card => container.appendChild(card));
 });
