@@ -1,71 +1,128 @@
 <!DOCTYPE html>
-<html lang="{{ language }}">
+<html lang="{{ language or 'en' }}" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduGrok - {{ title | default('Home') }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>{% block title %}EduGrok{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'grok-bg': '#000000',
+                        'grok-surface': '#0a0a0a',
+                        'grok-text': '#ffffff',
+                        'grok-secondary': '#71767b',
+                        'grok-border': '#333333',
+                        'grok-accent': '#4b5563', // Dark grey instead of blue
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #000000; color: #ffffff; }
+        h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
+        p { color: #e5e7eb !important; } /* Light gray for better readability on black */
+        .sidebar { background-color: #0a0a0a; border-right: 1px solid #333333; }
+        .card { background-color: #0a0a0a; border: 1px solid #333333; }
+        .btn-primary { background-color: #4b5563; border-color: #4b5563; color: #ffffff; }
+        .btn-primary:hover { background-color: #374151; }
+        .lesson-card { max-width: 600px; margin: 20px auto; text-align: center; }
+        .lesson-nav { display: flex; justify-content: center; gap: 1rem; margin-top: 20px; }
+        .lesson-nav button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+    {% block head %}{% endblock %}
 </head>
-<body class="{% if theme == 'astronaut' %}bg-blue-900 text-white{% elif theme == 'farm' %}bg-lime-200 text-black{% else %}bg-blue-900 text-white{% endif %}">
-    <nav class="bg-blue-700 text-white p-2 shadow-md flex justify-between items-center sticky top-0 z-50">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">EduGrok - Dino Cowboy Adventures!</h1>
-            {% if session.user_id %}
-                <div class="flex space-x-4">
-                    <a href="{{ url_for('home') }}" class="hover:underline">Home</a>
-                    <a href="{{ url_for('lessons') }}" class="hover:underline">Lessons</a>
-                    <a href="{{ url_for('profile') }}" class="hover:underline">Profile</a>
-                    <a href="{{ url_for('logout') }}" class="hover:underline">Logout</a>
-                </div>
-            {% else %}
-                <div class="flex space-x-4">
-                    <a href="{{ url_for('login') }}" class="hover:underline">Login</a>
-                    <a href="{{ url_for('register') }}" class="hover:underline">Register</a>
-                </div>
+<body class="bg-grok-bg text-grok-text min-h-screen flex">
+    <!-- Side Menu (X-style) -->
+    <nav class="sidebar fixed left-0 top-0 h-full w-64 flex flex-col z-50 -translate-x-full md:translate-x-0 transition-transform duration-300" id="sidebar">
+        <div class="p-4 border-b border-grok-border">
+            <h1 class="text-xl font-bold text-grok-text">EduGrok</h1>
+        </div>
+        <ul class="flex-1 p-4 space-y-2">
+            <li>
+                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-home text-grok-accent"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('lessons') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-book text-grok-accent"></i>
+                    <span>Lessons</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('phonics_game') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-gamepad text-grok-accent"></i>
+                    <span>Games</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('profile') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-user text-grok-accent"></i>
+                    <span>Profile</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('parent_dashboard') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-chart-bar text-grok-accent"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            {% if user_id %}
+            <li>
+                <a href="{{ url_for('logout') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
+                    <i class="fas fa-sign-out-alt text-grok-accent"></i>
+                    <span>Logout</span>
+                </a>
+            </li>
             {% endif %}
+        </ul>
+        <div class="p-4 border-t border-grok-border">
+            <a href="{{ url_for('feedback') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors w-full">
+                <i class="fas fa-comment-dots text-grok-accent"></i>
+                <span>Feedback</span>
+            </a>
         </div>
     </nav>
 
-    <main class="container mx-auto p-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div id="notification-{{ loop.index }}" class="bg-white p-4 rounded-lg shadow-md border mb-4 max-w-lg mx-auto relative {{ 'border-green-200' if category == 'success' else 'border-red-200' }} {{ 'text-green-800' if category == 'success' else 'text-red-800' }}">
-                        <span class="block">{{ message }}</span>
-                        <button onclick="closeNotification('notification-{{ loop.index }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    <!-- Overlay for mobile -->
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" id="overlay"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 ml-0 md:ml-64 p-4 transition-all duration-300">
+        <!-- Mobile menu toggle -->
+        <button class="md:hidden mb-4 p-2 bg-grok-surface rounded" onclick="toggleSidebar()">
+            <i class="fas fa-bars text-grok-text"></i>
+        </button>
 
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="bg-gray-800 text-white p-4 mt-8 text-center">
-        <p>&copy; 2025 EduGrok - Built with Grok by xAI. Pirate vibes all the way! 🏴‍☠️</p>
-    </footer>
-
     <script>
-        function closeNotification(id) {
-            const element = document.getElementById(id);
-            if (element) {
-                element.style.opacity = '0';
-                element.style.transform = 'translateX(100%)';
-                setTimeout(() => {
-                    element.remove();
-                }, 300);
-            }
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
         }
 
-        // Auto-dismiss notifications after 5 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            const notifications = document.querySelectorAll('[id^="notification-"]');
-            notifications.forEach((notif, index) => {
-                setTimeout(() => {
-                    closeNotification(notif.id);
-                }, (index + 1) * 5000); // Staggered auto-dismiss
-            });
+        document.getElementById('overlay').addEventListener('click', toggleSidebar);
+
+        // Close sidebar on window resize if mobile
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                document.getElementById('sidebar').classList.remove('-translate-x-full');
+                document.getElementById('overlay').classList.add('hidden');
+            }
         });
     </script>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>
