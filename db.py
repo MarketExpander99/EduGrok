@@ -1,4 +1,4 @@
-# db.py (updated)
+﻿# db.py (updated)
 import os
 import sqlite3
 import logging
@@ -169,24 +169,18 @@ def init_db():
         print(f"Initializing DB at {db_path}")
         
         # Drop and recreate posts table to ensure correct schema
-        c.execute("DROP TABLE IF EXISTS posts")
-        c.execute('''CREATE TABLE posts 
+        c.execute('''CREATE TABLE IF NOT EXISTS posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
                       subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT, views INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        logger.info("Created posts table with new schema")
-        print("Created posts table with new schema")
         
         # Drop and recreate lessons table to ensure new columns are included
-        c.execute("DROP TABLE IF EXISTS lessons")
-        c.execute('''CREATE TABLE lessons 
+        c.execute('''CREATE TABLE IF NOT EXISTS lessons 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
                       subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
                       trace_word TEXT, sound TEXT, spell_word TEXT, mc_question TEXT, 
                       mc_options TEXT, mc_answer TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        logger.info("Created lessons table with new schema")
-        print("Created lessons table with new schema")
         
         # Users table
         c.execute("PRAGMA table_info(users)")
@@ -205,56 +199,7 @@ def init_db():
                 c.execute("DROP TABLE IF EXISTS users_new")
                 c.execute('''CREATE TABLE users_new 
                              (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, 
-                              language TEXT DEFAULT 'en', star_coins INTEGER DEFAULT 0)''')
-                old_cols = [col for col in columns if col != 'id']
-                insert_cols = old_cols + missing_cols
-                insert_cols_str = ', '.join(insert_cols)
-                select_cols = ', '.join([col if col in old_cols else 
-                                        'NULL' if col == 'grade' else 
-                                        "'astronaut'" if col == 'theme' else 
-                                        '0' if col == 'subscribed' else 
-                                        "email" if col == 'handle' else 
-                                        "'en'" if col == 'language' else 
-                                        '0' if col == 'star_coins' else col 
-                                        for col in insert_cols])
-                c.execute(f"INSERT INTO users_new (id, {insert_cols_str}) SELECT id, {select_cols} FROM users")
-                c.execute("SELECT id, password FROM users_new WHERE password NOT LIKE 'pbkdf2:sha256%'")
-                for row in c.fetchall():
-                    user_id, plaintext = row[0], row[1]
-                    hashed = generate_password_hash(plaintext)
-                    c.execute("UPDATE users_new SET password = ? WHERE id = ?", (hashed, user_id))
-                c.execute('DROP TABLE users')
-                c.execute('ALTER TABLE users_new RENAME TO users')
-                logger.debug("Migration completed")
-                print("Users table migrated")
-        
-        # Other tables
-        c.execute('''CREATE TABLE IF NOT EXISTS lesson_responses 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, lesson_id INTEGER, user_id INTEGER, 
-                      activity_type TEXT, response TEXT, is_correct INTEGER, submitted_at TEXT,
-                      FOREIGN KEY (lesson_id) REFERENCES lessons(id), 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS tests 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
-                      score INTEGER, date TEXT, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS user_likes 
-                     (user_id INTEGER, post_id INTEGER, 
-                      PRIMARY KEY (user_id, post_id), 
-                      FOREIGN KEY (user_id) REFERENCES users(id), 
-                      FOREIGN KEY (post_id) REFERENCES posts(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS post_likes 
-                     (post_id INTEGER, user_id INTEGER, 
-                      PRIMARY KEY (post_id, user_id), 
-                      FOREIGN KEY (post_id) REFERENCES posts(id), 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS user_points 
-                     (user_id INTEGER PRIMARY KEY, points INTEGER DEFAULT 0, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS badges 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+                       ...(truncated 3415 characters)... users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
@@ -272,6 +217,7 @@ def init_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_id ON posts(id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_unique ON posts(user_id, content)')
         conn.commit()
         logger.info("Tables created/updated")
         print("Tables created/updated")
@@ -314,6 +260,23 @@ def init_db():
         logger.info("Bot posts seeded")
         print("Bot posts seeded")
 
+        # Fetch seeded post IDs
+        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%farm math%'", (skykidz_id,))
+        post1_id = c.fetchone()[0] if c.fetchone() else None
+        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%solar system%'", (grokedu_id,))
+        post2_id = c.fetchone()[0] if c.fetchone() else None
+        if post1_id and post2_id:
+            bot_comments = [
+                (post1_id, skykidz_id, 'This is fun!', 'datetime("now")'),
+                (post1_id, grokedu_id, 'Love the math adventure!', 'datetime("now")'),
+                (post2_id, skykidz_id, 'Mercury?', 'datetime("now")'),
+                (post2_id, grokedu_id, 'Great question!', 'datetime("now")'),
+            ]
+            c.executemany("INSERT OR IGNORE INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, ?)", bot_comments)
+            conn.commit()
+            logger.info("Bot comments seeded")
+            print("Bot comments seeded")
+
     except sqlite3.Error as e:
         logger.error(f"SQLite error in init_db: {str(e)}")
         print(f"SQLite error in init_db: {e}")
@@ -336,17 +299,15 @@ def seed_lessons():
         (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
         (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/sʌn/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
         (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
-        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0, None, None, None, 'What is 8 - 3?', '["4", "5", "6", "7"]', '5'),
-        (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0, 'dog', '/dɒɡ/', 'dog', 'What is the correct spelling?', '["dog", "dawg", "dg", "dogg"]', 'dog'),
-        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0, None, None, None, 'What causes rain?', '["Sun", "Clouds", "Wind", "Stars"]', 'Clouds'),
-        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0, None, None, None, 'What is 4 x 5?', '["15", "20", "25", "18"]', '20'),
-        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0, 'cat', '/kæt/', 'cat', 'What is the correct spelling?', '["cat", "kat", "ct", "caat"]', 'cat'),
         (None, 1, 'Phonics: Letter A', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/ˈæp.əl/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
         (None, 2, 'Math: Shapes', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
         (None, 3, 'Science: Water Cycle', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
         (None, 1, 'Language: Colors', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/rɛd/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
         (None, 2, 'Phonics: Letter B', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/bʊk/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
-        (None, 3, 'Math: Fractions', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4')
+        (None, 3, 'Math: Fractions', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4'),
+        (None, 2, 'math', '<p>Subtraction: Solve 10 - 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Subtraction">', 0, None, None, None, 'What is 7 - 2?', '["4", "5", "6", "3"]', '5'),
+        (None, 3, 'math', '<p>Multiplication: Solve 3 x 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Multiplication">', 0, None, None, None, 'What is 5 x 3?', '["10", "15", "20", "12"]', '15'),
+        (None, 2, 'science', '<p>Weather: What makes it rain?</p><img src="https://via.placeholder.com/300x200" alt="Weather"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is snow?', '["Frozen rain", "Hot wind", "Sunlight", "Clouds"]', 'Frozen rain')
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')

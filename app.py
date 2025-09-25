@@ -1,3 +1,4 @@
+
 import os
 import secrets
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, send_from_directory, abort
@@ -166,16 +167,15 @@ def home():
         user_id = session.get('user_id')
         grade = session.get('grade', 1)
 
-        # Fetch posts (updated to include media_url, views, and reposts)
+        # Fetch posts (updated to include media_url and views)
         c.execute("""
-            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views, p.reposts
+            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views
             FROM posts p 
             WHERE p.grade = ? 
             ORDER BY p.created_at DESC LIMIT 5
         """, (grade,))
         posts_data = c.fetchall()
         posts = []
-        comments_data = {}
         for row in posts_data:
             post = {
                 'id': row['id'],
@@ -186,26 +186,10 @@ def home():
                 'handle': row['handle'] or 'Unknown',
                 'created_at': row['created_at'] or 'Unknown',
                 'media_url': row['media_url'] or None,
-                'views': row['views'] or 0,
-                'reposts': row['reposts'] or 0
+                'views': row['views'] or 0
             }
             c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
             post['liked_by_user'] = c.fetchone() is not None
-
-            # Fetch comments for this post
-            c.execute("""
-                SELECT c.content, u.handle, c.created_at 
-                FROM comments c 
-                JOIN users u ON c.user_id = u.id 
-                WHERE c.post_id = ? 
-                ORDER BY c.created_at ASC 
-                LIMIT 5
-            """, (row['id'],))
-            comments_data[row['id']] = [
-                {'content': filter_content(r[0] or ''), 'handle': r[1] or 'Unknown', 'created_at': r[2] or 'Unknown'}
-                for r in c.fetchall()
-            ]
-
             posts.append(post)
 
         # Fetch lesson
@@ -238,7 +222,6 @@ def home():
         logger.info(f"User {user_id} accessed home with {len(posts)} posts")
         return render_template('home.html.j2', 
                             posts=posts, 
-                            comments=comments_data,
                             lesson=lesson, 
                             test=test, 
                             subscribed=subscribed, 
@@ -289,7 +272,7 @@ def create_post():
         user_id = session.get('user_id')
         handle = session.get('handle', 'User')
         grade = session.get('grade', 1)
-        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url, views, reposts) VALUES (?, ?, ?, ?, ?, datetime("now"), ?, 0, 0)',
+        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url, views) VALUES (?, ?, ?, ?, ?, datetime("now"), ?, 0)',
                      (user_id, handle, content, subject, grade, media_url))
         conn.commit()
         flash('Post created successfully', 'success')
@@ -322,53 +305,6 @@ def like_post(post_id):
         logger.error(f"Like post failed: {str(e)}")
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
-
-@app.route('/repost/<int:post_id>', methods=['POST'])
-def repost_post(post_id):
-    logger.debug(f"Reposting post {post_id}")
-    if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM reposts WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
-        if c.fetchone():
-            return jsonify({'success': False, 'error': 'Already reposted'}), 400
-        c.execute("INSERT INTO reposts (user_id, post_id, created_at) VALUES (?, ?, datetime('now'))", (session['user_id'], post_id))
-        c.execute("UPDATE posts SET reposts = reposts + 1 WHERE id = ?", (post_id,))
-        conn.commit()
-        logger.info(f"User {session['user_id']} reposted post {post_id}")
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Repost failed: {str(e)}")
-        conn.rollback()
-        return jsonify({'success': False, 'error': 'Server error'}), 500
-
-@app.route('/comment/<int:post_id>', methods=['POST'])
-def add_comment(post_id):
-    logger.debug(f"Adding comment to post {post_id}")
-    if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('login'))
-    content = request.form.get('content', '').strip()
-    if not content:
-        flash('Comment cannot be empty', 'error')
-        return redirect(url_for('home'))
-    content = filter_content(content)
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute("INSERT INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, datetime('now'))",
-                  (post_id, session['user_id'], content))
-        conn.commit()
-        flash('Comment added successfully', 'success')
-        logger.info(f"User {session['user_id']} commented on post {post_id}")
-        return redirect(url_for('home'))
-    except Exception as e:
-        logger.error(f"Comment failed: {str(e)}")
-        conn.rollback()
-        flash('Server error', 'error')
-        return redirect(url_for('home'))
 
 @app.route('/check_lesson', methods=['POST'])
 def check_lesson():
@@ -434,18 +370,6 @@ def assess():
     logger.debug("Assess route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    questions = [
-        {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
-        {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
-        {"q": "Science: What do plants need to grow?", "a": ["Water", "Sand", "Rocks"], "correct": "Water"},
-        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
-        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
-        {"q": "Example Q6", "a": ["Example6", "Wrong", "Wrong"], "correct": "Example6"},
-        {"q": "Example Q7", "a": ["Example7", "Wrong", "Wrong"], "correct": "Example7"},
-        {"q": "Example Q8", "a": ["Example8", "Wrong", "Wrong"], "correct": "Example8"},
-        {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
-        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"}
-    ]
     if request.method == 'POST':
         correct_answers = ["5", "Hat", "Water", "Example4", "Example5", "Example6", "Example7", "Example8", "Example9", "Example10"]
         score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}') == correct_answers[i-1])
@@ -463,6 +387,18 @@ def assess():
             conn.rollback()
             flash('Server error', 'error')
             return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    questions = [
+        {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
+        {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
+        {"q": "Science: What do plants need to grow?", "a": ["Water", "Sand", "Rocks"], "correct": "Water"},
+        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
+        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
+        {"q": "Example Q6", "a": ["Example6", "Wrong", "Wrong"], "correct": "Example6"},
+        {"q": "Example Q7", "a": ["Example7", "Wrong", "Wrong"], "correct": "Example7"},
+        {"q": "Example Q8", "a": ["Example8", "Wrong", "Wrong"], "correct": "Example8"},
+        {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
+        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"}
+    ]
     return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/complete_lesson/<int:lesson_id>')
@@ -516,13 +452,6 @@ def take_test():
     logger.debug("Test route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    questions = [
-        {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
-        {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
-        {"q": "Example Q3", "a": ["Example3", "Wrong", "Wrong"], "correct": "Example3"},
-        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
-        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"}
-    ]
     if request.method == 'POST':
         correct_answers = ["9", "Example2", "Example3", "Example4", "Example5"]
         score = sum(1 for i in range(1, 6) if request.form.get(f'q{i}') == correct_answers[i-1])
@@ -541,6 +470,13 @@ def take_test():
             conn.rollback()
             flash('Server error', 'error')
             return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    questions = [
+        {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
+        {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
+        {"q": "Example Q3", "a": ["Example3", "Wrong", "Wrong"], "correct": "Example3"},
+        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
+        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"}
+    ]
     return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/game')
