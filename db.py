@@ -125,7 +125,17 @@ def check_db_schema():
             elif columns[col] != col_type.split()[0]:
                 logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
                 raise ValueError(f"Users table column {col} type mismatch")
-        for table in ['posts', 'lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
+        
+        # Check posts table for media_url
+        c.execute("PRAGMA table_info(posts)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'media_url' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN media_url TEXT")
+            conn.commit()
+            logger.info("Added media_url column to posts table")
+            print("Added media_url column to posts table")
+        
+        for table in ['lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
             c.execute(f"PRAGMA table_info({table})")
             if not c.fetchall():
                 logger.error(f"Table {table} missing")
@@ -149,7 +159,7 @@ def init_db():
         c.execute("DROP TABLE IF EXISTS posts")
         c.execute('''CREATE TABLE posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
-                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, 
+                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         logger.info("Created posts table with new schema")
         print("Created posts table with new schema")

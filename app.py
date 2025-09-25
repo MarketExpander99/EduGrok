@@ -10,6 +10,8 @@ from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lesson
 from auth import register, login, logout, set_theme, set_language
 from urllib.parse import urlparse
 import mimetypes
+import json
+from werkzeug.utils import secure_filename
 
 # Load .env file
 load_dotenv()
@@ -39,6 +41,29 @@ def filter_content(content):
         return ""
     for word in BAD_WORDS:
         content = re.sub(rf'\b{word}\b', '***', content, flags=re.IGNORECASE)
+    return content
+
+# Helper functions for media
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'mp4'}
+
+def embed_links(content):
+    # YouTube
+    youtube_regex = r'https?://(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)'
+    match = re.search(youtube_regex, content)
+    if match:
+        video_id = match.group(1)
+        embed = f'<iframe width="300" height="200" src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen></iframe>'
+        content = re.sub(youtube_regex, embed, content, count=1)
+    
+    # Rumble
+    rumble_regex = r'https?://rumble\.com/v([a-zA-Z0-9_-]+)'
+    match = re.search(rumble_regex, content)
+    if match:
+        video_id = match.group(1)
+        embed = f'<iframe width="300" height="200" src="https://rumble.com/embed/{video_id}/" frameborder="0" allowfullscreen></iframe>'
+        content = re.sub(rumble_regex, embed, content, count=1)
+    
     return content
 
 @app.teardown_appcontext
@@ -97,6 +122,11 @@ def init_app():
             init_db()
             check_db_schema()
             seed_lessons()
+            # Setup upload folder
+            upload_folder = os.path.join(app.static_folder, 'uploads')
+            os.makedirs(upload_folder, exist_ok=True)
+            app.config['UPLOAD_FOLDER'] = upload_folder
+            app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB limit
             logger.info("App initialized - DB ready")
             print("App initialized - DB ready")
         except Exception as e:
@@ -136,9 +166,9 @@ def home():
         user_id = session.get('user_id')
         grade = session.get('grade', 1)
 
-        # Fetch posts
+        # Fetch posts (updated to include media_url)
         c.execute("""
-            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at 
+            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url 
             FROM posts p 
             WHERE p.grade = ? 
             ORDER BY p.created_at DESC LIMIT 5
@@ -153,7 +183,8 @@ def home():
                 'grade': row['grade'] or 1,
                 'likes': row['likes'] or 0,
                 'handle': row['handle'] or 'Unknown',
-                'created_at': row['created_at'] or 'Unknown'
+                'created_at': row['created_at'] or 'Unknown',
+                'media_url': row['media_url'] or None
             }
             c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
             post['liked_by_user'] = c.fetchone() is not None
@@ -169,7 +200,6 @@ def home():
         lesson_result = c.fetchone()
         lesson = dict(lesson_result) if lesson_result else None
         if lesson and lesson['mc_options']:
-            import json
             lesson['mc_options'] = json.loads(lesson['mc_options'])
 
         # Fetch test
@@ -214,21 +244,37 @@ def create_post():
     if 'user_id' not in session:
         flash('Login required', 'error')
         return redirect(url_for('login'))
-    content = filter_content(request.form.get('content'))
+    content = filter_content(request.form.get('content', ''))
     subject = request.form.get('subject', 'General')
     if not content:
         flash('Post content is required', 'error')
         return redirect(url_for('home'))
+    
+    media_url = None
+    if 'media' in request.files:
+        file = request.files['media']
+        if file.filename != '':
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{timestamp}_{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                media_url = f"/static/uploads/{filename}"
+    
+    # Handle external links
+    content = embed_links(content)
+    
     try:
         conn = get_db()
         user_id = session.get('user_id')
         handle = session.get('handle', 'User')
         grade = session.get('grade', 1)
-        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))',
-                     (user_id, handle, content, subject, grade))
+        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url) VALUES (?, ?, ?, ?, ?, datetime("now"), ?)',
+                     (user_id, handle, content, subject, grade, media_url))
         conn.commit()
         flash('Post created successfully', 'success')
-        logger.info(f"User {user_id} created post: {content}")
+        logger.info(f"User {user_id} created post: {content[:50]}...")
         return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Create post failed: {str(e)}")
@@ -258,31 +304,63 @@ def like_post(post_id):
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
-@app.route('/save_lesson_response', methods=['POST'])
-def save_lesson_response():
-    logger.debug("Saving lesson response")
+@app.route('/check_lesson', methods=['POST'])
+def check_lesson():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json()
+    lesson_id = data.get('lesson_id')
+    activity_type = data.get('activity_type')
+    response = data.get('response')
+    
     try:
-        data = request.get_json()
-        lesson_id = data.get('lesson_id')
-        activity_type = data.get('activity_type')
-        response = data.get('response')
-        is_correct = data.get('is_correct')
-        if not all([lesson_id, activity_type, response is not None, is_correct is not None]):
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         conn = get_db()
         c = conn.cursor()
+        # Get lesson details
+        c.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,))
+        lesson = dict(c.fetchone())
+        
+        is_correct = 0
+        points_award = 0
+        if activity_type == 'math_fill':
+            expected = eval(lesson.get('mc_answer', '0'))  # e.g., '6*3' -> 18
+            is_correct = 1 if int(response) == expected else 0
+            points_award = 10 if is_correct else 5
+        elif activity_type == 'spelling_complete':
+            expected = lesson.get('mc_answer', '').lower()
+            is_correct = 1 if response.lower().strip() == expected else 0
+            points_award = 10 if is_correct else 5
+        elif activity_type == 'mc_choice':
+            expected = lesson.get('mc_answer', '')
+            is_correct = 1 if response == expected else 0
+            points_award = 10 if is_correct else 5
+        elif activity_type == 'sentence_complete':
+            expected = lesson.get('mc_answer', '')
+            is_correct = 1 if response.lower() in expected.lower() else 0
+            points_award = 10 if is_correct else 5
+        elif activity_type == 'match_three':
+            expected_matches = 3
+            user_matches = len([m for m in json.loads(response) if m in json.loads(lesson.get('mc_options', '[]'))])
+            is_correct = 1 if user_matches >= expected_matches else 0
+            points_award = 10 if is_correct else 5
+        
+        # Store response
         c.execute("""
             INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, submitted_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (lesson_id, session['user_id'], activity_type, response, 1 if is_correct else 0, datetime.now().isoformat()))
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """, (lesson_id, session['user_id'], activity_type, response, is_correct))
+        
+        # Mark lesson completed and award points if flagged
+        if data.get('complete_lesson', False):
+            c.execute("UPDATE lessons SET completed = 1 WHERE id = ?", (lesson_id,))
+            c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", 
+                      (session['user_id'], session['user_id'], points_award))
+            c.execute("UPDATE users SET star_coins = star_coins + ? WHERE id = ?", (points_award, session['user_id']))
+        
         conn.commit()
-        logger.info(f"User {session['user_id']} saved response for lesson {lesson_id}, activity {activity_type}")
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'is_correct': bool(is_correct), 'points': points_award})
     except Exception as e:
-        logger.error(f"Save lesson response failed: {str(e)}")
-        conn.rollback()
+        logger.error(f"Check lesson failed: {str(e)}")
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
 @app.route('/assess', methods=['GET', 'POST'])
@@ -675,6 +753,17 @@ def generate_lesson():
             mc_question = 'What is the correct spelling?'
             mc_options = f'["{trace_word}", "{trace_word[0]}a{trace_word[1:]}", "{trace_word[:2]}", "{trace_word}a"]'
             mc_answer = trace_word
+        elif subject == 'math':
+            if int(grade) == 1:
+                lesson_content = 'What is 6 + 3? <input type="number" id="math-input" placeholder="Enter answer"> <button onclick="checkMath()">Check</button>'
+                mc_answer = '9'
+            elif int(grade) == 2:
+                lesson_content = 'Match: 2x3=6, 4x2=8, 5x1=5 <div id="match-game"><!-- JS drag-drop --></div>'
+                mc_options = '["6", "8", "5"]'
+                mc_answer = '6'
+            elif int(grade) == 3:
+                lesson_content = '6 x 3 = ? <input type="number" id="math-input" placeholder="Enter answer"> <button onclick="checkMath()">Check</button>'
+                mc_answer = '18'
         if session.get('language') == 'bilingual':
             lesson_content += f"<br>Afrikaans: Gegenereerde {subject} les vir Graad {grade}"
         conn = get_db()
