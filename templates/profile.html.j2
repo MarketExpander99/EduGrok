@@ -2,69 +2,69 @@
 
 {% block content %}
 <div class="max-w-lg mx-auto mb-6">
-    <h2 class="text-2xl font-semibold mb-6 text-gray-800">Your Profile, Dino Cowboy!</h2>
+    <h2 class="text-2xl font-semibold mb-6 text-white">Your Profile, Dino Cowboy!</h2>
 </div>
 
 {% if user %}
-    <div class="bg-white p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-4">User Info</h3>
+    <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-blue-100 mb-4">User Info</h3>
         <div class="flex items-center mb-4">
             <div class="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center mr-4 font-bold text-lg">
                 {{ user.handle[0] | upper if user.handle else 'U' }}
             </div>
             <div>
-                <p class="text-gray-800 text-base"><strong>Handle:</strong> {{ user.handle | default('User') }}</p>
-                <p class="text-gray-800 text-base"><strong>Grade:</strong> {{ grade }}</p>
-                <p class="text-gray-800 text-base"><strong>Star Coins:</strong> {{ star_coins | default(0) }}</p>
-                <p class="text-gray-800 text-base"><strong>Points:</strong> {{ points | default(0) }}</p>
+                <p class="text-white text-base"><strong>Handle:</strong> {{ user.handle | default('User') }}</p>
+                <p class="text-white text-base"><strong>Grade:</strong> {{ grade }}</p>
+                <p class="text-white text-base"><strong>Star Coins:</strong> {{ star_coins | default(0) }}</p>
+                <p class="text-white text-base"><strong>Points:</strong> {{ points | default(0) }}</p>
             </div>
         </div>
     </div>
 
-    <div class="bg-yellow-50 p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <h3 class="text-lg font-semibold text-orange-900 mb-4">Progress</h3>
-        <p class="text-gray-800 text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed }}</p>
-        <p class="text-gray-800 text-base mb-2"><strong>Games Played:</strong> {{ games_played }}</p>
-        <p class="text-gray-800 text-base"><strong>Average Test Score:</strong> {{ avg_score }}</p>
+    <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-orange-100 mb-4">Progress</h3>
+        <p class="text-white text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed }}</p>
+        <p class="text-white text-base mb-2"><strong>Games Played:</strong> {{ games_played }}</p>
+        <p class="text-white text-base"><strong>Average Test Score:</strong> {{ avg_score }}</p>
     </div>
 
-    <div class="bg-white p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-4">Badges</h3>
+    <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-blue-100 mb-4">Badges</h3>
         {% if badges %}
             <div class="flex flex-wrap gap-2">
                 {% for badge in badges %}
-                    <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">{{ badge.badge_name }} ({{ badge.awarded_date }})</span>
+                    <span class="bg-yellow-900 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium">{{ badge.badge_name }} ({{ badge.awarded_date }})</span>
                 {% endfor %}
             </div>
         {% else %}
-            <p class="text-gray-600 text-base">No badges yet. Keep learning to earn some!</p>
+            <p class="text-gray-400 text-base">No badges yet. Keep learning to earn some!</p>
         {% endif %}
     </div>
 
-    <div class="bg-yellow-50 p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <h3 class="text-lg font-semibold text-orange-900 mb-4">Feedback History</h3>
+    <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-orange-100 mb-4">Feedback History</h3>
         {% if feedbacks %}
             {% for feedback in feedbacks %}
-                <p class="text-gray-800 text-base mb-2"><strong>Rating:</strong> {{ feedback.rating }} - <strong>Comments:</strong> {{ feedback.comments | default('None') }} - <strong>Date:</strong> {{ feedback.submitted_date }}</p>
+                <p class="text-white text-base mb-2"><strong>Rating:</strong> {{ feedback.rating }} - <strong>Comments:</strong> {{ feedback.comments | default('None') }} - <strong>Date:</strong> {{ feedback.submitted_date }}</p>
             {% endfor %}
         {% else %}
-            <p class="text-gray-600 text-base">No feedback submitted yet. <a href="{{ url_for('feedback') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition inline-flex items-center">Submit Feedback</a></p>
+            <p class="text-gray-400 text-base">No feedback submitted yet. <a href="{{ url_for('feedback') }}" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition inline-flex items-center">Submit Feedback</a></p>
         {% endif %}
     </div>
 
-    <div class="bg-white p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-4">Settings</h3>
+    <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+        <h3 class="text-lg font-semibold text-blue-100 mb-4">Settings</h3>
         <form action="{{ url_for('set_theme') }}" method="POST" class="mb-4">
-            <label for="theme" class="block text-gray-700 font-medium mb-2">Theme:</label>
-            <select name="theme" id="theme" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
+            <label for="theme" class="block text-gray-300 font-medium mb-2">Theme:</label>
+            <select name="theme" id="theme" class="w-full p-3 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 bg-gray-800 text-white">
                 <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                 <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
             </select>
             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Update Theme</button>
         </form>
         <form action="{{ url_for('set_language') }}" method="POST">
-            <label for="language" class="block text-gray-700 font-medium mb-2">Language:</label>
-            <select name="language" id="language" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
+            <label for="language" class="block text-gray-300 font-medium mb-2">Language:</label>
+            <select name="language" id="language" class="w-full p-3 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 bg-gray-800 text-white">
                 <option value="en" {% if language == 'en' %}selected{% endif %}>English</option>
                 <option value="bilingual" {% if language == 'bilingual' %}selected{% endif %}>Bilingual (English/Afrikaans)</option>
             </select>
@@ -73,7 +73,7 @@
     </div>
 {% else %}
     <div class="text-center py-8 max-w-lg mx-auto">
-        <p class="text-red-600 text-lg">Unable to load user information. Please log in again.</p>
+        <p class="text-red-400 text-lg">Unable to load user information. Please log in again.</p>
     </div>
 {% endif %}
 {% endblock %}

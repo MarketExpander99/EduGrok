@@ -348,10 +348,12 @@ def repost_post(post_id):
 def add_comment(post_id):
     logger.debug(f"Adding comment to post {post_id}")
     if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
     content = request.form.get('content', '').strip()
     if not content:
-        return jsonify({'success': False, 'error': 'Comment cannot be empty'}), 400
+        flash('Comment cannot be empty', 'error')
+        return redirect(url_for('home'))
     content = filter_content(content)
     try:
         conn = get_db()
@@ -359,6 +361,7 @@ def add_comment(post_id):
         c.execute("INSERT INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, datetime('now'))",
                   (post_id, session['user_id'], content))
         conn.commit()
+        flash('Comment added successfully', 'success')
         logger.info(f"User {session['user_id']} commented on post {post_id}")
         return redirect(url_for('home'))
     except Exception as e:
@@ -431,6 +434,18 @@ def assess():
     logger.debug("Assess route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    questions = [
+        {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
+        {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
+        {"q": "Science: What do plants need to grow?", "a": ["Water", "Sand", "Rocks"], "correct": "Water"},
+        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
+        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
+        {"q": "Example Q6", "a": ["Example6", "Wrong", "Wrong"], "correct": "Example6"},
+        {"q": "Example Q7", "a": ["Example7", "Wrong", "Wrong"], "correct": "Example7"},
+        {"q": "Example Q8", "a": ["Example8", "Wrong", "Wrong"], "correct": "Example8"},
+        {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
+        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"}
+    ]
     if request.method == 'POST':
         correct_answers = ["5", "Hat", "Water", "Example4", "Example5", "Example6", "Example7", "Example8", "Example9", "Example10"]
         score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}') == correct_answers[i-1])
@@ -448,18 +463,6 @@ def assess():
             conn.rollback()
             flash('Server error', 'error')
             return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-    questions = [
-        {"q": "Math: 2 + 3 = ?", "a": ["5", "6", "4"], "correct": "5"},
-        {"q": "Language: Pick a word that rhymes with 'cat'.", "a": ["Hat", "Dog", "Car"], "correct": "Hat"},
-        {"q": "Science: What do plants need to grow?", "a": ["Water", "Sand", "Rocks"], "correct": "Water"},
-        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
-        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"},
-        {"q": "Example Q6", "a": ["Example6", "Wrong", "Wrong"], "correct": "Example6"},
-        {"q": "Example Q7", "a": ["Example7", "Wrong", "Wrong"], "correct": "Example7"},
-        {"q": "Example Q8", "a": ["Example8", "Wrong", "Wrong"], "correct": "Example8"},
-        {"q": "Example Q9", "a": ["Example9", "Wrong", "Wrong"], "correct": "Example9"},
-        {"q": "Example Q10", "a": ["Example10", "Wrong", "Wrong"], "correct": "Example10"}
-    ]
     return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/complete_lesson/<int:lesson_id>')
@@ -513,6 +516,13 @@ def take_test():
     logger.debug("Test route")
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    questions = [
+        {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
+        {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
+        {"q": "Example Q3", "a": ["Example3", "Wrong", "Wrong"], "correct": "Example3"},
+        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
+        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"}
+    ]
     if request.method == 'POST':
         correct_answers = ["9", "Example2", "Example3", "Example4", "Example5"]
         score = sum(1 for i in range(1, 6) if request.form.get(f'q{i}') == correct_answers[i-1])
@@ -531,13 +541,6 @@ def take_test():
             conn.rollback()
             flash('Server error', 'error')
             return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-    questions = [
-        {"q": "Math: 4 + 5 = ?", "a": ["9", "8", "10"], "correct": "9"},
-        {"q": "Example Q2", "a": ["Example2", "Wrong", "Wrong"], "correct": "Example2"},
-        {"q": "Example Q3", "a": ["Example3", "Wrong", "Wrong"], "correct": "Example3"},
-        {"q": "Example Q4", "a": ["Example4", "Wrong", "Wrong"], "correct": "Example4"},
-        {"q": "Example Q5", "a": ["Example5", "Wrong", "Wrong"], "correct": "Example5"}
-    ]
     return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 @app.route('/game')
