@@ -89,14 +89,28 @@
                 </button>
             </div>
             {% if post.id in comments %}
+            {% set sorted_comments = comments[post.id] | sort(attribute='created_at', reverse=True) %}
+            {% set visible_comments = sorted_comments[:5] %}
+            {% set hidden_comments = sorted_comments[5:] %}
             <div class="comments-section mt-4 p-3 bg-gray-900 rounded-lg">
                 <h4 class="text-sm font-semibold text-blue-100 mb-2">Comments:</h4>
-                {% for comment in comments[post.id] %}
+                {% for comment in visible_comments %}
                 <div class="comment mb-2 text-sm text-gray-300">
                     <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
                     {{ comment.content | safe }}
                 </div>
                 {% endfor %}
+                {% if hidden_comments %}
+                <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                    {% for comment in hidden_comments %}
+                    <div class="comment mb-2 text-sm text-gray-300">
+                        <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
+                        {{ comment.content | safe }}
+                    </div>
+                    {% endfor %}
+                </div>
+                <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-blue-400 hover:text-blue-300 text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
+                {% endif %}
             </div>
             {% endif %}
             <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
@@ -310,6 +324,18 @@ function repostPost(postId) {
 function toggleComments(postId) {
     const form = document.getElementById(`comment-form-${postId}`);
     form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleCommentsExtra(postId) {
+    const hiddenDiv = document.getElementById(`hidden-comments-${postId}`);
+    const btn = document.getElementById(`toggle-btn-${postId}`);
+    if (hiddenDiv.style.display === 'none') {
+        hiddenDiv.style.display = 'block';
+        btn.textContent = 'Show less';
+    } else {
+        hiddenDiv.style.display = 'none';
+        btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
+    }
 }
 
 function checkTrace(lessonId) {
