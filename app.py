@@ -166,15 +166,16 @@ def home():
         user_id = session.get('user_id')
         grade = session.get('grade', 1)
 
-        # Fetch posts (updated to include media_url and views)
+        # Fetch posts (updated to include media_url, views, and reposts)
         c.execute("""
-            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views
+            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views, p.reposts
             FROM posts p 
             WHERE p.grade = ? 
             ORDER BY p.created_at DESC LIMIT 5
         """, (grade,))
         posts_data = c.fetchall()
         posts = []
+        comments_data = {}
         for row in posts_data:
             post = {
                 'id': row['id'],
@@ -185,10 +186,26 @@ def home():
                 'handle': row['handle'] or 'Unknown',
                 'created_at': row['created_at'] or 'Unknown',
                 'media_url': row['media_url'] or None,
-                'views': row['views'] or 0
+                'views': row['views'] or 0,
+                'reposts': row['reposts'] or 0
             }
             c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
             post['liked_by_user'] = c.fetchone() is not None
+
+            # Fetch comments for this post
+            c.execute("""
+                SELECT c.content, u.handle, c.created_at 
+                FROM comments c 
+                JOIN users u ON c.user_id = u.id 
+                WHERE c.post_id = ? 
+                ORDER BY c.created_at ASC 
+                LIMIT 5
+            """, (row['id'],))
+            comments_data[row['id']] = [
+                {'content': filter_content(r[0] or ''), 'handle': r[1] or 'Unknown', 'created_at': r[2] or 'Unknown'}
+                for r in c.fetchall()
+            ]
+
             posts.append(post)
 
         # Fetch lesson
@@ -221,6 +238,7 @@ def home():
         logger.info(f"User {user_id} accessed home with {len(posts)} posts")
         return render_template('home.html.j2', 
                             posts=posts, 
+                            comments=comments_data,
                             lesson=lesson, 
                             test=test, 
                             subscribed=subscribed, 
@@ -271,7 +289,7 @@ def create_post():
         user_id = session.get('user_id')
         handle = session.get('handle', 'User')
         grade = session.get('grade', 1)
-        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url, views) VALUES (?, ?, ?, ?, ?, datetime("now"), ?, 0)',
+        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url, views, reposts) VALUES (?, ?, ?, ?, ?, datetime("now"), ?, 0, 0)',
                      (user_id, handle, content, subject, grade, media_url))
         conn.commit()
         flash('Post created successfully', 'success')
@@ -304,6 +322,50 @@ def like_post(post_id):
         logger.error(f"Like post failed: {str(e)}")
         conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
+
+@app.route('/repost/<int:post_id>', methods=['POST'])
+def repost_post(post_id):
+    logger.debug(f"Reposting post {post_id}")
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM reposts WHERE user_id = ? AND post_id = ?", (session['user_id'], post_id))
+        if c.fetchone():
+            return jsonify({'success': False, 'error': 'Already reposted'}), 400
+        c.execute("INSERT INTO reposts (user_id, post_id, created_at) VALUES (?, ?, datetime('now'))", (session['user_id'], post_id))
+        c.execute("UPDATE posts SET reposts = reposts + 1 WHERE id = ?", (post_id,))
+        conn.commit()
+        logger.info(f"User {session['user_id']} reposted post {post_id}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Repost failed: {str(e)}")
+        conn.rollback()
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+@app.route('/comment/<int:post_id>', methods=['POST'])
+def add_comment(post_id):
+    logger.debug(f"Adding comment to post {post_id}")
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    content = request.form.get('content', '').strip()
+    if not content:
+        return jsonify({'success': False, 'error': 'Comment cannot be empty'}), 400
+    content = filter_content(content)
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, datetime('now'))",
+                  (post_id, session['user_id'], content))
+        conn.commit()
+        logger.info(f"User {session['user_id']} commented on post {post_id}")
+        return redirect(url_for('home'))
+    except Exception as e:
+        logger.error(f"Comment failed: {str(e)}")
+        conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('home'))
 
 @app.route('/check_lesson', methods=['POST'])
 def check_lesson():

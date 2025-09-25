@@ -1,3 +1,4 @@
+# db.py (updated)
 import os
 import sqlite3
 import logging
@@ -80,6 +81,8 @@ def reset_db():
         c.execute("DROP TABLE IF EXISTS user_points")
         c.execute("DROP TABLE IF EXISTS user_likes")
         c.execute("DROP TABLE IF EXISTS post_likes")
+        c.execute("DROP TABLE IF EXISTS reposts")
+        c.execute("DROP TABLE IF EXISTS comments")
         c.execute("DROP TABLE IF EXISTS games")
         c.execute("DROP TABLE IF EXISTS tests")
         c.execute("DROP TABLE IF EXISTS lesson_responses")
@@ -126,7 +129,7 @@ def check_db_schema():
                 logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
                 raise ValueError(f"Users table column {col} type mismatch")
         
-        # Check posts table for media_url and views
+        # Check posts table for media_url, views, and reposts
         c.execute("PRAGMA table_info(posts)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         if 'media_url' not in columns:
@@ -139,8 +142,13 @@ def check_db_schema():
             conn.commit()
             logger.info("Added views column to posts table")
             print("Added views column to posts table")
+        if 'reposts' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN reposts INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added reposts column to posts table")
+            print("Added reposts column to posts table")
         
-        for table in ['lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
+        for table in ['lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games', 'reposts', 'comments']:
             c.execute(f"PRAGMA table_info({table})")
             if not c.fetchall():
                 logger.error(f"Table {table} missing")
@@ -164,7 +172,7 @@ def init_db():
         c.execute("DROP TABLE IF EXISTS posts")
         c.execute('''CREATE TABLE posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
-                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT, views INTEGER DEFAULT 0,
+                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT, views INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         logger.info("Created posts table with new schema")
         print("Created posts table with new schema")
@@ -253,6 +261,14 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS games 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, score INTEGER, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS reposts 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, post_id INTEGER, created_at TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id), 
+                      FOREIGN KEY (post_id) REFERENCES posts(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS comments 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER, content TEXT, created_at TEXT,
+                      FOREIGN KEY (post_id) REFERENCES posts(id), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_id ON posts(id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
@@ -288,12 +304,12 @@ def init_db():
         logger.debug("Bot user IDs: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
         print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
 
-        # Seed bot posts (updated to include views=0)
+        # Seed bot posts (updated to include views=0 and reposts=0)
         bot_posts = [
-            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")', None, 0),
-            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")', None, 0),
+            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")', None, 0, 0),
+            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")', None, 0, 0),
         ]
-        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at, media_url, views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", bot_posts)
+        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at, media_url, views, reposts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
         logger.info("Bot posts seeded")
         print("Bot posts seeded")
