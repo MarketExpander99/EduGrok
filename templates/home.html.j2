@@ -52,15 +52,42 @@
                     </video>
                 {% endif %}
             {% endif %}
+            <!-- View Count -->
+            <div class="flex items-center text-gray-400 text-xs mb-3">
+                <span class="mr-1">👁️</span>
+                <span>{{ post.views or 0 }} views</span>
+            </div>
             <div class="flex flex-wrap gap-2 mb-3">
                 <span class="bg-blue-900 text-blue-100 text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
                 <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes }}</span>
             </div>
-            <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST" class="flex justify-end">
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed" {% if post.liked_by_user %}disabled{% endif %}>
-                    {{ 'Unlike' if post.liked_by_user else 'Like' }}
+            <!-- Social Interactions Bar -->
+            <div class="flex justify-between items-center pt-3 border-t border-gray-700">
+                <div class="flex space-x-6">
+                    <!-- Like Button with Icon -->
+                    <form action="{{ url_for('like_post', post_id=post.id) }}" method="POST" class="flex items-center space-x-1">
+                        <button type="submit" class="text-gray-400 hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
+                            <span class="text-lg">❤️</span>
+                            <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
+                        </button>
+                    </form>
+                    <!-- Repost Button -->
+                    <button onclick="repostPost({{ post.id }})" class="text-gray-400 hover:text-green-400 transition flex items-center space-x-1">
+                        <span class="text-lg">🔄</span>
+                        <span class="text-sm">Repost</span>
+                    </button>
+                    <!-- Comment Button -->
+                    <button class="text-gray-400 hover:text-blue-400 transition flex items-center space-x-1">
+                        <span class="text-lg">💬</span>
+                        <span class="text-sm">Comment</span>
+                    </button>
+                </div>
+                <!-- Share Button -->
+                <button class="text-gray-400 hover:text-indigo-400 transition flex items-center space-x-1">
+                    <span class="text-lg">📤</span>
+                    <span class="text-sm">Share</span>
                 </button>
-            </form>
+            </div>
         </div>
     {% endfor %}
 {% else %}
@@ -77,6 +104,8 @@
             <!-- Math Fill-in -->
             <div class="mb-4" id="math-activity-{{ lesson.id }}">
                 <h4 class="text-md font-semibold text-orange-200 mb-2">Math Fill-in</h4>
+                <input type="number" id="math-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Enter your answer">
+                <button onclick="checkMath()" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
                 <script>
                     function checkMath() {
                         const answer = document.getElementById('math-input-{{ lesson.id }}').value;
@@ -190,12 +219,12 @@
     </div>
 </div>
 
-<div class="mt-8 p-4 bg-gray-50 rounded-xl shadow-sm max-w-lg mx-auto">
-    <h2 class="text-xl font-semibold mb-3 text-gray-800">Recent Test</h2>
+<div class="mt-8 p-4 bg-black text-white rounded-xl shadow-sm max-w-lg mx-auto border border-gray-700">
+    <h2 class="text-xl font-semibold mb-3 text-gray-300">Recent Test</h2>
     {% if test %}
-        <p class="text-gray-700 text-lg">Grade {{ test.grade }} - Score: {{ test.score }}/10 - Date: {{ test.date }}</p>
+        <p class="text-gray-300 text-lg">Grade {{ test.grade }} - Score: {{ test.score }}/10 - Date: {{ test.date }}</p>
     {% else %}
-        <p class="text-gray-600">No tests taken yet. Take one to get started!</p>
+        <p class="text-gray-400">No tests taken yet. Take one to get started!</p>
     {% endif %}
 </div>
 
@@ -323,6 +352,11 @@ function completeLesson(lessonId) {
         // Optionally reload page or update UI
         location.reload();
     }).catch(err => console.error('Error:', err));
+}
+
+function repostPost(postId) {
+    // Stub for repost functionality - implement backend route if needed
+    alert('Repost feature coming soon! 🚀');
 }
 </script>
 {% endblock %}

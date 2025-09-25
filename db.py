@@ -126,7 +126,7 @@ def check_db_schema():
                 logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
                 raise ValueError(f"Users table column {col} type mismatch")
         
-        # Check posts table for media_url
+        # Check posts table for media_url and views
         c.execute("PRAGMA table_info(posts)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         if 'media_url' not in columns:
@@ -134,6 +134,11 @@ def check_db_schema():
             conn.commit()
             logger.info("Added media_url column to posts table")
             print("Added media_url column to posts table")
+        if 'views' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN views INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added views column to posts table")
+            print("Added views column to posts table")
         
         for table in ['lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games']:
             c.execute(f"PRAGMA table_info({table})")
@@ -159,7 +164,7 @@ def init_db():
         c.execute("DROP TABLE IF EXISTS posts")
         c.execute('''CREATE TABLE posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
-                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT,
+                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT, views INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         logger.info("Created posts table with new schema")
         print("Created posts table with new schema")
@@ -283,12 +288,12 @@ def init_db():
         logger.debug("Bot user IDs: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
         print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
 
-        # Seed bot posts
+        # Seed bot posts (updated to include views=0)
         bot_posts = [
-            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")'),
-            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")'),
+            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")', None, 0),
+            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")', None, 0),
         ]
-        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", bot_posts)
+        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at, media_url, views) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
         logger.info("Bot posts seeded")
         print("Bot posts seeded")
@@ -310,17 +315,22 @@ def seed_lessons():
     c = conn.cursor()
     lessons = [
         (None, 1, 'Phonics: Letter M', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/muːn/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
-        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, None, None, None),
-        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, None, None, None),
-        (None, 1, 'Reading: Short Stories', '<p>Read a short story about a space adventure.</p>', 0, None, None, None, None, None, None),
-        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, None, None, None),
+        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'Count the numbers: How many apples? (Answer: 5)', '["3", "5", "7", "10"]', '5'),
+        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury'),
+        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
         (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/sʌn/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
-        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, None, None, None),
-        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0, None, None, None, None, None, None),
+        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
+        (None, 2, 'math', 'Grade 2: Subtraction Adventure<br>Solve: 5 - 2 = ?<br>Explanation: Take away 2 from 5 leaves 3!<br>Afrikaans: Graad 2: Aftrek Avontuur<br>Oplos: 5 - 2 = ?<br>Verduideliking: Haal 2 uit 5 laat 3!', 0, None, None, None, 'What is 8 - 3?', '["4", "5", "6", "7"]', '5'),
         (None, 2, 'language', 'Grade 2: Simple Sentences<br>Make a sentence with "dog".<br>Afrikaans: Graad 2: Eenvoudige Sinne<br>Maak \'n sin met "hond".', 0, 'dog', '/dɒɡ/', 'dog', 'What is the correct spelling?', '["dog", "dawg", "dg", "dogg"]', 'dog'),
-        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0, None, None, None, None, None, None),
-        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0, None, None, None, None, None, None),
-        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0, 'cat', '/kæt/', 'cat', 'What is the correct spelling?', '["cat", "kat", "ct", "caat"]', 'cat')
+        (None, 2, 'science', 'Grade 2: Weather Words<br>What is rain?<br>Afrikaans: Graad 2: Weer Woorde<br>Wat is reën?', 0, None, None, None, 'What causes rain?', '["Sun", "Clouds", "Wind", "Stars"]', 'Clouds'),
+        (None, 3, 'math', 'Grade 3: Basic Multiplication<br>2 x 3 = ?<br>Afrikaans: Graad 3: Basiese Vermenigvuldiging<br>2 x 3 = ?', 0, None, None, None, 'What is 4 x 5?', '["15", "20", "25", "18"]', '20'),
+        (None, 3, 'language', 'Grade 3: Reading Comprehension<br>Read and answer: The cat sat on the mat.<br>Afrikaans: Graad 3: Leesbegrip<br>Lees en antwoord: Die kat het op die mat gesit.', 0, 'cat', '/kæt/', 'cat', 'What is the correct spelling?', '["cat", "kat", "ct", "caat"]', 'cat'),
+        (None, 1, 'Phonics: Letter A', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/ˈæp.əl/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
+        (None, 2, 'Math: Shapes', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
+        (None, 3, 'Science: Water Cycle', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
+        (None, 1, 'Language: Colors', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/rɛd/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
+        (None, 2, 'Phonics: Letter B', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/bʊk/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
+        (None, 3, 'Math: Fractions', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4')
     ]
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')

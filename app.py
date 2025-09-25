@@ -166,9 +166,9 @@ def home():
         user_id = session.get('user_id')
         grade = session.get('grade', 1)
 
-        # Fetch posts (updated to include media_url)
+        # Fetch posts (updated to include media_url and views)
         c.execute("""
-            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url 
+            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views
             FROM posts p 
             WHERE p.grade = ? 
             ORDER BY p.created_at DESC LIMIT 5
@@ -184,7 +184,8 @@ def home():
                 'likes': row['likes'] or 0,
                 'handle': row['handle'] or 'Unknown',
                 'created_at': row['created_at'] or 'Unknown',
-                'media_url': row['media_url'] or None
+                'media_url': row['media_url'] or None,
+                'views': row['views'] or 0
             }
             c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
             post['liked_by_user'] = c.fetchone() is not None
@@ -270,7 +271,7 @@ def create_post():
         user_id = session.get('user_id')
         handle = session.get('handle', 'User')
         grade = session.get('grade', 1)
-        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url) VALUES (?, ?, ?, ?, ?, datetime("now"), ?)',
+        conn.execute('INSERT INTO posts (user_id, handle, content, subject, grade, created_at, media_url, views) VALUES (?, ?, ?, ?, ?, datetime("now"), ?, 0)',
                      (user_id, handle, content, subject, grade, media_url))
         conn.commit()
         flash('Post created successfully', 'success')
