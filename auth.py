@@ -15,12 +15,12 @@ def register():
         if not email or not password or not grade.isdigit() or int(grade) not in [1, 2, 3]:
             logger.error(f"Registration failed: Invalid input - email={email}, grade={grade}, password={'set' if password else 'missing'}")
             flash("Invalid email, password, or grade (1-3)", "error")
-            return render_template('register.html.j2', error="Invalid email, password, or grade (1-3)", 
+            return render_template('register.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         if len(password) < 6:
             logger.error(f"Registration failed: Password too short for email={email}")
             flash("Password must be at least 6 characters", "error")
-            return render_template('register.html.j2', error="Password must be at least 6 characters", 
+            return render_template('register.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         try:
             hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
@@ -36,12 +36,12 @@ def register():
         except sqlite3.IntegrityError as e:
             logger.error(f"Registration failed: Email {email} already exists - {str(e)}")
             flash("Email already registered", "error")
-            return render_template('register.html.j2', error="Email already registered", 
+            return render_template('register.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         except Exception as e:
             logger.error(f"Registration failed: {str(e)}")
             flash("Server error during registration", "error")
-            return render_template('register.html.j2', error="Server error", 
+            return render_template('register.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     return render_template('register.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
@@ -52,7 +52,7 @@ def login():
         if not email or not password:
             logger.error("Login failed: Missing email or password")
             flash("Email and password required", "error")
-            return render_template('login.html.j2', error="Email and password required", 
+            return render_template('login.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         try:
             conn = get_db()
@@ -75,12 +75,12 @@ def login():
             else:
                 logger.error(f"Login failed: User {email} not found")
                 flash("Invalid email or password", "error")
-            return render_template('login.html.j2', error="Invalid email or password", 
+            return render_template('login.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
         except Exception as e:
             logger.error(f"Login failed: {str(e)}")
             flash("Server error during login", "error")
-            return render_template('login.html.j2', error="Server error", 
+            return render_template('login.html.j2', 
                                  theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     return render_template('login.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
