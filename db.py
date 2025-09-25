@@ -1,5 +1,4 @@
-﻿# db.py (updated)
-import os
+﻿import os
 import sqlite3
 import logging
 from werkzeug.security import generate_password_hash
@@ -262,9 +261,11 @@ def init_db():
 
         # Fetch seeded post IDs
         c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%farm math%'", (skykidz_id,))
-        post1_id = c.fetchone()[0] if c.fetchone() else None
+        row = c.fetchone()
+        post1_id = row[0] if row else None
         c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%solar system%'", (grokedu_id,))
-        post2_id = c.fetchone()[0] if c.fetchone() else None
+        row = c.fetchone()
+        post2_id = row[0] if row else None
         if post1_id and post2_id:
             bot_comments = [
                 (post1_id, skykidz_id, 'This is fun!', 'datetime("now")'),

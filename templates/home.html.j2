@@ -71,9 +71,9 @@
                         <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
                     </button>
                     <!-- Repost Button -->
-                    <button onclick="repostPost({{ post.id }})" class="text-gray-400 hover:text-green-400 transition flex items-center space-x-1">
+                    <button onclick="repostPost({{ post.id }})" class="text-gray-400 hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
                         <span class="text-lg">🔄</span>
-                        <span class="text-sm">Repost</span>
+                        <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
                     </button>
                     <!-- Comment Button -->
                     <button onclick="toggleComments({{ post.id }})" class="text-gray-400 hover:text-blue-400 transition flex items-center space-x-1">
@@ -152,20 +152,7 @@
                 <!-- Simple buttons for demo -->
                 <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 1</button>
                 <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 2</button>
-                <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Match 3</button>
-                <script>
-                    function submitMatch(lessonId) {
-                        // Stub: assume selections [1,2,3] for full match
-                        const selections = [1, 2, 3];
-                        fetch('/check_lesson', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                lesson_id: lessonId,
-                                activity_type: 'match_three',
-                                response: JSON.stringify(selections),
-                                complete_lesson: true
-                            })
+                <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px...(truncated 749 characters)...                        })
                         }).then(res => res.json()).then(data => {
                             alert(data.is_correct ? 'Great match! +' + data.points + ' points' : 'Keep trying!');
                         }).catch(err => console.error('Error:', err));
