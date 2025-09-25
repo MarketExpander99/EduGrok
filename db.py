@@ -1,4 +1,5 @@
-﻿import os
+﻿# db.py
+import os
 import sqlite3
 import logging
 from werkzeug.security import generate_password_hash
@@ -198,20 +199,42 @@ def init_db():
                 c.execute("DROP TABLE IF EXISTS users_new")
                 c.execute('''CREATE TABLE users_new 
                              (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                       ...(truncated 3415 characters)... users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS feedback 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT, 
+                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, 
+                              language TEXT DEFAULT 'en', star_coins INTEGER DEFAULT 0)''')
+                c.execute('''INSERT INTO users_new SELECT * FROM users''')
+                c.execute('DROP TABLE users')
+                c.execute('ALTER TABLE users_new RENAME TO users')
+                conn.commit()
+                logger.info("Migrated users table")
+                print("Migrated users table")
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS tests 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS games 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, score INTEGER, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS lesson_responses 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, lesson_id INTEGER, user_id INTEGER, activity_type TEXT, response TEXT, is_correct BOOLEAN, points INTEGER,
+                      FOREIGN KEY (lesson_id) REFERENCES lessons(id), FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS post_likes 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER,
+                      FOREIGN KEY (post_id) REFERENCES posts(id), FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS reposts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, post_id INTEGER, created_at TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id), 
-                      FOREIGN KEY (post_id) REFERENCES posts(id))''')
+                      FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (post_id) REFERENCES posts(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS comments 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER, content TEXT, created_at TEXT,
                       FOREIGN KEY (post_id) REFERENCES posts(id), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_points 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, points INTEGER, earned_at TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS badges 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, earned_at TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS feedback 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, rating INTEGER, created_at TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS games 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, game_type TEXT, score INTEGER, played_at TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_posts_id ON posts(id DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
@@ -249,10 +272,13 @@ def init_db():
         logger.debug("Bot user IDs: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
         print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
 
-        # Seed bot posts (updated to include views=0 and reposts=0)
+        # Seed bot posts (updated to include views=0 and reposts=0, added more posts)
         bot_posts = [
             (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")', None, 0, 0),
             (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")', None, 0, 0),
+            (skykidz_id, 'SkyKidz', 'What color is the sky? Let\'s learn about colors!', 'language', 1, 3, 'datetime("now")', None, 0, 0),
+            (grokedu_id, 'GrokEdu', 'Simple subtraction: 5 apples minus 2 = ?', 'math', 2, 7, 'datetime("now")', None, 0, 0),
+            (skykidz_id, 'SkyKidz', 'Animals on the farm: Which one says moo?', 'science', 1, 4, 'datetime("now")', None, 0, 0),
         ]
         c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at, media_url, views, reposts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", bot_posts)
         conn.commit()
@@ -266,12 +292,33 @@ def init_db():
         c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%solar system%'", (grokedu_id,))
         row = c.fetchone()
         post2_id = row[0] if row else None
-        if post1_id and post2_id:
+        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%color is the sky%'", (skykidz_id,))
+        row = c.fetchone()
+        post3_id = row[0] if row else None
+        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%Simple subtraction%'", (grokedu_id,))
+        row = c.fetchone()
+        post4_id = row[0] if row else None
+        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%Animals on the farm%'", (skykidz_id,))
+        row = c.fetchone()
+        post5_id = row[0] if row else None
+
+        if post1_id and post2_id and post3_id and post4_id and post5_id:
             bot_comments = [
+                # Comments for post1
                 (post1_id, skykidz_id, 'This is fun!', 'datetime("now")'),
                 (post1_id, grokedu_id, 'Love the math adventure!', 'datetime("now")'),
+                # Comments for post2
                 (post2_id, skykidz_id, 'Mercury?', 'datetime("now")'),
                 (post2_id, grokedu_id, 'Great question!', 'datetime("now")'),
+                # Comments for post3
+                (post3_id, grokedu_id, 'Blue!', 'datetime("now")'),
+                (post3_id, skykidz_id, 'Yes, blue sky!', 'datetime("now")'),
+                # Comments for post4
+                (post4_id, skykidz_id, '3 apples left!', 'datetime("now")'),
+                (post4_id, grokedu_id, 'Correct!', 'datetime("now")'),
+                # Comments for post5
+                (post5_id, grokedu_id, 'The cow!', 'datetime("now")'),
+                (post5_id, skykidz_id, 'Moo moo!', 'datetime("now")'),
             ]
             c.executemany("INSERT OR IGNORE INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, ?)", bot_comments)
             conn.commit()
@@ -289,23 +336,23 @@ def init_db():
         conn.rollback()
         raise
 
-# Seed lessons with media
+# Seed lessons with media (fixed subjects to match template checks: 'math', 'language', 'science')
 def seed_lessons():
     conn = get_db()
     c = conn.cursor()
     lessons = [
-        (None, 1, 'Phonics: Letter M', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/muːn/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
-        (None, 1, 'Math: Counting 1-10', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'Count the numbers: How many apples? (Answer: 5)', '["3", "5", "7", "10"]', '5'),
-        (None, 1, 'Science: Planets', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury'),
-        (None, 1, 'Math: Addition', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
-        (None, 1, 'Phonics: Letter S', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/sʌn/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
-        (None, 1, 'Science: Animals', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
-        (None, 1, 'Phonics: Letter A', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/ˈæp.əl/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
-        (None, 2, 'Math: Shapes', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
-        (None, 3, 'Science: Water Cycle', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
-        (None, 1, 'Language: Colors', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/rɛd/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
-        (None, 2, 'Phonics: Letter B', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/bʊk/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
-        (None, 3, 'Math: Fractions', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4'),
+        (None, 1, 'language', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/mu?n/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
+        (None, 1, 'math', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'Count the numbers: How many apples? (Answer: 5)', '["3", "5", "7", "10"]', '5'),
+        (None, 1, 'science', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury'),
+        (None, 1, 'math', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
+        (None, 1, 'language', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/s?n/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
+        (None, 1, 'science', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
+        (None, 1, 'language', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/æp.?l/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
+        (None, 2, 'math', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
+        (None, 3, 'science', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
+        (None, 1, 'language', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/r?d/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
+        (None, 2, 'language', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/b?k/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
+        (None, 3, 'math', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4'),
         (None, 2, 'math', '<p>Subtraction: Solve 10 - 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Subtraction">', 0, None, None, None, 'What is 7 - 2?', '["4", "5", "6", "3"]', '5'),
         (None, 3, 'math', '<p>Multiplication: Solve 3 x 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Multiplication">', 0, None, None, None, 'What is 5 x 3?', '["10", "15", "20", "12"]', '15'),
         (None, 2, 'science', '<p>Weather: What makes it rain?</p><img src="https://via.placeholder.com/300x200" alt="Weather"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is snow?', '["Frozen rain", "Hot wind", "Sunlight", "Clouds"]', 'Frozen rain')

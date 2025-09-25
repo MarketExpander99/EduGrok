@@ -1,3 +1,4 @@
+<!-- home.html.j2 -->
 {% extends "base.html.j2" %}
 
 {% block content %}
@@ -151,8 +152,17 @@
                 <p class="text-gray-300 mb-2">Match numbers: Drag to pair (e.g., 2x3 to 6)</p>
                 <!-- Simple buttons for demo -->
                 <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 1</button>
-                <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 2</button>
-                <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px...(truncated 749 characters)...                        })
+                <script>
+                    function submitMatch(lessonId) {
+                        fetch('/check_lesson', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                lesson_id: lessonId,
+                                activity_type: 'match_game',
+                                response: 'demo_match',
+                                complete_lesson: true
+                            })
                         }).then(res => res.json()).then(data => {
                             alert(data.is_correct ? 'Great match! +' + data.points + ' points' : 'Keep trying!');
                         }).catch(err => console.error('Error:', err));

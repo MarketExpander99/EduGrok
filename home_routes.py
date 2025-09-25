@@ -1,15 +1,12 @@
-from flask import session, redirect, url_for, render_template, flash, request
+# home_routes.py (updated)
+from flask import session, redirect, url_for, render_template, flash
 import logging
-from datetime import datetime
 import json
 
 logger = logging.getLogger(__name__)
 
 from db import get_db
-
-def filter_content(content):  # Assuming this is defined in app.py, but if needed, duplicate or import
-    # ... (copy the filter_content function if not importing)
-    pass
+from utils import filter_content  # Import filter_content from utils.py
 
 def index():
     return redirect(url_for('home'))
@@ -24,7 +21,7 @@ def home():
         conn = get_db()
         c = conn.cursor()
         
-        # Ensure session has grade
+        # Ensure session has grade and handle
         if 'grade' not in session:
             c.execute("SELECT grade, handle FROM users WHERE id = ?", (session['user_id'],))
             user = c.fetchone()
@@ -35,54 +32,48 @@ def home():
         user_id = session.get('user_id')
         grade = session.get('grade', 1)
 
-        # Fetch posts (updated to include media_url, views, and reposts)
+        # Fetch all posts (no grade filter, no limit to show all)
         c.execute("""
-            SELECT p.id, p.content, p.subject, p.grade, p.likes, p.handle, p.created_at, p.media_url, p.views, p.reposts
-            FROM posts p 
-            WHERE p.grade = ? 
-            ORDER BY p.created_at DESC LIMIT 5
-        """, (grade,))
-        posts_data = c.fetchall()
+            SELECT * FROM posts 
+            ORDER BY created_at DESC
+        """)
+        posts_rows = c.fetchall()
         posts = []
-        comments_data = {}
-        for row in posts_data:
-            post = {
-                'id': row['id'],
-                'content': filter_content(row['content'] or ''),
-                'subject': row['subject'] or 'General',
-                'grade': row['grade'] or 1,
-                'likes': row['likes'] or 0,
-                'handle': row['handle'] or 'Unknown',
-                'created_at': row['created_at'] or 'Unknown',
-                'media_url': row['media_url'] or None,
-                'views': row['views'] or 0,
-                'reposts': row['reposts'] or 0
-            }
-            c.execute("SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?", (user_id, row['id']))
-            post['liked_by_user'] = c.fetchone() is not None
+        comments = {}
+        
+        # Fetch liked and reposted by current user
+        liked_by_user = set()
+        reposted_by_user = set()
+        if user_id:
+            c.execute('SELECT post_id FROM post_likes WHERE user_id = ?', (user_id,))
+            liked_by_user = {row['post_id'] for row in c.fetchall()}
+            c.execute('SELECT post_id FROM reposts WHERE user_id = ?', (user_id,))
+            reposted_by_user = {row['post_id'] for row in c.fetchall()}
 
-            # Fetch comments for this post
+        for row in posts_rows:
+            post = dict(row)
+            post['content'] = filter_content(post['content'] or '')
+            post['liked_by_user'] = post['id'] in liked_by_user
+            post['reposted_by_user'] = post['id'] in reposted_by_user
+
+            # Fetch comments for this post (full dict, no limit)
             c.execute("""
-                SELECT c.content, u.handle, c.created_at 
+                SELECT c.*, u.handle 
                 FROM comments c 
                 JOIN users u ON c.user_id = u.id 
                 WHERE c.post_id = ? 
-                ORDER BY c.created_at ASC 
-                LIMIT 5
+                ORDER BY c.created_at ASC
             """, (row['id'],))
-            comments_data[row['id']] = [
-                {'content': filter_content(r[0] or ''), 'handle': r[1] or 'Unknown', 'created_at': r[2] or 'Unknown'}
-                for r in c.fetchall()
-            ]
+            comments[row['id']] = [dict(r) for r in c.fetchall()]
 
             posts.append(post)
 
-        # Fetch lesson
+        # Fetch a random incomplete lesson (add RANDOM for variety, keep grade filter)
         c.execute("""
             SELECT id, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer 
             FROM lessons 
             WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 
-            LIMIT 1
+            ORDER BY RANDOM() LIMIT 1
         """, (user_id, grade))
         lesson_result = c.fetchone()
         lesson = dict(lesson_result) if lesson_result else None
@@ -107,7 +98,7 @@ def home():
         logger.info(f"User {user_id} accessed home with {len(posts)} posts")
         return render_template('home.html.j2', 
                             posts=posts, 
-                            comments=comments_data,
+                            comments=comments,
                             lesson=lesson, 
                             test=test, 
                             subscribed=subscribed, 
