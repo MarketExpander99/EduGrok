@@ -386,7 +386,7 @@ function checkTrace(lessonId) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             lesson_id: lessonId,
-            activity_type: 'mc_choice',
+            activity_type: 'trace_complete',
             response: input
         })
     }).then(res => res.json()).then(data => {
@@ -416,7 +416,7 @@ function checkMultipleChoice(lessonId) {
         alert('Please select an option.');
         return;
     }
-    const answer = selected.value.trim();
+    const answer = selected.value.trim().toLowerCase();
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
