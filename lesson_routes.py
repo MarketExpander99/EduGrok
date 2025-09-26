@@ -149,7 +149,7 @@ def lessons():
         c.execute('SELECT * FROM lessons WHERE user_id = ? AND grade = ? ORDER BY id DESC', 
                   (session['user_id'], grade))
         lessons_list = c.fetchall()
-        return render_template('lessons.html', lessons=lessons_list)  # Assume lessons.html exists
+        return render_template('lessons.html.j2', lessons=lessons_list, grade=grade)
     except Exception as e:
         logger.error(f"Fetch lessons failed: {str(e)}")
         flash('Server error', 'error')
