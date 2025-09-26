@@ -12,6 +12,7 @@ def register():
         password = request.form.get('password')
         grade = request.form.get('grade', '1')
         handle = request.form.get('handle', email)
+        logger.debug(f"Attempting registration with email: {email}, grade: {grade}, handle: {handle}")
         if not email or not password or not grade.isdigit() or int(grade) not in [1, 2, 3]:
             logger.error(f"Registration failed: Invalid input - email={email}, grade={grade}, password={'set' if password else 'missing'}")
             flash("Invalid email, password, or grade (1-3)", "error")

@@ -1,5 +1,4 @@
-﻿# db.py
-import os
+﻿import os
 import sqlite3
 import logging
 from werkzeug.security import generate_password_hash
@@ -79,7 +78,6 @@ def reset_db():
         c.execute("DROP TABLE IF EXISTS feedback")
         c.execute("DROP TABLE IF EXISTS badges")
         c.execute("DROP TABLE IF EXISTS user_points")
-        c.execute("DROP TABLE IF EXISTS user_likes")
         c.execute("DROP TABLE IF EXISTS post_likes")
         c.execute("DROP TABLE IF EXISTS reposts")
         c.execute("DROP TABLE IF EXISTS comments")
@@ -148,7 +146,7 @@ def check_db_schema():
             logger.info("Added reposts column to posts table")
             print("Added reposts column to posts table")
         
-        for table in ['lessons', 'lesson_responses', 'tests', 'user_likes', 'post_likes', 'user_points', 'badges', 'feedback', 'games', 'reposts', 'comments']:
+        for table in ['lessons', 'lesson_responses', 'tests', 'post_likes', 'user_points', 'badges', 'feedback', 'games', 'reposts', 'comments']:
             c.execute(f"PRAGMA table_info({table})")
             if not c.fetchall():
                 logger.error(f"Table {table} missing")

@@ -101,6 +101,16 @@
             <i class="fas fa-bars text-grok-text"></i>
         </button>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <ul class="mb-4 max-w-md mx-auto">
+            {% for category, message in messages %}
+            <li class="{% if category == 'error' %}text-red-500{% elif category == 'success' %}text-green-500{% else %}text-yellow-500{% endif %} p-2 rounded bg-gray-800">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% endwith %}
+
         {% block content %}{% endblock %}
     </main>
 
