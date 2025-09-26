@@ -1,12 +1,16 @@
 ﻿import os
 import sqlite3
 import logging
-from werkzeug.security import generate_password_hash
 from flask import g
 
 # Configure logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='/tmp/db.log', level=logging.DEBUG)
+
+from users_db import init_users_tables, seed_users, check_users_schema
+from lessons_db import init_lessons_tables, check_lessons_schema, seed_lessons
+from social_db import init_social_tables, seed_social_posts, seed_social_comments, check_social_schema
+from achievements_db import init_achievements_tables, check_achievements_schema
 
 # DB connection
 def get_db():
@@ -75,23 +79,17 @@ def reset_db():
     conn = get_db()
     c = conn.cursor()
     try:
-        c.execute("DROP TABLE IF EXISTS feedback")
-        c.execute("DROP TABLE IF EXISTS badges")
-        c.execute("DROP TABLE IF EXISTS user_points")
-        c.execute("DROP TABLE IF EXISTS post_likes")
-        c.execute("DROP TABLE IF EXISTS reposts")
-        c.execute("DROP TABLE IF EXISTS comments")
-        c.execute("DROP TABLE IF EXISTS games")
-        c.execute("DROP TABLE IF EXISTS tests")
-        c.execute("DROP TABLE IF EXISTS lesson_responses")
-        c.execute("DROP TABLE IF EXISTS lessons")
-        c.execute("DROP TABLE IF EXISTS posts")
-        c.execute("DROP TABLE IF EXISTS users")
+        drops = [
+            "feedback", "badges", "user_points", "post_likes", "reposts", "comments",
+            "games", "tests", "lesson_responses", "lessons", "posts", "users"
+        ]
+        for table in drops:
+            c.execute(f"DROP TABLE IF EXISTS {table}")
         conn.commit()
         logger.info("Force reset: Dropped all tables")
         print("Dropped all tables")
         init_db()
-        seed_lessons()
+        seed_lessons(conn)
         check_db_schema()
         logger.info("Force reset complete")
         print("DB reset complete")
@@ -104,68 +102,11 @@ def reset_db():
 # Schema check
 def check_db_schema():
     conn = get_db()
-    c = conn.cursor()
     try:
-        c.execute("PRAGMA table_info(users)")
-        columns = {col[1]: col[2] for col in c.fetchall()}
-        expected = {
-            'id': 'INTEGER', 'email': 'TEXT', 'password': 'TEXT',
-            'grade': 'INTEGER', 'theme': 'TEXT', 'subscribed': 'INTEGER',
-            'handle': 'TEXT', 'language': 'TEXT', 'star_coins': 'INTEGER'
-        }
-        for col, col_type in expected.items():
-            if col not in columns:
-                if col == 'star_coins':
-                    c.execute("ALTER TABLE users ADD COLUMN star_coins INTEGER DEFAULT 0")
-                    conn.commit()
-                    logger.info("Added star_coins column to users table")
-                    print("Added star_coins column to users table")
-                else:
-                    logger.error(f"Users table missing column: {col}")
-                    raise ValueError(f"Users table missing column: {col}")
-            elif columns[col] != col_type.split()[0]:
-                logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
-                raise ValueError(f"Users table column {col} type mismatch")
-        
-        # Check posts table for media_url, views, and reposts
-        c.execute("PRAGMA table_info(posts)")
-        columns = {col[1]: col[2] for col in c.fetchall()}
-        if 'media_url' not in columns:
-            c.execute("ALTER TABLE posts ADD COLUMN media_url TEXT")
-            conn.commit()
-            logger.info("Added media_url column to posts table")
-            print("Added media_url column to posts table")
-        if 'views' not in columns:
-            c.execute("ALTER TABLE posts ADD COLUMN views INTEGER DEFAULT 0")
-            conn.commit()
-            logger.info("Added views column to posts table")
-            print("Added views column to posts table")
-        if 'reposts' not in columns:
-            c.execute("ALTER TABLE posts ADD COLUMN reposts INTEGER DEFAULT 0")
-            conn.commit()
-            logger.info("Added reposts column to posts table")
-            print("Added reposts column to posts table")
-        
-        # Check badges table for awarded_date (migrate from earned_at if exists)
-        c.execute("PRAGMA table_info(badges)")
-        columns = {col[1]: col[2] for col in c.fetchall()}
-        if 'earned_at' in columns and 'awarded_date' not in columns:
-            # Migrate earned_at to awarded_date
-            c.execute("ALTER TABLE badges RENAME COLUMN earned_at TO awarded_date")
-            conn.commit()
-            logger.info("Renamed earned_at to awarded_date in badges table")
-            print("Renamed earned_at to awarded_date in badges table")
-        elif 'awarded_date' not in columns:
-            c.execute("ALTER TABLE badges ADD COLUMN awarded_date TEXT")
-            conn.commit()
-            logger.info("Added awarded_date column to badges table")
-            print("Added awarded_date column to badges table")
-        
-        for table in ['lessons', 'lesson_responses', 'tests', 'post_likes', 'user_points', 'badges', 'feedback', 'games', 'reposts', 'comments']:
-            c.execute(f"PRAGMA table_info({table})")
-            if not c.fetchall():
-                logger.error(f"Table {table} missing")
-                raise ValueError(f"Table {table} missing")
+        check_users_schema(conn)
+        check_lessons_schema(conn)
+        check_social_schema(conn)
+        check_achievements_schema(conn)
         logger.debug("Schema check passed")
         print("Schema check passed")
     except Exception as e:
@@ -181,117 +122,13 @@ def init_db():
         logger.debug(f"Initializing DB at {db_path}")
         print(f"Initializing DB at {db_path}")
         
-        # Drop and recreate posts table to ensure correct schema
-        c.execute('''CREATE TABLE IF NOT EXISTS posts 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, handle TEXT, content TEXT, 
-                      subject TEXT, grade INTEGER, likes INTEGER DEFAULT 0, created_at TEXT, media_url TEXT, views INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        init_users_tables(conn)
+        init_lessons_tables(c)
+        init_social_tables(c)
+        init_achievements_tables(c)
         
-        # Drop and recreate lessons table to ensure new columns are included
-        c.execute('''CREATE TABLE IF NOT EXISTS lessons 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
-                      subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
-                      trace_word TEXT, sound TEXT, spell_word TEXT, mc_question TEXT, 
-                      mc_options TEXT, mc_answer TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        
-        # Users table
-        c.execute("PRAGMA table_info(users)")
-        columns = {col[1]: col for col in c.fetchall()}
-        if not columns:
-            logger.debug("Creating users table")
-            c.execute('''CREATE TABLE users 
-                         (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                          grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, 
-                          language TEXT DEFAULT 'en', star_coins INTEGER DEFAULT 0)''')
-        else:
-            missing_cols = [col for col in ['grade', 'theme', 'subscribed', 'handle', 'language', 'star_coins'] 
-                           if col not in columns]
-            if missing_cols:
-                logger.debug(f"Migrating users table: {missing_cols}")
-                c.execute("DROP TABLE IF EXISTS users_new")
-                c.execute('''CREATE TABLE users_new 
-                             (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, 
-                              grade INTEGER, theme TEXT, subscribed INTEGER DEFAULT 0, handle TEXT, 
-                              language TEXT DEFAULT 'en', star_coins INTEGER DEFAULT 0)''')
-                c.execute('''INSERT INTO users_new SELECT * FROM users''')
-                c.execute('DROP TABLE users')
-                c.execute('ALTER TABLE users_new RENAME TO users')
-                conn.commit()
-                logger.info("Migrated users table")
-                print("Migrated users table")
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS tests 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS lesson_responses 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, lesson_id INTEGER, user_id INTEGER, activity_type TEXT, response TEXT, is_correct BOOLEAN, points INTEGER,
-                      FOREIGN KEY (lesson_id) REFERENCES lessons(id), FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS post_likes 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER,
-                      FOREIGN KEY (post_id) REFERENCES posts(id), FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS reposts 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, post_id INTEGER, created_at TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (post_id) REFERENCES posts(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS comments 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, user_id INTEGER, content TEXT, created_at TEXT,
-                      FOREIGN KEY (post_id) REFERENCES posts(id), 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS user_points 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, points INTEGER, earned_at TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS badges 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS feedback 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, rating INTEGER, created_at TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS games 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, game_type TEXT, score INTEGER, played_at TEXT,
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_posts_id ON posts(id DESC)')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
-        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_unique ON posts(user_id, content)')
-        
-        # Remove any duplicate comments before creating unique index
-        c.execute('''
-            DELETE FROM comments
-            WHERE id NOT IN (
-                SELECT MIN(id)
-                FROM comments
-                GROUP BY post_id, user_id, content
-            )
-        ''')
-        deleted = c.rowcount
-        if deleted > 0:
-            logger.info(f"Removed {deleted} duplicate comments")
-            print(f"Removed {deleted} duplicate comments")
-        conn.commit()
-        
-        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_unique ON comments(post_id, user_id, content)')
-        conn.commit()
-        logger.info("Tables created/updated")
-        print("Tables created/updated")
-
         # Seed bot users
-        bots = [
-            ('skykidz@example.com', generate_password_hash('botpass'), 1, 'farm', 0, 'SkyKidz', 'en', 0),
-            ('grokedu@example.com', generate_password_hash('botpass'), 2, 'space', 0, 'GrokEdu', 'en', 0),
-        ]
-        c.executemany("INSERT OR IGNORE INTO users (email, password, grade, theme, subscribed, handle, language, star_coins) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", bots)
-        conn.commit()
-        logger.info("Bot users inserted")
-        print("Bot users inserted")
-
-        # Fetch bot user IDs
-        c.execute("SELECT id FROM users WHERE email = 'skykidz@example.com'")
-        skykidz_row = c.fetchone()
-        skykidz_id = skykidz_row[0] if skykidz_row else None
-        c.execute("SELECT id FROM users WHERE email = 'grokedu@example.com'")
-        grokedu_row = c.fetchone()
-        grokedu_id = grokedu_row[0] if grokedu_row else None
-
+        skykidz_id, grokedu_id = seed_users(conn)
         if skykidz_id is None or grokedu_id is None:
             logger.error("Failed to retrieve bot user IDs. SkyKidz ID: %s, GrokEdu ID: %s", skykidz_id, grokedu_id)
             c.execute("SELECT email, id FROM users")
@@ -302,58 +139,20 @@ def init_db():
         logger.debug("Bot user IDs: SkyKidz=%s, GrokEdu=%s", skykidz_id, grokedu_id)
         print(f"Bot user IDs: SkyKidz={skykidz_id}, GrokEdu={grokedu_id}")
 
-        # Seed bot posts (updated to include views=0 and reposts=0, added more posts)
-        bot_posts = [
-            (skykidz_id, 'SkyKidz', 'Check out this fun farm math adventure! 2 cows + 3 chickens = ?', 'math', 1, 5, 'datetime("now")', None, 0, 0),
-            (grokedu_id, 'GrokEdu', 'Explore the solar system: Name a planet close to the sun.', 'science', 2, 10, 'datetime("now")', None, 0, 0),
-            (skykidz_id, 'SkyKidz', 'What color is the sky? Let\'s learn about colors!', 'language', 1, 3, 'datetime("now")', None, 0, 0),
-            (grokedu_id, 'GrokEdu', 'Simple subtraction: 5 apples minus 2 = ?', 'math', 2, 7, 'datetime("now")', None, 0, 0),
-            (skykidz_id, 'SkyKidz', 'Animals on the farm: Which one says moo?', 'science', 1, 4, 'datetime("now")', None, 0, 0),
-        ]
-        c.executemany("INSERT OR IGNORE INTO posts (user_id, handle, content, subject, grade, likes, created_at, media_url, views, reposts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", bot_posts)
+        # Seed bot posts
+        post1_id, post2_id, post3_id, post4_id, post5_id = seed_social_posts(c, skykidz_id, grokedu_id)
+        if post1_id and post2_id and post3_id and post4_id and post5_id:
+            seed_social_comments(c, skykidz_id, grokedu_id, post1_id, post2_id, post3_id, post4_id, post5_id)
+        
         conn.commit()
+        logger.info("Tables created/updated")
+        print("Tables created/updated")
+        logger.info("Bot users inserted")
+        print("Bot users inserted")
         logger.info("Bot posts seeded")
         print("Bot posts seeded")
-
-        # Fetch seeded post IDs
-        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%farm math%'", (skykidz_id,))
-        row = c.fetchone()
-        post1_id = row[0] if row else None
-        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%solar system%'", (grokedu_id,))
-        row = c.fetchone()
-        post2_id = row[0] if row else None
-        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%color is the sky%'", (skykidz_id,))
-        row = c.fetchone()
-        post3_id = row[0] if row else None
-        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%Simple subtraction%'", (grokedu_id,))
-        row = c.fetchone()
-        post4_id = row[0] if row else None
-        c.execute("SELECT id FROM posts WHERE user_id = ? AND content LIKE '%Animals on the farm%'", (skykidz_id,))
-        row = c.fetchone()
-        post5_id = row[0] if row else None
-
-        if post1_id and post2_id and post3_id and post4_id and post5_id:
-            bot_comments = [
-                # Comments for post1
-                (post1_id, skykidz_id, 'This is fun!', 'datetime("now")'),
-                (post1_id, grokedu_id, 'Love the math adventure!', 'datetime("now")'),
-                # Comments for post2
-                (post2_id, skykidz_id, 'Mercury?', 'datetime("now")'),
-                (post2_id, grokedu_id, 'Great question!', 'datetime("now")'),
-                # Comments for post3
-                (post3_id, grokedu_id, 'Blue!', 'datetime("now")'),
-                (post3_id, skykidz_id, 'Yes, blue sky!', 'datetime("now")'),
-                # Comments for post4
-                (post4_id, skykidz_id, '3 apples left!', 'datetime("now")'),
-                (post4_id, grokedu_id, 'Correct!', 'datetime("now")'),
-                # Comments for post5
-                (post5_id, grokedu_id, 'The cow!', 'datetime("now")'),
-                (post5_id, skykidz_id, 'Moo moo!', 'datetime("now")'),
-            ]
-            c.executemany("INSERT OR IGNORE INTO comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, ?)", bot_comments)
-            conn.commit()
-            logger.info("Bot comments seeded")
-            print("Bot comments seeded")
+        logger.info("Bot comments seeded")
+        print("Bot comments seeded")
 
     except sqlite3.Error as e:
         logger.error(f"SQLite error in init_db: {str(e)}")
@@ -363,41 +162,5 @@ def init_db():
     except Exception as e:
         logger.error(f"DB init failed: {str(e)}")
         print(f"DB init failed: {e}")
-        conn.rollback()
-        raise
-
-# Seed lessons with media (fixed subjects to match template checks: 'math', 'language', 'science')
-def seed_lessons():
-    conn = get_db()
-    c = conn.cursor()
-    lessons = [
-        (None, 1, 'language', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/mu?n/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
-        (None, 1, 'math', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'What number comes after 4?', '["3", "5", "7", "10"]', '5'),
-        (None, 1, 'science', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury'),
-        (None, 1, 'math', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
-        (None, 1, 'language', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/s?n/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
-        (None, 1, 'science', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
-        (None, 1, 'language', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/æp.?l/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
-        (None, 2, 'math', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
-        (None, 3, 'science', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
-        (None, 1, 'language', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/r?d/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
-        (None, 2, 'language', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/b?k/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
-        (None, 3, 'math', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4'),
-        (None, 2, 'math', '<p>Subtraction: Solve 10 - 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Subtraction">', 0, None, None, None, 'What is 10 - 4?', '["3", "4", "5", "6"]', '6'),
-        (None, 3, 'math', '<p>Multiplication: Solve 3 x 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Multiplication">', 0, None, None, None, 'What is 3 x 4?', '["10", "12", "15", "20"]', '12'),
-        (None, 2, 'science', '<p>Weather: Learn about snow.</p><img src="https://via.placeholder.com/300x200" alt="Weather"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is snow?', '["Frozen rain", "Hot wind", "Sunlight", "Clouds"]', 'Frozen rain')
-    ]
-    try:
-        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
-        c.executemany("""
-            INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, lessons)
-        conn.commit()
-        logger.debug("Seeded %d lessons", len(lessons))
-        print(f"Seeded {len(lessons)} lessons")
-    except sqlite3.OperationalError as e:
-        logger.error(f"Seed lessons failed: {str(e)}")
-        print(f"Seed lessons failed: {e}")
         conn.rollback()
         raise
