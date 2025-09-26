@@ -1,3 +1,4 @@
+# users_db.py
 import logging
 import sqlite3
 from werkzeug.security import generate_password_hash
@@ -88,11 +89,54 @@ def check_users_schema(conn):
                 logger.error(f"Users table column {col} type mismatch: expected {col_type}, got {columns[col]}")
                 raise ValueError(f"Users table column {col} type mismatch")
         
-        for table in ['feedback', 'games']:
-            c.execute(f"PRAGMA table_info({table})")
-            if not c.fetchall():
-                logger.error(f"Table {table} missing")
-                raise ValueError(f"Table {table} missing")
+        # Check feedback table
+        c.execute("PRAGMA table_info(feedback)")
+        fb_columns = {col[1]: col[2] for col in c.fetchall()}
+        expected_fb = {
+            'id': 'INTEGER', 'user_id': 'INTEGER', 'rating': 'INTEGER',
+            'comments': 'TEXT', 'submitted_date': 'TEXT'
+        }
+        if not fb_columns:
+            logger.info("Creating feedback table")
+            c.execute('''CREATE TABLE feedback 
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT,
+                          FOREIGN KEY (user_id) REFERENCES users(id))''')
+            conn.commit()
+        else:
+            for col, col_type in expected_fb.items():
+                if col not in fb_columns:
+                    c.execute(f"ALTER TABLE feedback ADD COLUMN {col} {col_type}")
+                    logger.info(f"Added {col} column to feedback table")
+                    print(f"Added {col} column to feedback table")
+                    conn.commit()
+                elif fb_columns[col] != col_type.split()[0]:
+                    logger.error(f"Feedback table column {col} type mismatch: expected {col_type}, got {fb_columns[col]}")
+                    raise ValueError(f"Feedback table column {col} type mismatch")
+        
+        # Check games table
+        c.execute("PRAGMA table_info(games)")
+        games_columns = {col[1]: col[2] for col in c.fetchall()}
+        expected_games = {
+            'id': 'INTEGER', 'user_id': 'INTEGER', 'game_type': 'TEXT',
+            'score': 'INTEGER', 'played_at': 'TEXT'
+        }
+        if not games_columns:
+            logger.info("Creating games table")
+            c.execute('''CREATE TABLE games 
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, game_type TEXT, score INTEGER, played_at TEXT,
+                          FOREIGN KEY (user_id) REFERENCES users(id))''')
+            conn.commit()
+        else:
+            for col, col_type in expected_games.items():
+                if col not in games_columns:
+                    c.execute(f"ALTER TABLE games ADD COLUMN {col} {col_type}")
+                    logger.info(f"Added {col} column to games table")
+                    print(f"Added {col} column to games table")
+                    conn.commit()
+                elif games_columns[col] != col_type.split()[0]:
+                    logger.error(f"Games table column {col} type mismatch: expected {col_type}, got {games_columns[col]}")
+                    raise ValueError(f"Games table column {col} type mismatch")
+        
     except Exception as e:
         logger.error(f"Users schema check failed: {str(e)}")
         raise
