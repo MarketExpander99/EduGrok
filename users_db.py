@@ -33,7 +33,7 @@ def init_users_tables(conn):
                 print("Migrated users table")
         
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, rating INTEGER, created_at TEXT,
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS games 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, game_type TEXT, score INTEGER, played_at TEXT,

@@ -58,7 +58,7 @@ def login():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("SELECT id, password, grade, theme, language FROM users WHERE email = ?", (email,))
+            c.execute("SELECT id, password, grade, theme, language, handle FROM users WHERE email = ?", (email,))
             user = c.fetchone()
             if user:
                 logger.debug(f"Found user {email}, stored hash: {user['password']}")
@@ -67,6 +67,7 @@ def login():
                     session['grade'] = user['grade'] or 1
                     session['theme'] = user['theme'] or 'astronaut'
                     session['language'] = user['language'] or 'en'
+                    session['handle'] = user['handle'] or email
                     logger.info(f"User logged in: {email}")
                     flash("Login successful!", "success")
                     return redirect(url_for('home'))

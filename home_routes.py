@@ -21,12 +21,12 @@ def home():
         conn = get_db()
         c = conn.cursor()
         
-        # Ensure session has grade and handle
-        if 'grade' not in session:
+        # Ensure session has grade and handle (fallback, though set in login)
+        if 'grade' not in session or 'handle' not in session:
             c.execute("SELECT grade, handle FROM users WHERE id = ?", (session['user_id'],))
             user = c.fetchone()
             session['grade'] = user['grade'] if user and user['grade'] is not None else 1
-            session['handle'] = user['handle'] if user and user['handle'] is not None else 'User'
+            session['handle'] = user['handle'] if user and user['handle'] is not None else session.get('email', 'User')
             logger.debug(f"Set session['grade'] to {session['grade']} and session['handle'] to {session['handle']} for user {session['user_id']}")
 
         user_id = session.get('user_id')

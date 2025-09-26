@@ -30,9 +30,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
 
-# Secure session settings
+# Secure session settings (conditional for HTTPS)
+production = 'RENDER' in os.environ
 app.config.update(
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=production,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax'
 )
@@ -52,10 +53,6 @@ def teardown_db(error):
 # Static file route to ensure CSS serves
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    # Strip query params from filename (e.g., 'styles.css?v=1' -> 'styles.css')
-    parsed = urlparse(request.path)
-    clean_filename = os.path.basename(parsed.path)  # Grabs just the file, ignores query
-    
     try:
         # Ensure static dir exists
         static_dir = app.static_folder
@@ -63,20 +60,20 @@ def serve_static(filename):
             os.makedirs(static_dir)
         
         # Guess MIME type
-        mime_type, _ = mimetypes.guess_type(clean_filename)
+        mime_type, _ = mimetypes.guess_type(filename)
         if mime_type is None:
             mime_type = 'application/octet-stream'
         
-        response = send_from_directory(static_dir, clean_filename)
+        response = send_from_directory(static_dir, filename)
         response.headers['Content-Type'] = mime_type
         
-        logger.debug(f"Serving static file: {clean_filename} (from req: {filename}, MIME: {mime_type})")
+        logger.debug(f"Serving static file: {filename} (MIME: {mime_type})")
         return response
     except FileNotFoundError:
-        logger.debug(f"Static file not found: {clean_filename}")
+        logger.debug(f"Static file not found: {filename}")
         abort(404)
     except Exception as e:
-        logger.error(f"Static serve error for {clean_filename}: {e}")
+        logger.error(f"Static serve error for {filename}: {e}")
         abort(500)
 
 # Initialize app

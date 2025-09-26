@@ -1,3 +1,4 @@
+# assess_routes.py
 from flask import session, request, flash, redirect, url_for, render_template
 import logging
 from datetime import datetime
@@ -26,6 +27,7 @@ def assess():
         correct_answers = ["5", "Hat", "Water", "Example4", "Example5", "Example6", "Example7", "Example8", "Example9", "Example10"]
         score = sum(1 for i in range(1, 11) if request.form.get(f'q{i}') == correct_answers[i-1])
         grade = 1 if score < 4 else 2 if score < 7 else 3
+        conn = None
         try:
             conn = get_db()
             c = conn.cursor()
@@ -33,12 +35,17 @@ def assess():
             conn.commit()
             session['grade'] = grade
             flash('Assessment completed', 'success')
+            logger.info(f"User {session['user_id']} completed assessment with score {score}, new grade {grade}")
             return redirect(url_for('home'))
         except Exception as e:
             logger.error(f"Assess failed: {str(e)}")
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash('Server error', 'error')
             return render_template('assess.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        finally:
+            if conn:
+                conn.close()
     return render_template('assess.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def take_test():
@@ -55,6 +62,7 @@ def take_test():
     if request.method == 'POST':
         correct_answers = ["9", "Example2", "Example3", "Example4", "Example5"]
         score = sum(1 for i in range(1, 6) if request.form.get(f'q{i}') == correct_answers[i-1])
+        conn = None
         try:
             conn = get_db()
             c = conn.cursor()
@@ -64,12 +72,17 @@ def take_test():
             c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
             conn.commit()
             flash('Test completed', 'success')
+            logger.info(f"User {session['user_id']} completed test with score {score}, awarded {points_award} points")
             return redirect(url_for('game', score=score))
         except Exception as e:
             logger.error(f"Test failed: {str(e)}")
-            conn.rollback()
+            if conn:
+                conn.rollback()
             flash('Server error', 'error')
             return render_template('test.html.j2', error="Server error", questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        finally:
+            if conn:
+                conn.close()
     return render_template('test.html.j2', questions=questions, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def game():
