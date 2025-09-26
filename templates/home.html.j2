@@ -141,7 +141,7 @@
                 <button onclick="checkMath()" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
                 <script>
                     function checkMath() {
-                        const answer = document.getElementById('math-input-{{ lesson.id }}').value;
+                        const answer = document.getElementById('math-input-{{ lesson.id }}').value.trim();
                         if (!answer) { alert('Please enter an answer.'); return; }
                         fetch('/check_lesson', {
                             method: 'POST',
@@ -379,7 +379,7 @@ function toggleCommentsExtra(postId) {
 }
 
 function checkTrace(lessonId) {
-    const input = document.getElementById(`trace-input-${lessonId}`).value.trim();
+    const input = document.getElementById(`trace-input-${lessonId}`).value.trim().toLowerCase();
     if (!input) { alert('Please enter the word.'); return; }
     fetch('/check_lesson', {
         method: 'POST',
@@ -395,7 +395,7 @@ function checkTrace(lessonId) {
 }
 
 function checkSpelling(lessonId) {
-    const input = document.getElementById(`spell-input-${lessonId}`).value.trim();
+    const input = document.getElementById(`spell-input-${lessonId}`).value.trim().toLowerCase();
     if (!input) { alert('Please enter your spelling.'); return; }
     fetch('/check_lesson', {
         method: 'POST',
@@ -432,7 +432,7 @@ function checkMultipleChoice(lessonId) {
 }
 
 function checkSentence(lessonId) {
-    const answer = document.getElementById(`sentence-select-${lessonId}`).value;
+    const answer = document.getElementById(`sentence-select-${lessonId}`).value.trim().toLowerCase();
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
