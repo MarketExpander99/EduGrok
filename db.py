@@ -146,6 +146,21 @@ def check_db_schema():
             logger.info("Added reposts column to posts table")
             print("Added reposts column to posts table")
         
+        # Check badges table for awarded_date (migrate from earned_at if exists)
+        c.execute("PRAGMA table_info(badges)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'earned_at' in columns and 'awarded_date' not in columns:
+            # Migrate earned_at to awarded_date
+            c.execute("ALTER TABLE badges RENAME COLUMN earned_at TO awarded_date")
+            conn.commit()
+            logger.info("Renamed earned_at to awarded_date in badges table")
+            print("Renamed earned_at to awarded_date in badges table")
+        elif 'awarded_date' not in columns:
+            c.execute("ALTER TABLE badges ADD COLUMN awarded_date TEXT")
+            conn.commit()
+            logger.info("Added awarded_date column to badges table")
+            print("Added awarded_date column to badges table")
+        
         for table in ['lessons', 'lesson_responses', 'tests', 'post_likes', 'user_points', 'badges', 'feedback', 'games', 'reposts', 'comments']:
             c.execute(f"PRAGMA table_info({table})")
             if not c.fetchall():
@@ -226,7 +241,7 @@ def init_db():
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, points INTEGER, earned_at TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS badges 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, earned_at TEXT,
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, content TEXT, rating INTEGER, created_at TEXT,
@@ -238,6 +253,23 @@ def init_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_lessons_user_grade_completed ON lessons(user_id, grade, completed)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_tests_user_date ON tests(user_id, date)')
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_unique ON posts(user_id, content)')
+        
+        # Remove any duplicate comments before creating unique index
+        c.execute('''
+            DELETE FROM comments
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM comments
+                GROUP BY post_id, user_id, content
+            )
+        ''')
+        deleted = c.rowcount
+        if deleted > 0:
+            logger.info(f"Removed {deleted} duplicate comments")
+            print(f"Removed {deleted} duplicate comments")
+        conn.commit()
+        
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_comments_unique ON comments(post_id, user_id, content)')
         conn.commit()
         logger.info("Tables created/updated")
         print("Tables created/updated")

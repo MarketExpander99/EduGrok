@@ -4,20 +4,22 @@
 {% block content %}
 
 <div id="post-form-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div id="post-form" class="hidden bg-black p-6 rounded-xl shadow-xl border border-blue-200 max-w-lg w-full mx-4 transform scale-95 transition-all duration-300 text-white">
+    <div id="post-form" class="hidden bg-black p-6 rounded-xl shadow-xl border border-blue-200 max-w-xl w-full mx-4 transform scale-95 transition-all duration-300 text-white max-h-[80vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-blue-100">Create a Post</h2>
             <button id="close-post-form" class="text-gray-400 hover:text-gray-200 text-2xl font-bold">&times;</button>
         </div>
         <form action="{{ url_for('create_post') }}" method="POST" enctype="multipart/form-data">
-            <textarea name="content" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Share something..." required rows="4"></textarea>
+            <textarea id="post-content" name="content" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Share something..." required rows="6"></textarea>
+            <div id="char-count" class="text-right text-sm text-gray-400 mb-4">0/280</div>
             <select name="subject" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white">
                 <option value="math">Math</option>
                 <option value="science">Science</option>
                 <option value="language">Language</option>
                 <option value="General">General</option>
             </select>
-            <input type="file" name="media" accept="image/*,video/mp4" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400">
+            <input type="file" id="media-upload" name="media" accept="image/*,video/mp4" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400">
+            <div id="media-preview" class="mt-4 mb-4"></div>
             <div class="flex justify-end space-x-3">
                 <button type="button" id="cancel-post" class="px-4 py-2 text-gray-400 border border-gray-600 rounded-md hover:bg-gray-700 transition">Cancel</button>
                 <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post</button>
@@ -295,6 +297,44 @@ document.addEventListener('DOMContentLoaded', function() {
             closePostForm();
         }
     });
+
+    // Media preview
+    const mediaUpload = document.getElementById('media-upload');
+    if (mediaUpload) {
+        mediaUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const preview = document.getElementById('media-preview');
+            preview.innerHTML = ''; // Clear previous preview
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '300px';
+                img.style.objectFit = 'contain';
+                img.style.borderRadius = '8px';
+                preview.appendChild(img);
+            } else if (file.type === 'video/mp4') {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                video.style.maxHeight = '300px';
+                video.style.objectFit = 'contain';
+                video.style.borderRadius = '8px';
+                preview.appendChild(video);
+            }
+        });
+    }
+
+    // Character count
+    const postContent = document.getElementById('post-content');
+    if (postContent) {
+        postContent.addEventListener('input', function() {
+            const count = this.value.length;
+            document.getElementById('char-count').textContent = `${count}/280`;
+        });
+    }
 });
 
 function likePost(postId) {
