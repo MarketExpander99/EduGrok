@@ -10,6 +10,9 @@ from urllib.parse import urlparse
 import mimetypes
 from werkzeug.utils import secure_filename
 
+# Add CORS for dev (install via: pip install flask-cors)
+from flask_cors import CORS
+
 from utils import allowed_file, embed_links  # Import helpers from utils.py
 
 from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lessons
@@ -29,6 +32,9 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_urlsafe(32)
+
+# Enable CORS for all routes in dev (safe for Codespaces; restrict in prod)
+CORS(app, origins=["*"], supports_credentials=True, methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 # Secure session settings (conditional for HTTPS)
 production = 'RENDER' in os.environ
