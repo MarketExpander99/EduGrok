@@ -1,3 +1,4 @@
+<!-- lesson_card.html.j2 -->
 <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
     <h3 class="text-lg font-semibold text-orange-100 mb-3">{{ lesson.subject }}</h3>
     <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
@@ -65,8 +66,9 @@
 <script>
 // Lesson-specific JS (math/language checks, complete lesson)
 function checkMath() {
-    const answer = document.getElementById('math-input-{{ lesson.id }}').value.trim();
-    if (!answer) { alert('Please enter an answer.'); return; }
+    const inputValue = document.getElementById('math-input-{{ lesson.id }}').value.trim();
+    if (!inputValue) { alert('Please enter an answer.'); return; }
+    const answer = parseFloat(inputValue.toLowerCase()) || 0;  // Parse to number; fallback to 0 if invalid
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -109,10 +111,15 @@ function checkTrace(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'trace_complete',
-            response: input
+            response: input,
+            complete_lesson: true  // Added for consistency
         })
     }).then(res => res.json()).then(data => {
-        alert(data.is_correct ? 'Correct! Great job tracing the word. +' + data.points + ' points' : 'Try again! Make sure to type the word exactly as shown.');
+        if (data.is_correct) {
+            alert('Correct! Great job tracing the word. +' + data.points + ' points');
+        } else {
+            alert('Try again! Make sure to type the word exactly as shown.');
+        }
     }).catch(err => console.error('Error:', err));
 }
 
@@ -125,10 +132,15 @@ function checkSpelling(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'spelling_complete',
-            response: input
+            response: input,
+            complete_lesson: true  // Added for consistency
         })
     }).then(res => res.json()).then(data => {
-        alert(data.is_correct ? 'Correct! You spelled the word correctly. +' + data.points + ' points' : 'Try again! Check the spelling carefully.');
+        if (data.is_correct) {
+            alert('Correct! You spelled the word correctly. +' + data.points + ' points');
+        } else {
+            alert('Try again! Check the spelling carefully.');
+        }
     }).catch(err => console.error('Error:', err));
 }
 
@@ -149,7 +161,11 @@ function checkMultipleChoice(lessonId) {
             complete_lesson: true
         })
     }).then(res => res.json()).then(data => {
-        alert(data.is_correct ? 'Correct! You chose the right answer. +' + data.points + ' points' : 'Incorrect. Try again!');
+        if (data.is_correct) {
+            alert('Correct! You chose the right answer. +' + data.points + ' points');
+        } else {
+            alert('Incorrect. Try again!');
+        }
     }).catch(err => console.error('Error:', err));
 }
 
@@ -165,7 +181,11 @@ function checkSentence(lessonId) {
             complete_lesson: true
         })
     }).then(res => res.json()).then(data => {
-        alert(data.is_correct ? 'Perfect! +' + data.points + ' points' : 'Try again!');
+        if (data.is_correct) {
+            alert('Perfect! +' + data.points + ' points');
+        } else {
+            alert('Try again!');
+        }
     }).catch(err => console.error('Error:', err));
 }
 

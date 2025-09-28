@@ -3,15 +3,29 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
+def add_column_if_missing(c, table, column, col_type='TEXT'):
+    """Safely add a column if it doesn't exist using PRAGMA."""
+    c.execute(f"PRAGMA table_info({table})")
+    columns = [row[1] for row in c.fetchall()]
+    if column not in columns:
+        c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+        logger.info(f"Added column {column} to {table}")
+    else:
+        logger.debug(f"Column {column} already exists in {table}")
+
 def init_lessons_tables(c):
     try:
-        # Drop and recreate lessons table to ensure new columns are included
+        # Create lessons table with new columns
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, 
                       subject TEXT, content TEXT, completed BOOLEAN DEFAULT 0, 
                       trace_word TEXT, sound TEXT, spell_word TEXT, mc_question TEXT, 
-                      mc_options TEXT, mc_answer TEXT,
+                      mc_options TEXT, mc_answer TEXT, math_answer TEXT, sentence_answer TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
+        
+        # Add columns if table exists but columns are missing (for upgrades)
+        add_column_if_missing(c, 'lessons', 'math_answer')
+        add_column_if_missing(c, 'lessons', 'sentence_answer')
         
         c.execute('''CREATE TABLE IF NOT EXISTS tests 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT,
@@ -34,25 +48,25 @@ def seed_lessons(conn=None):
     try:
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, content)')
         lessons = [
-            (None, 1, 'language', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/mu?n/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon'),
-            (None, 1, 'math', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'What number comes after 4?', '["3", "5", "7", "10"]', '5'),
-            (None, 1, 'science', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury'),
-            (None, 1, 'math', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7'),
-            (None, 1, 'language', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/s?n/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun'),
-            (None, 1, 'science', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat'),
-            (None, 1, 'language', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/æp.?l/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple'),
-            (None, 2, 'math', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3'),
-            (None, 3, 'science', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation'),
-            (None, 1, 'language', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/r?d/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red'),
-            (None, 2, 'language', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/b?k/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book'),
-            (None, 3, 'math', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4'),
-            (None, 2, 'math', '<p>Subtraction: Solve 10 - 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Subtraction">', 0, None, None, None, 'What is 10 - 4?', '["3", "4", "5", "6"]', '6'),
-            (None, 3, 'math', '<p>Multiplication: Solve 3 x 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Multiplication">', 0, None, None, None, 'What is 3 x 4?', '["10", "12", "15", "20"]', '12'),
-            (None, 2, 'science', '<p>Weather: Learn about snow.</p><img src="https://via.placeholder.com/300x200" alt="Weather"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is snow?', '["Frozen rain", "Hot wind", "Sunlight", "Clouds"]', 'Frozen rain')
+            (None, 1, 'language', '<p>Learn the M sound with words like <strong>moon</strong> and <strong>mars</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Moon"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, 'moon', '/mu?n/', 'moon', 'What is the correct spelling?', '["moon", "mon", "mooon", "mun"]', 'moon', None, None),
+            (None, 1, 'math', '<p>Count from 1 to 10 with fun examples!</p><img src="https://via.placeholder.com/300x200" alt="Numbers">', 0, None, None, None, 'What number comes after 4?', '["3", "5", "7", "10"]', '5', None, None),
+            (None, 1, 'science', '<p>Explore the planets in our solar system.</p><img src="https://via.placeholder.com/300x200" alt="Planets"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which planet is closest to the sun?', '["Earth", "Mars", "Mercury", "Jupiter"]', 'Mercury', None, None),
+            (None, 1, 'math', '<p>Learn to add numbers up to 10.</p><img src="https://via.placeholder.com/300x200" alt="Addition">', 0, None, None, None, 'What is 4 + 3?', '["6", "7", "8", "5"]', '7', '7', None),
+            (None, 1, 'language', '<p>Learn the S sound with words like <strong>sun</strong> and <strong>star</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Sun">', 0, 'sun', '/s?n/', 'sun', 'What is the correct spelling?', '["sun", "son", "sunn", "sn"]', 'sun', None, None),
+            (None, 1, 'science', '<p>Discover animals on Earth and beyond!</p><img src="https://via.placeholder.com/300x200" alt="Animals"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'Which animal says "meow"?', '["Dog", "Cat", "Bird", "Fish"]', 'Cat', None, None),
+            (None, 1, 'language', '<p>Learn the A sound with words like <strong>apple</strong> and <strong>ant</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Apple">', 0, 'apple', '/æp.?l/', 'apple', 'What is the correct spelling?', '["apple", "aple", "appl", "aplle"]', 'apple', None, None),
+            (None, 2, 'math', '<p>Identify different shapes: Circle, Square, Triangle.</p><img src="https://via.placeholder.com/300x200" alt="Shapes">', 0, None, None, None, 'How many sides does a triangle have?', '["0", "3", "4", "Infinite"]', '3', '3', None),
+            (None, 3, 'science', '<p>Learn about evaporation, condensation, and precipitation.</p><img src="https://via.placeholder.com/300x200" alt="Water Cycle"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is the first step in the water cycle?', '["Precipitation", "Evaporation", "Condensation", "Collection"]', 'Evaporation', None, None),
+            (None, 1, 'language', '<p>Learn basic colors: Red, Blue, Green.</p><img src="https://via.placeholder.com/300x200" alt="Colors">', 0, 'red', '/r?d/', 'red', 'What is the correct spelling?', '["red", "read", "rd", "redd"]', 'red', None, 'mat'),
+            (None, 2, 'language', '<p>Learn the B sound with words like <strong>book</strong> and <strong>ball</strong>.</p><img src="https://via.placeholder.com/300x200" alt="Book">', 0, 'book', '/b?k/', 'book', 'What is the correct spelling?', '["book", "buk", "boook", "bock"]', 'book', None, None),
+            (None, 3, 'math', '<p>Understand simple fractions like 1/2 and 1/4.</p><img src="https://via.placeholder.com/300x200" alt="Fractions">', 0, None, None, None, 'What is half of 8?', '["3", "4", "5", "6"]', '4', '4', None),
+            (None, 2, 'math', '<p>Subtraction: Solve 10 - 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Subtraction">', 0, None, None, None, 'What is 10 - 4?', '["3", "4", "5", "6"]', '6', '6', None),
+            (None, 3, 'math', '<p>Multiplication: Solve 3 x 4 = ?</p><img src="https://via.placeholder.com/300x200" alt="Multiplication">', 0, None, None, None, 'What is 3 x 4?', '["10", "12", "15", "20"]', '12', '12', None),
+            (None, 2, 'science', '<p>Weather: Learn about snow.</p><img src="https://via.placeholder.com/300x200" alt="Weather"><video src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4" controls width="300"></video>', 0, None, None, None, 'What is snow?', '["Frozen rain", "Hot wind", "Sunlight", "Clouds"]', 'Frozen rain', None, None)
         ]
         c.executemany("""
-            INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO lessons (user_id, grade, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer, math_answer, sentence_answer)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, lessons)
         conn.commit()
         logger.debug("Seeded %d lessons", len(lessons))
@@ -71,6 +85,13 @@ def check_lessons_schema(conn):
             if not c.fetchall():
                 logger.error(f"Table {table} missing")
                 raise ValueError(f"Table {table} missing")
+        # Extra check for new columns
+        c.execute("PRAGMA table_info(lessons)")
+        columns = [row[1] for row in c.fetchall()]
+        required = ['math_answer', 'sentence_answer']
+        for col in required:
+            if col not in columns:
+                logger.warning(f"Required column {col} missing in lessons table")
     except Exception as e:
         logger.error(f"Lessons schema check failed: {str(e)}")
         raise

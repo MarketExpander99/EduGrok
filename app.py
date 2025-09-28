@@ -76,6 +76,15 @@ def serve_static(filename):
         logger.error(f"Static serve error for {filename}: {e}")
         abort(500)
 
+# Debug route to inspect registered routes (visit /debug in browser)
+@app.route('/debug')
+def debug_routes():
+    output = []
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(rule.methods)
+        output.append(f"{rule.endpoint}: {rule} ({methods})")
+    return '<br>'.join(sorted(output))
+
 # Initialize app
 def init_app():
     with app.app_context():
@@ -90,6 +99,10 @@ def init_app():
             app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB limit
             logger.info("App initialized - DB ready")
             print("App initialized - DB ready")
+            # Log registered routes for debugging
+            logger.info("Registered routes:")
+            for rule in app.url_map.iter_rules():
+                logger.info(f"  {rule.endpoint}: {rule} ({','.join(rule.methods)})")
         except Exception as e:
             logger.error(f"App init failed: {str(e)}")
             print(f"App init failed: {e}")
@@ -120,10 +133,11 @@ app.add_url_rule('/like/<int:post_id>', 'like_post', like_post, methods=['POST']
 app.add_url_rule('/repost/<int:post_id>', 'repost_post', repost_post, methods=['POST'])
 app.add_url_rule('/comment/<int:post_id>', 'add_comment', add_comment, methods=['POST'])
 
+# Lesson routes (ensured POST for check_lesson; added logging hook)
 app.add_url_rule('/check_lesson', 'check_lesson', check_lesson, methods=['POST'])
-app.add_url_rule('/complete_lesson/<int:lesson_id>', 'complete_lesson', complete_lesson)
-app.add_url_rule('/reset_lesson/<int:lesson_id>', 'reset_lesson', reset_lesson)
-app.add_url_rule('/lessons', 'lessons', lessons)
+app.add_url_rule('/complete_lesson/<int:lesson_id>', 'complete_lesson', complete_lesson, methods=['POST'])
+app.add_url_rule('/reset_lesson/<int:lesson_id>', 'reset_lesson', reset_lesson, methods=['POST'])
+app.add_url_rule('/lessons', 'lessons', lessons, methods=['GET'])
 app.add_url_rule('/generate_lesson', 'generate_lesson', generate_lesson, methods=['POST'])
 
 app.add_url_rule('/assess', 'assess', assess, methods=['GET', 'POST'])
