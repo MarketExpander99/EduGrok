@@ -8,15 +8,24 @@
 {% if lessons %}
     {% for lesson in lessons %}
         <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-            <h3 class="text-lg font-semibold text-orange-100 mb-3">{{ lesson.subject }}</h3>
+            <div class="flex justify-between items-start mb-3">
+                <h3 class="text-lg font-semibold text-orange-100">{{ lesson.subject }}</h3>
+                {% if lesson.completed %}
+                    <span class="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center">
+                        <i class="fas fa-check mr-1"></i>Completed
+                    </span>
+                {% endif %}
+            </div>
             <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
             <div class="flex justify-end space-x-3">
-                <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition inline-flex items-center text-sm">
-                    Do Again
-                </a>
-                <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
-                    Complete Lesson
-                </a>
+                {% if not lesson.completed %}
+                    <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition inline-flex items-center text-sm">
+                        Do Again
+                    </a>
+                    <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
+                        Complete Lesson
+                    </a>
+                {% endif %}
             </div>
         </div>
     {% endfor %}

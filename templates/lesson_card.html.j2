@@ -36,7 +36,7 @@
         <div class="mb-4">
             <h4 class="text-md font-semibold text-orange-200 mb-2">Multiple Choice</h4>
             <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is the correct spelling?' }}</p>
-            {% for option in lesson.mc_options or ['cat', 'kat', 'ct', 'caat'] %}
+            {% for option in lesson.mc_options or [] %}
                 <label class="block mb-2 text-white">
                     <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
                     {{ option }}
@@ -54,6 +54,19 @@
                 <option value="moon">moon</option>
             </select>
             <button onclick="checkSentence({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+        </div>
+    {% elif lesson.subject == 'science' %}
+        <!-- Science Multiple Choice -->
+        <div class="mb-4">
+            <h4 class="text-md font-semibold text-orange-200 mb-2">Science Quiz</h4>
+            <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is this?' }}</p>
+            {% for option in lesson.mc_options or [] %}
+                <label class="block mb-2 text-white">
+                    <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
+                    {{ option }}
+                </label>
+            {% endfor %}
+            <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
         </div>
     {% endif %}
     <div class="flex justify-end">

@@ -27,58 +27,69 @@ def check_lesson():
         response = str(response or '').strip().lower()
     complete_lesson = data.get('complete_lesson', False)
 
-    if not lesson_id or not activity_type:
-        return jsonify({'success': False, 'error': 'Missing lesson_id or activity_type'}), 400
+    if not lesson_id:
+        return jsonify({'success': False, 'error': 'Missing lesson_id'}), 400
 
+    user_id = session['user_id']
     try:
         conn = get_db()
         c = conn.cursor()
 
-        # Fetch lesson
-        c.execute('SELECT * FROM lessons WHERE id = ? AND user_id = ? AND completed = 0', 
-                  (lesson_id, session['user_id']))
+        # Auto-assign if not already
+        c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", (user_id, lesson_id))
+        conn.commit()
+
+        # Fetch lesson (ensure assigned and incomplete)
+        c.execute("""
+            SELECT l.* FROM lessons l 
+            JOIN lessons_users lu ON l.id = lu.lesson_id 
+            WHERE lu.user_id = ? AND l.id = ? AND lu.completed = 0
+        """, (user_id, lesson_id))
         lesson = c.fetchone()
         if not lesson:
             return jsonify({'success': False, 'error': 'Lesson not found or already completed'}), 404
 
-        # Determine expected answer based on activity_type
-        expected = ''
-        if activity_type == 'trace_complete':
-            expected = (lesson['trace_word'] or '').strip().lower()
-        elif activity_type == 'spelling_complete':
-            expected = (lesson['spell_word'] or '').strip().lower()
-        elif activity_type == 'mc_choice':
-            expected = (lesson['mc_answer'] or '').strip().lower()
-            # Optional: Handle mc_options as list if comma-separated (for array-like checks)
-            # mc_opts = [opt.strip().lower() for opt in (lesson['mc_options'] or '').split(',') if opt.strip()]
-            # if response in mc_opts:  # If multi-correct, but keep == for now
-        elif activity_type == 'sentence_complete':
-            expected = (lesson['sentence_answer'] or 'mat').strip().lower()  # Dynamic fallback
-        elif activity_type == 'math_fill':
-            expected = (lesson['math_answer'] or '6').strip().lower()  # Dynamic fallback
-        elif activity_type == 'match_game':
-            expected = f"demo_match_{lesson_id}"  # Dynamic stub based on ID
+        is_correct = False
+        points = 0
+        if activity_type:
+            # Determine expected answer based on activity_type
+            expected = ''
+            if activity_type == 'trace_complete':
+                expected = (lesson['trace_word'] or '').strip().lower()
+            elif activity_type == 'spelling_complete':
+                expected = (lesson['spell_word'] or '').strip().lower()
+            elif activity_type == 'mc_choice':
+                expected = (lesson['mc_answer'] or '').strip().lower()
+            elif activity_type == 'sentence_complete':
+                expected = (lesson['sentence_answer'] or '').strip().lower()
+            elif activity_type == 'math_fill':
+                expected = (lesson['math_answer'] or '').strip().lower()
+            elif activity_type == 'match_game':
+                expected = f"demo_match_{lesson_id}"
 
-        is_correct = (response == expected)
-        points = 10 if is_correct else 0
+            is_correct = (response == expected)
+            points = 10 if is_correct else 0
 
-        # Save response to DB
-        c.execute('''INSERT INTO lesson_responses 
-                     (lesson_id, user_id, activity_type, response, is_correct, points)
-                     VALUES (?, ?, ?, ?, ?, ?)''',
-                  (lesson_id, session['user_id'], activity_type, response, is_correct, points))
-        conn.commit()
+            # Save response to DB
+            c.execute('''INSERT INTO lesson_responses 
+                         (lesson_id, user_id, activity_type, response, is_correct, points)
+                         VALUES (?, ?, ?, ?, ?, ?)''',
+                      (lesson_id, user_id, activity_type, response, is_correct, points))
+            conn.commit()
 
-        logger.info(f"Lesson {lesson_id} activity {activity_type} for user {session['user_id']}: {'Correct' if is_correct else 'Incorrect'} (response: {response} (type: {type(response)}), expected: {expected} (type: {type(expected)}))")
+            logger.info(f"Lesson {lesson_id} activity {activity_type} for user {user_id}: {'Correct' if is_correct else 'Incorrect'} (response: {response} (type: {type(response)}), expected: {expected} (type: {type(expected)}))")
 
         if complete_lesson:
-            # Mark lesson as completed and award bonus points
-            total_points = 50  # Base completion points; adjust as needed
-            c.execute('UPDATE lessons SET completed = 1 WHERE id = ?', (lesson_id,))
-            c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (total_points, session['user_id']))
-            conn.commit()
-            points += total_points  # Add to response points
-            logger.info(f"Completed lesson {lesson_id} for user {session['user_id']}, awarded {total_points} coins")
+            # Mark assignment as completed and award bonus points
+            c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", (user_id, lesson_id))
+            if c.rowcount > 0:
+                total_points = 50
+                c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (total_points, user_id))
+                conn.commit()
+                points += total_points
+                logger.info(f"Completed lesson {lesson_id} for user {user_id}, awarded {total_points} coins")
+            else:
+                logger.warning(f"No rows updated for complete lesson {lesson_id} user {user_id}")
 
         return jsonify({
             'success': True,
@@ -98,21 +109,22 @@ def complete_lesson(lesson_id):
         flash('Login required', 'error')
         return redirect(url_for('lessons'))
 
+    user_id = session['user_id']
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute('UPDATE lessons SET completed = 1 WHERE id = ? AND user_id = ?', 
-                  (lesson_id, session['user_id']))
+        c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
+                  (user_id, lesson_id))
         if c.rowcount == 0:
             flash('Lesson not found or already completed', 'error')
             return redirect(url_for('lessons'))
 
         # Award points
         points = 50
-        c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (points, session['user_id']))
+        c.execute('UPDATE users SET star_coins = star_coins + ? WHERE id = ?', (points, user_id))
         conn.commit()
         flash(f'Lesson completed! +{points} star coins', 'success')
-        logger.info(f"Manually completed lesson {lesson_id} for user {session['user_id']}")
+        logger.info(f"Manually completed lesson {lesson_id} for user {user_id}")
         return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Complete lesson failed: {str(e)}")
@@ -126,20 +138,21 @@ def reset_lesson(lesson_id):
         flash('Login required', 'error')
         return redirect(url_for('lessons'))
 
+    user_id = session['user_id']
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute('UPDATE lessons SET completed = 0 WHERE id = ? AND user_id = ?', 
-                  (lesson_id, session['user_id']))
+        c.execute('UPDATE lessons_users SET completed = 0 WHERE user_id = ? AND lesson_id = ?', 
+                  (user_id, lesson_id))
         if c.rowcount == 0:
             flash('Lesson not found', 'error')
             return redirect(url_for('lessons'))
 
         # Reset responses
-        c.execute('DELETE FROM lesson_responses WHERE lesson_id = ?', (lesson_id,))
+        c.execute('DELETE FROM lesson_responses WHERE user_id = ? AND lesson_id = ?', (user_id, lesson_id))
         conn.commit()
         flash('Lesson reset successfully', 'success')
-        logger.info(f"Reset lesson {lesson_id} for user {session['user_id']}")
+        logger.info(f"Reset lesson {lesson_id} for user {user_id}")
         return redirect(url_for('lessons'))
     except Exception as e:
         logger.error(f"Reset lesson failed: {str(e)}")
@@ -156,9 +169,42 @@ def lessons():
         conn = get_db()
         c = conn.cursor()
         grade = session.get('grade', 1)
-        c.execute('SELECT * FROM lessons WHERE user_id = ? AND grade = ? ORDER BY id DESC', 
-                  (session['user_id'], grade))
-        lessons_list = c.fetchall()
+        c.execute("""
+            SELECT l.* FROM lessons l 
+            JOIN lessons_users lu ON l.id = lu.lesson_id 
+            WHERE lu.user_id = ? AND l.grade = ? 
+            ORDER BY lu.assigned_at DESC
+        """, (session['user_id'], grade))
+        raw_lessons = c.fetchall()
+        lessons_list = [dict(r) for r in raw_lessons]
+        for l in lessons_list:
+            if l.get('mc_options'):
+                l['mc_options'] = json.loads(l['mc_options'])
+        # Auto-assign if none
+        if not lessons_list:
+            c.execute("""
+                SELECT l.id FROM lessons l 
+                WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
+                AND l.grade = ? 
+                ORDER BY RANDOM() LIMIT 3
+            """, (session['user_id'], grade))
+            avail_ids = [row['id'] for row in c.fetchall()]
+            if avail_ids:
+                c.executemany("INSERT INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", 
+                              [(session['user_id'], lid) for lid in avail_ids])
+                conn.commit()
+                # Refetch
+                c.execute("""
+                    SELECT l.* FROM lessons l 
+                    JOIN lessons_users lu ON l.id = lu.lesson_id 
+                    WHERE lu.user_id = ? AND l.grade = ? 
+                    ORDER BY lu.assigned_at DESC
+                """, (session['user_id'], grade))
+                raw_lessons = c.fetchall()
+                lessons_list = [dict(r) for r in raw_lessons]
+                for l in lessons_list:
+                    if l.get('mc_options'):
+                        l['mc_options'] = json.loads(l['mc_options'])
         return render_template('lessons.html.j2', lessons=lessons_list, grade=grade)
     except Exception as e:
         logger.error(f"Fetch lessons failed: {str(e)}")
@@ -185,32 +231,48 @@ def generate_lesson():
     sentence_answer = None
 
     if subject == 'language':
-        trace_word = 'sun'
-        spell_word = 'sun'
-        sound = '/sʌn/'
-        mc_question = 'What is the correct spelling?'
-        mc_options = 'sun,son,sunne'  # Comma-separated
-        mc_answer = 'sun'
-        sentence_answer = 'mat'
-        content = f"Learn the {sound} sound with words like sun and star."
+        if grade == 1:
+            trace_word = 'cat'
+            spell_word = 'cat'
+            sound = '/kæt/'
+            mc_question = 'What is the correct spelling?'
+            mc_options = ['cat', 'kat', 'ct', 'caat']
+            mc_answer = 'cat'
+            sentence_answer = 'hat'
+            content = f"Learn the short A sound with words like cat and hat."
+        else:  # grade 2
+            trace_word = 'blue'
+            spell_word = 'blue'
+            sound = '/bluː/'
+            mc_question = 'What is the correct spelling?'
+            mc_options = ['blue', 'blu', 'bule', 'bloo']
+            mc_answer = 'blue'
+            sentence_answer = 'sky'
+            content = f"Learn the BL blend with words like blue and black."
     elif subject == 'math':
-        # Simple dynamic math: e.g., 2+4
-        a, b, op = 2, 4, '+'
-        expression = f"{a}{op}{b}"
-        content = f"What is {expression}?"
-        math_answer = str(eval(f"{a}{op}{b}"))  # Safe eval for simple ops
-        # For variety, randomize: import random; a=random.randint(1,10); etc.
+        if grade == 1:
+            a, b = 5, 3
+            content = f"What is {a} + {b}?"
+            math_answer = str(a + b)
+        else:
+            a, b = 10, 2
+            content = f"What is {a} - {b}?"
+            math_answer = str(a - b)
 
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute('''INSERT INTO lessons (user_id, grade, subject, content, trace_word, sound, spell_word, 
+        mc_options_json = json.dumps(mc_options) if mc_options else None
+        c.execute('''INSERT INTO lessons (grade, subject, content, trace_word, sound, spell_word, 
                      mc_question, mc_options, mc_answer, math_answer, sentence_answer) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (session['user_id'], grade, subject, content, trace_word, sound, spell_word,
-                   mc_question, mc_options, mc_answer, math_answer, sentence_answer))
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (grade, subject, content, trace_word, sound, spell_word,
+                   mc_question, mc_options_json, mc_answer, math_answer, sentence_answer))
         conn.commit()
         lesson_id = c.lastrowid
+        c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", 
+                  (session['user_id'], lesson_id))
+        conn.commit()
         logger.info(f"Generated lesson {lesson_id} for user {session['user_id']}")
         return jsonify({'success': True, 'lesson_id': lesson_id})
     except Exception as e:

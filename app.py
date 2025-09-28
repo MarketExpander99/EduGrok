@@ -141,8 +141,8 @@ app.add_url_rule('/comment/<int:post_id>', 'add_comment', add_comment, methods=[
 
 # Lesson routes (ensured POST for check_lesson; added logging hook)
 app.add_url_rule('/check_lesson', 'check_lesson', check_lesson, methods=['POST'])
-app.add_url_rule('/complete_lesson/<int:lesson_id>', 'complete_lesson', complete_lesson, methods=['POST'])
-app.add_url_rule('/reset_lesson/<int:lesson_id>', 'reset_lesson', reset_lesson, methods=['POST'])
+app.add_url_rule('/complete_lesson/<int:lesson_id>', 'complete_lesson', complete_lesson, methods=['GET'])
+app.add_url_rule('/reset_lesson/<int:lesson_id>', 'reset_lesson', reset_lesson, methods=['GET'])
 app.add_url_rule('/lessons', 'lessons', lessons, methods=['GET'])
 app.add_url_rule('/generate_lesson', 'generate_lesson', generate_lesson, methods=['POST'])
 

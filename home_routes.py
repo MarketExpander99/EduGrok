@@ -68,14 +68,33 @@ def home():
 
             posts.append(post)
 
-        # Fetch a random incomplete lesson (add RANDOM for variety, keep grade filter)
+        # Fetch a random incomplete lesson (with auto-assign if none)
         c.execute("""
-            SELECT id, subject, content, completed, trace_word, sound, spell_word, mc_question, mc_options, mc_answer 
-            FROM lessons 
-            WHERE (user_id IS NULL OR user_id = ?) AND grade = ? AND completed = 0 
+            SELECT l.* FROM lessons l 
+            JOIN lessons_users lu ON l.id = lu.lesson_id 
+            WHERE lu.user_id = ? AND lu.completed = 0 AND l.grade = ? 
             ORDER BY RANDOM() LIMIT 1
         """, (user_id, grade))
         lesson_result = c.fetchone()
+        if not lesson_result:
+            # Auto-assign a random unassigned lesson for the grade
+            c.execute("""
+                SELECT l.id FROM lessons l 
+                WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
+                AND l.grade = ? 
+                ORDER BY RANDOM() LIMIT 1
+            """, (user_id, grade))
+            avail = c.fetchone()
+            if avail:
+                c.execute("INSERT INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", (user_id, avail['id']))
+                conn.commit()
+                # Refetch the assigned one
+                c.execute("""
+                    SELECT l.* FROM lessons l 
+                    JOIN lessons_users lu ON l.id = lu.lesson_id 
+                    WHERE lu.user_id = ? AND lu.lesson_id = ? AND lu.completed = 0
+                """, (user_id, avail['id']))
+                lesson_result = c.fetchone()
         lesson = dict(lesson_result) if lesson_result else None
         if lesson and lesson['mc_options']:
             lesson['mc_options'] = json.loads(lesson['mc_options'])
