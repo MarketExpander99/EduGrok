@@ -1,5 +1,5 @@
 {% for post in posts %}
-    <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+    <div id="post-{{ post.id }}" class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
         <div class="flex items-center mb-3">
             <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm">
                 {{ post.handle[0] | upper if post.handle else 'U' }}
@@ -9,6 +9,12 @@
                 <p class="text-xs text-gray-400">{{ post.created_at }}</p>
             </div>
         </div>
+        {% if post.original_handle %}
+            <div class="text-gray-400 text-xs mb-2 flex items-center">
+                <span class="text-lg mr-1">🔄</span>
+                <span>Reposted from {{ post.original_handle }}</span>
+            </div>
+        {% endif %}
         <p class="text-white leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
         {% if post.media_url %}
             {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
@@ -27,7 +33,7 @@
         </div>
         <div class="flex flex-wrap gap-2 mb-3">
             <span class="bg-blue-900 text-blue-100 text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
-            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes }}</span>
+            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes or 0 }}</span>
             <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Reposts: {{ post.reposts or 0 }}</span>
         </div>
         <!-- Social Interactions Bar -->
@@ -50,7 +56,7 @@
                 </button>
             </div>
             <!-- Share Button -->
-            <button class="text-gray-400 hover:text-indigo-400 transition flex items-center space-x-1">
+            <button onclick="sharePost({{ post.id }})" class="text-gray-400 hover:text-indigo-400 transition flex items-center space-x-1">
                 <span class="text-lg">📤</span>
                 <span class="text-sm">Share</span>
             </button>
@@ -130,5 +136,21 @@ function toggleCommentsExtra(postId) {
         hiddenDiv.style.display = 'none';
         btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
     }
+}
+
+function sharePost(postId) {
+    const url = `${window.location.origin}/home#post-${postId}`;
+    navigator.clipboard.writeText(url).then(() => {
+        const btn = event.target;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>';
+        btn.style.color = '#a78bfa';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.color = '';
+        }, 2000);
+    }).catch(() => {
+        alert('Failed to copy link. Please copy manually: ' + url);
+    });
 }
 </script>

@@ -13,13 +13,11 @@
     </div>
 {% endif %}
 
-{% if lessons %}
-    {% for lesson in lessons %}
-        {% include "lesson_card.html.j2" %}
-    {% endfor %}
+{% if lesson %}
+    {% include "lesson_card.html.j2" %}
 {% else %}
     <div class="text-center py-8">
-        <p class="text-gray-600 text-lg">No incomplete lessons right now. <a href="{{ url_for('lessons') }}" class="text-orange-500 hover:underline">Check the Lessons page for more!</a></p>
+        <p class="text-gray-600 text-lg">No lessons available. Try generating a new one!</p>
     </div>
 {% endif %}
 
