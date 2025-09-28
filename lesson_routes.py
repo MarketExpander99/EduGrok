@@ -160,32 +160,6 @@ def reset_lesson(lesson_id):
             conn.rollback()
         flash('Server error', 'error')
         return redirect(url_for('lessons'))
-    if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('lessons'))
-
-    user_id = session['user_id']
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute('UPDATE lessons_users SET completed = 0 WHERE user_id = ? AND lesson_id = ?', 
-                  (user_id, lesson_id))
-        if c.rowcount == 0:
-            flash('Lesson not found', 'error')
-            return redirect(url_for('lessons'))
-
-        # Reset responses
-        c.execute('DELETE FROM lesson_responses WHERE user_id = ? AND lesson_id = ?', (user_id, lesson_id))
-        conn.commit()
-        flash('Lesson reset successfully', 'success')
-        logger.info(f"Reset lesson {lesson_id} for user {user_id}")
-        return redirect(url_for('lessons'))
-    except Exception as e:
-        logger.error(f"Reset lesson failed: {str(e)}")
-        if conn:
-            conn.rollback()
-        flash('Server error', 'error')
-        return redirect(url_for('lessons'))
 
 def lessons():
     if 'user_id' not in session:
@@ -233,116 +207,45 @@ def lessons():
         logger.error(f"Fetch lessons failed: {str(e)}")
         flash('Server error', 'error')
         return redirect(url_for('home'))
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        grade = session.get('grade', 1)
-        user_id = session['user_id']
-
-        # Fetch ALL lessons for grade, LEFT JOIN to get completed status (NULL if unassigned)
-        c.execute("""
-            SELECT l.*, lu.completed 
-            FROM lessons l 
-            LEFT JOIN lessons_users lu ON (l.id = lu.lesson_id AND lu.user_id = ?)
-            WHERE l.grade = ?
-            ORDER BY l.id ASC
-        """, (user_id, grade))
-        raw_lessons = c.fetchall()
-        lessons_list = []
-        unassigned_ids = []
-
-        for r in raw_lessons:
-            lesson_dict = dict(r)
-            if lesson_dict.get('mc_options'):
-                lesson_dict['mc_options'] = json.loads(lesson_dict['mc_options'])
-            # Treat NULL completed as 0 (incomplete/unassigned)
-            lesson_dict['completed'] = lesson_dict['completed'] or 0
-            lessons_list.append(lesson_dict)
-            if lesson_dict['completed'] == 0:
-                unassigned_ids.append(lesson_dict['id'])
-
-        # Auto-assign any unassigned ones (all at once, no limit)
-        if unassigned_ids:
-            c.executemany("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, completed) VALUES (?, ?, 0)", 
-                          [(user_id, lid) for lid in unassigned_ids])
-            conn.commit()
-            logger.info(f"Auto-assigned {len(unassigned_ids)} lessons for user {user_id} in grade {grade}")
-
-        return render_template('lessons.html.j2', lessons=lessons_list, grade=grade)
-    except Exception as e:
-        logger.error(f"Fetch lessons failed: {str(e)}")
-        flash('Server error', 'error')
-        return redirect(url_for('home'))
 
 def generate_lesson():
+    # Placeholder for generating lessons (if needed)
+    pass
+
+def schedule_lessons():
     if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'Login required'}), 401
-
-    data = request.json
-    subject = data.get('subject', 'language')
+        flash('Login required', 'error')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
     grade = session.get('grade', 1)
-
-    # Simple generation logic; in production, use AI or predefined
-    trace_word = None
-    spell_word = None
-    sound = None
-    mc_question = None
-    mc_options = None
-    mc_answer = None
-    content = ''
-    math_answer = None
-    sentence_answer = None
-
-    if subject == 'language':
-        if grade == 1:
-            trace_word = 'cat'
-            spell_word = 'cat'
-            sound = '/kæt/'
-            mc_question = 'What is the correct spelling?'
-            mc_options = ['cat', 'kat', 'ct', 'caat']
-            mc_answer = 'cat'
-            sentence_answer = 'mat'  # Fixed: Set to 'mat' to match template
-            content = f"Learn the short A sound with words like cat and hat."
-        else:  # grade 2
-            trace_word = 'blue'
-            spell_word = 'blue'
-            sound = '/bluː/'
-            mc_question = 'What is the correct spelling?'
-            mc_options = ['blue', 'blu', 'bule', 'bloo']
-            mc_answer = 'blue'
-            sentence_answer = 'sky'
-            content = f"Learn the BL blend with words like blue and black."
-    elif subject == 'math':
-        if grade == 1:
-            a, b = 5, 3
-            content = f"What is {a} + {b}?"
-            math_answer = str(a + b)
-        else:
-            a, b = 10, 2
-            content = f"What is {a} - {b}?"
-            math_answer = str(a - b)
-
     try:
         conn = get_db()
         c = conn.cursor()
-        mc_options_json = json.dumps(mc_options) if mc_options else None
-        c.execute('''INSERT INTO lessons (grade, subject, content, trace_word, sound, spell_word, 
-                     mc_question, mc_options, mc_answer, math_answer, sentence_answer) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (grade, subject, content, trace_word, sound, spell_word,
-                   mc_question, mc_options_json, mc_answer, math_answer, sentence_answer))
-        conn.commit()
-        lesson_id = c.lastrowid
-        c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", 
-                  (session['user_id'], lesson_id))
-        conn.commit()
-        logger.info(f"Generated lesson {lesson_id} for user {session['user_id']}")
-        return jsonify({'success': True, 'lesson_id': lesson_id})
+        
+        # Fetch up to 3 random unassigned lessons for the grade
+        c.execute("""
+            SELECT l.id FROM lessons l 
+            WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
+            AND l.grade = ? 
+            ORDER BY RANDOM() LIMIT 3
+        """, (user_id, grade))
+        avail_ids = [row['id'] for row in c.fetchall()]
+        
+        if avail_ids:
+            c.executemany("INSERT INTO lessons_users (user_id, lesson_id, completed) VALUES (?, ?, 0)", 
+                          [(user_id, lid) for lid in avail_ids])
+            conn.commit()
+            flash(f'Scheduled {len(avail_ids)} new lessons to your feed!', 'success')
+            logger.info(f"Scheduled {len(avail_ids)} lessons for user {user_id}")
+        else:
+            flash('No more lessons available for your grade. Check back later!', 'info')
+            logger.info(f"No available lessons to schedule for user {user_id}, grade {grade}")
+        
+        return redirect(url_for('home'))
     except Exception as e:
-        logger.error(f"Generate lesson failed: {str(e)}")
+        logger.error(f"Schedule lessons failed: {str(e)}")
         if conn:
             conn.rollback()
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        flash('Server error while scheduling lessons', 'error')
+        return redirect(url_for('home'))

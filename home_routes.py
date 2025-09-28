@@ -68,7 +68,7 @@ def home():
 
             posts.append(post)
 
-        # Fetch ALL incomplete lessons for grade (with auto-assign if none)
+        # Fetch incomplete lessons for grade (no auto-assign; handle empty in template)
         c.execute("""
             SELECT l.* FROM lessons l 
             JOIN lessons_users lu ON l.id = lu.lesson_id 
@@ -81,33 +81,6 @@ def home():
             if l.get('mc_options'):
                 l['mc_options'] = json.loads(l['mc_options'])
         
-        if not lessons:
-            # Auto-assign up to 3 random unassigned if none incomplete
-            c.execute("""
-                SELECT l.id FROM lessons l 
-                WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
-                AND l.grade = ? 
-                ORDER BY RANDOM() LIMIT 3
-            """, (user_id, grade))
-            avail_ids = [row['id'] for row in c.fetchall()]
-            if avail_ids:
-                c.executemany("INSERT INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", 
-                              [(user_id, lid) for lid in avail_ids])
-                conn.commit()
-                # Refetch incompletes
-                c.execute("""
-                    SELECT l.* FROM lessons l 
-                    JOIN lessons_users lu ON l.id = lu.lesson_id 
-                    WHERE lu.user_id = ? AND lu.completed = 0 AND l.grade = ? 
-                    ORDER BY lu.assigned_at DESC
-                """, (user_id, grade))
-                lessons_result = c.fetchall()
-                lessons = [dict(r) for r in lessons_result]
-                for l in lessons:
-                    if l.get('mc_options'):
-                        l['mc_options'] = json.loads(l['mc_options'])
-                logger.info(f"Auto-assigned {len(avail_ids)} lessons to home feed for user {user_id}")
-
         # Fetch test
         c.execute("""
             SELECT id, grade, score, date 
@@ -127,7 +100,7 @@ def home():
         return render_template('home.html.j2', 
                             posts=posts, 
                             comments=comments,
-                            lessons=lessons,  # Changed: plural list
+                            lessons=lessons,  # Changed: plural list, no auto-assign
                             test=test, 
                             subscribed=subscribed, 
                             theme=session.get('theme', 'astronaut'), 
