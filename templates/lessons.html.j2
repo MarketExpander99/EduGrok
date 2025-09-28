@@ -22,8 +22,8 @@
                     <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition inline-flex items-center text-sm">
                         Do Again
                     </a>
-                    <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
-                        Complete Lesson
+                    <a href="{{ url_for('home') }}?lesson_id={{ lesson.id }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
+                        Start Lesson
                     </a>
                 {% endif %}
             </div>

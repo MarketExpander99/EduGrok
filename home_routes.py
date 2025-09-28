@@ -68,36 +68,45 @@ def home():
 
             posts.append(post)
 
-        # Fetch a random incomplete lesson (with auto-assign if none)
+        # Fetch ALL incomplete lessons for grade (with auto-assign if none)
         c.execute("""
             SELECT l.* FROM lessons l 
             JOIN lessons_users lu ON l.id = lu.lesson_id 
             WHERE lu.user_id = ? AND lu.completed = 0 AND l.grade = ? 
-            ORDER BY RANDOM() LIMIT 1
+            ORDER BY lu.assigned_at DESC
         """, (user_id, grade))
-        lesson_result = c.fetchone()
-        if not lesson_result:
-            # Auto-assign a random unassigned lesson for the grade
+        lessons_result = c.fetchall()
+        lessons = [dict(r) for r in lessons_result]
+        for l in lessons:
+            if l.get('mc_options'):
+                l['mc_options'] = json.loads(l['mc_options'])
+        
+        if not lessons:
+            # Auto-assign up to 3 random unassigned if none incomplete
             c.execute("""
                 SELECT l.id FROM lessons l 
                 WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
                 AND l.grade = ? 
-                ORDER BY RANDOM() LIMIT 1
+                ORDER BY RANDOM() LIMIT 3
             """, (user_id, grade))
-            avail = c.fetchone()
-            if avail:
-                c.execute("INSERT INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", (user_id, avail['id']))
+            avail_ids = [row['id'] for row in c.fetchall()]
+            if avail_ids:
+                c.executemany("INSERT INTO lessons_users (user_id, lesson_id) VALUES (?, ?)", 
+                              [(user_id, lid) for lid in avail_ids])
                 conn.commit()
-                # Refetch the assigned one
+                # Refetch incompletes
                 c.execute("""
                     SELECT l.* FROM lessons l 
                     JOIN lessons_users lu ON l.id = lu.lesson_id 
-                    WHERE lu.user_id = ? AND lu.lesson_id = ? AND lu.completed = 0
-                """, (user_id, avail['id']))
-                lesson_result = c.fetchone()
-        lesson = dict(lesson_result) if lesson_result else None
-        if lesson and lesson['mc_options']:
-            lesson['mc_options'] = json.loads(lesson['mc_options'])
+                    WHERE lu.user_id = ? AND lu.completed = 0 AND l.grade = ? 
+                    ORDER BY lu.assigned_at DESC
+                """, (user_id, grade))
+                lessons_result = c.fetchall()
+                lessons = [dict(r) for r in lessons_result]
+                for l in lessons:
+                    if l.get('mc_options'):
+                        l['mc_options'] = json.loads(l['mc_options'])
+                logger.info(f"Auto-assigned {len(avail_ids)} lessons to home feed for user {user_id}")
 
         # Fetch test
         c.execute("""
@@ -114,11 +123,11 @@ def home():
         result = c.fetchone()
         subscribed = result['subscribed'] if result else 0
 
-        logger.info(f"User {user_id} accessed home with {len(posts)} posts")
+        logger.info(f"User {user_id} accessed home with {len(posts)} posts and {len(lessons)} incomplete lessons")
         return render_template('home.html.j2', 
                             posts=posts, 
                             comments=comments,
-                            lesson=lesson, 
+                            lessons=lessons,  # Changed: plural list
                             test=test, 
                             subscribed=subscribed, 
                             theme=session.get('theme', 'astronaut'), 

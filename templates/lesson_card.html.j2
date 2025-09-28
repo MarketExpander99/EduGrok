@@ -78,10 +78,11 @@
 
 <script>
 // Lesson-specific JS (math/language checks, complete lesson)
+// Changed: Set complete_lesson: false for individual checks to avoid premature completion
 function checkMath() {
     const inputValue = document.getElementById('math-input-{{ lesson.id }}').value.trim();
     if (!inputValue) { alert('Please enter an answer.'); return; }
-    const answer = parseFloat(inputValue.toLowerCase()) || 0;  // Parse to number; fallback to 0 if invalid
+    const answer = parseFloat(inputValue) || 0;
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -89,13 +90,13 @@ function checkMath() {
             lesson_id: {{ lesson.id }},
             activity_type: 'math_fill',
             response: answer,
-            complete_lesson: true
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
+        if (data.success && data.is_correct) {
             alert('Correct! +' + data.points + ' points');
         } else {
-            alert('Try again!');
+            alert(data.message || 'Try again!');
         }
     }).catch(err => console.error('Error:', err));
 }
@@ -108,10 +109,14 @@ function submitMatch(lessonId) {
             lesson_id: lessonId,
             activity_type: 'match_game',
             response: 'demo_match',
-            complete_lesson: true
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        alert(data.is_correct ? 'Great match! +' + data.points + ' points' : 'Keep trying!');
+        if (data.success && data.is_correct) {
+            alert('Great match! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Keep trying!');
+        }
     }).catch(err => console.error('Error:', err));
 }
 
@@ -125,13 +130,13 @@ function checkTrace(lessonId) {
             lesson_id: lessonId,
             activity_type: 'trace_complete',
             response: input,
-            complete_lesson: true  // Added for consistency
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
+        if (data.success && data.is_correct) {
             alert('Correct! Great job tracing the word. +' + data.points + ' points');
         } else {
-            alert('Try again! Make sure to type the word exactly as shown.');
+            alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
         }
     }).catch(err => console.error('Error:', err));
 }
@@ -146,13 +151,13 @@ function checkSpelling(lessonId) {
             lesson_id: lessonId,
             activity_type: 'spelling_complete',
             response: input,
-            complete_lesson: true  // Added for consistency
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
+        if (data.success && data.is_correct) {
             alert('Correct! You spelled the word correctly. +' + data.points + ' points');
         } else {
-            alert('Try again! Check the spelling carefully.');
+            alert(data.message || 'Try again! Check the spelling carefully.');
         }
     }).catch(err => console.error('Error:', err));
 }
@@ -171,13 +176,13 @@ function checkMultipleChoice(lessonId) {
             lesson_id: lessonId,
             activity_type: 'mc_choice',
             response: answer,
-            complete_lesson: true
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
+        if (data.success && data.is_correct) {
             alert('Correct! You chose the right answer. +' + data.points + ' points');
         } else {
-            alert('Incorrect. Try again!');
+            alert(data.message || 'Incorrect. Try again!');
         }
     }).catch(err => console.error('Error:', err));
 }
@@ -191,13 +196,13 @@ function checkSentence(lessonId) {
             lesson_id: lessonId,
             activity_type: 'sentence_complete',
             response: answer,
-            complete_lesson: true
+            complete_lesson: false  // Changed to false
         })
     }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
+        if (data.success && data.is_correct) {
             alert('Perfect! +' + data.points + ' points');
         } else {
-            alert('Try again!');
+            alert(data.message || 'Try again!');
         }
     }).catch(err => console.error('Error:', err));
 }
@@ -211,9 +216,13 @@ function completeLesson(lessonId) {
             complete_lesson: true
         })
     }).then(res => res.json()).then(data => {
-        alert('Lesson completed! Check your points.');
-        // Optionally reload page or update UI
-        location.reload();
+        if (data.success) {
+            alert('Lesson completed! Check your points.');
+            // Optionally reload page or update UI
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to complete lesson.');
+        }
     }).catch(err => console.error('Error:', err));
 }
 </script>
