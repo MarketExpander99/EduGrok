@@ -1,37 +1,45 @@
+<!-- lessons.html.j2 -->
 {% extends "base.html.j2" %}
 
 {% block content %}
-<div class="max-w-lg mx-auto mb-6">
-    <h2 class="text-2xl font-semibold mb-6 text-gray-800">Lessons (Grade {{ grade }})</h2>
+<div class="container mx-auto p-4 max-w-4xl">
+    <h1 class="text-3xl font-bold text-white mb-6 text-center">Lessons (Grade {{ grade }}) 📚</h1>
+    
+    {% if lessons %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for lesson in lessons %}
+            <div id="lesson-{{ lesson.id }}" class="lesson-card bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200">
+                <h3 class="text-xl font-semibold text-white mb-2">Lesson {{ lesson.id }}: {{ lesson.title or 'Untitled' }}</h3>
+                <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
+                {% if lesson.completed %}
+                    <div class="flex justify-between">
+                        <span class="text-green-400 text-sm">✅ Completed</span>
+                        <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold transition">Do Again</a>
+                    </div>
+                {% else %}
+                    <div class="flex justify-end">
+                        <a href="{{ url_for('check_lesson') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md font-semibold transition" onclick="startLesson({{ lesson.id }})">Start Lesson</a>
+                    </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-8 bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
+            <h3 class="text-xl font-semibold text-white mb-2">No Lessons Available for Your Grade</h3>
+            <p class="text-gray-300 mb-4">Try generating a new one or check back later!</p>
+            <a href="{{ url_for('generate_lesson') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold transition duration-200 inline-block">
+                Generate Lesson
+            </a>
+        </div>
+    {% endif %}
 </div>
 
-{% if lessons %}
-    {% for lesson in lessons %}
-        <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-            <div class="flex justify-between items-start mb-3">
-                <h3 class="text-lg font-semibold text-orange-100">{{ lesson.subject }}</h3>
-                {% if lesson.completed %}
-                    <span class="bg-green-500 text-white px-2 py-1 rounded-full text-xs flex items-center">
-                        <i class="fas fa-check mr-1"></i>Completed
-                    </span>
-                {% endif %}
-            </div>
-            <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
-            <div class="flex justify-end space-x-3">
-                {% if not lesson.completed %}
-                    <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition inline-flex items-center text-sm">
-                        Do Again
-                    </a>
-                    <a href="{{ url_for('home') }}?lesson_id={{ lesson.id }}" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
-                        Start Lesson
-                    </a>
-                {% endif %}
-            </div>
-        </div>
-    {% endfor %}
-{% else %}
-    <div class="text-center py-8 max-w-lg mx-auto">
-        <p class="text-gray-600 text-lg">No lessons available for your grade. Try generating a new one!</p>
-    </div>
-{% endif %}
+<script>
+function startLesson(lessonId) {
+    // Optional: Set lesson ID in session or localStorage for lesson page
+    sessionStorage.setItem('active_lesson', lessonId);
+    // Redirect or load lesson content here if needed
+}
+</script>
 {% endblock %}

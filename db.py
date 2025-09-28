@@ -81,7 +81,7 @@ def reset_db():
     try:
         drops = [
             "feedback", "badges", "user_points", "post_likes", "reposts", "comments",
-            "games", "tests", "lesson_responses", "lessons", "posts", "users"
+            "games", "tests", "lesson_responses", "lessons_users", "lessons", "posts", "users"
         ]
         for table in drops:
             c.execute(f"DROP TABLE IF EXISTS {table}")
@@ -143,6 +143,11 @@ def init_db():
         post1_id, post2_id, post3_id, post4_id, post5_id = seed_social_posts(c, skykidz_id, grokedu_id)
         if post1_id and post2_id and post3_id and post4_id and post5_id:
             seed_social_comments(c, skykidz_id, grokedu_id, post1_id, post2_id, post3_id, post4_id, post5_id)
+        
+        # FIXED: Seed lessons on init (not just reset)
+        seed_lessons(conn)
+        logger.info("Lessons seeded on init")
+        print("Lessons seeded on init")
         
         conn.commit()
         logger.info("Tables created/updated")

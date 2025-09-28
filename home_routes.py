@@ -68,7 +68,7 @@ def home():
 
             posts.append(post)
 
-        # Fetch incomplete lessons for grade (no auto-assign; handle empty in template)
+        # Fetch incomplete lessons for grade (now with assigned_at for ordering; no auto-assign)
         c.execute("""
             SELECT l.* FROM lessons l 
             JOIN lessons_users lu ON l.id = lu.lesson_id 
@@ -100,7 +100,7 @@ def home():
         return render_template('home.html.j2', 
                             posts=posts, 
                             comments=comments,
-                            lessons=lessons,  # Changed: plural list, no auto-assign
+                            lessons=lessons,  # Plural list, now fetches correctly
                             test=test, 
                             subscribed=subscribed, 
                             theme=session.get('theme', 'astronaut'), 

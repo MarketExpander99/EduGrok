@@ -1,8 +1,12 @@
+<!-- home.html.j2 -->
 {% extends "base.html.j2" %}
 
 {% block content %}
+
+{% include "post_form.html.j2" %}
+
 <div class="container mx-auto p-4 max-w-4xl">
-    <h1 class="text-3xl font-bold text-white mb-6 text-center">Welcome, {{ session.handle }}! 🚀</h1>
+    <h1 class="text-3xl font-bold text-white mb-6 text-center">Welcome, {{ handle }}! 🚀</h1>
     
     <!-- Lessons Section -->
     <div class="lessons-section mb-8">
@@ -10,27 +14,29 @@
             <span class="mr-2">📚</span>
             Your Lessons
         </h2>
-        {% for lesson in lessons %}
-        <div class="lesson-card bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-4 max-w-lg mx-auto">
-            <h3 class="text-xl font-semibold text-white mb-2">Lesson {{ lesson.id }}: {{ lesson.title or 'Untitled' }}</h3>
-            <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
-            <div class="flex justify-end">
-                <a href="{{ url_for('lessons') }}#lesson-{{ lesson.id }}" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md font-semibold transition">Do Lesson</a>
+        {% if lessons %}
+            {% for lesson in lessons %}
+            <div id="lesson-{{ lesson.id }}" class="lesson-card bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-4 max-w-lg mx-auto">
+                <h3 class="text-xl font-semibold text-white mb-2">Lesson {{ lesson.id }}: {{ lesson.title or 'Untitled' }}</h3>
+                <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
+                <div class="flex justify-end space-x-2">
+                    <a href="{{ url_for('lessons') }}#lesson-{{ lesson.id }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition">Do Lesson</a>
+                    <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-semibold transition">Do Again</a>
+                </div>
             </div>
-        </div>
-        {% endfor %}
-        {% if not lessons %}
-        <div class="lesson-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-200 text-center max-w-lg mx-auto">
-            <h3 class="text-xl font-semibold text-white mb-2">No Lessons Scheduled Yet</h3>
-            <p class="text-gray-300 mb-4">Ready to dive into learning? Schedule some fun lessons tailored to Grade {{ session.grade }}!</p>
-            <form method="POST" action="{{ url_for('schedule_lessons') }}" style="display: inline;">
-                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold transition duration-200 flex items-center mx-auto">
-                    <span class="mr-2">📅</span>
-                    Schedule Lessons
-                </button>
-            </form>
-            <p class="text-sm text-gray-400 mt-4">Click to add up to 3 new lessons to your feed.</p>
-        </div>
+            {% endfor %}
+        {% else %}
+            <div class="lesson-card bg-gray-800 p-6 rounded-xl shadow-lg border border-blue-200 text-center max-w-lg mx-auto">
+                <h3 class="text-xl font-semibold text-white mb-2">No Lessons Scheduled Yet</h3>
+                <p class="text-gray-300 mb-4">Ready to dive into learning? Schedule some fun lessons tailored to Grade {{ grade }}!</p>
+                <form method="POST" action="{{ url_for('schedule_lessons') }}" style="display: inline;">
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold transition duration-200 flex items-center mx-auto">
+                        <span class="mr-2">📅</span>
+                        Schedule Lessons
+                    </button>
+                </form>
+                <p class="text-sm text-gray-400 mt-4">Click to add up to 3 new lessons to your feed.</p>
+            </div>
         {% endif %}
     </div>
 
@@ -40,11 +46,20 @@
             <span class="mr-2">💬</span>
             Community Feed
         </h2>
-        {% include 'posts.html.j2' %}
+        {% if posts %}
+            {% include "posts.html.j2" %}
+        {% else %}
+            <div class="text-center py-8 bg-black p-5 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
+                <p class="text-gray-600 text-lg">No posts available yet. Be the first to share!</p>
+            </div>
+        {% endif %}
     </div>
 
+    <!-- Game Card -->
+    {% include "game_card.html.j2" %}
+
     <!-- Recent Test -->
-    {% include 'recent_test.html.j2' %}
+    {% include "recent_test.html.j2" %}
 
     {% if subscribed %}
     <div class="bg-green-900 p-4 rounded-xl border border-green-500 text-center mb-6">
@@ -52,4 +67,87 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Shared JS for post form (modal toggle, media preview, char count) - kept in home for global access
+document.addEventListener('DOMContentLoaded', function() {
+    const openButton = document.getElementById('open-post-form');
+    const closeButton = document.getElementById('close-post-form');
+    const cancelButton = document.getElementById('cancel-post');
+    const postForm = document.getElementById('post-form');
+    const backdrop = document.getElementById('post-form-backdrop');
+
+    if (!openButton || !postForm || !backdrop) {
+        console.error('Required elements not found for post form toggle');
+        return;
+    }
+
+    openButton.addEventListener('click', function() {
+        postForm.classList.remove('hidden');
+        backdrop.classList.remove('hidden');
+        setTimeout(() => {
+            postForm.classList.remove('scale-95');
+            postForm.classList.add('scale-100');
+        }, 10);
+    });
+
+    function closePostForm() {
+        postForm.classList.add('scale-95');
+        setTimeout(() => {
+            postForm.classList.remove('scale-100');
+            postForm.classList.add('hidden');
+            backdrop.classList.add('hidden');
+        }, 200);
+    }
+
+    closeButton.addEventListener('click', closePostForm);
+    if (cancelButton) {
+        cancelButton.addEventListener('click', closePostForm);
+    }
+    backdrop.addEventListener('click', function(e) {
+        if (e.target === backdrop) {
+            closePostForm();
+        }
+    });
+
+    // Media preview
+    const mediaUpload = document.getElementById('media-upload');
+    if (mediaUpload) {
+        mediaUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const preview = document.getElementById('media-preview');
+            preview.innerHTML = ''; // Clear previous preview
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '300px';
+                img.style.objectFit = 'contain';
+                img.style.borderRadius = '8px';
+                preview.appendChild(img);
+            } else if (file.type === 'video/mp4') {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                video.style.maxHeight = '300px';
+                video.style.objectFit = 'contain';
+                video.style.borderRadius = '8px';
+                preview.appendChild(video);
+            }
+        });
+    }
+
+    // Character count
+    const postContent = document.getElementById('post-content');
+    if (postContent) {
+        postContent.addEventListener('input', function() {
+            const count = this.value.length;
+            document.getElementById('char-count').textContent = `${count}/280`;
+        });
+    }
+});
+</script>
+
 {% endblock %}
