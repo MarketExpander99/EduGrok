@@ -1,4 +1,3 @@
-# lessons.html.j2
 {% extends "base.html.j2" %}
 {% block title %}Lessons - EduGrok{% endblock %}
 {% block content %}
@@ -24,34 +23,46 @@
     {% endif %}
 </div>
 <script>
-    function addToFeed(lessonId) {
-        fetch('/add_to_feed', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({lesson_id: lessonId})
-        })
-        .then(response => response.json())
-        .then(data => {
+    async function handleFetch(fetchPromise, successMsg, errorMsg) {
+        try {
+            const response = await fetchPromise;
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Fetch error:', errorText);
+                alert(errorMsg || 'Request failed: ' + response.status);
+                return;
+            }
+            const data = await response.json();
             if (data.success) {
+                if (successMsg) alert(successMsg);
                 location.reload();
             } else {
-                alert('Failed to add lesson');
+                alert(data.error || errorMsg || 'Operation failed');
             }
-        })
-        .catch(error => console.error('Error:', error));
+        } catch (error) {
+            console.error('Fetch error:', error);
+            alert('Network error or invalid response. Please try again.');
+        }
+    }
+
+    function addToFeed(lessonId) {
+        handleFetch(
+            fetch('/add_to_feed', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lesson_id: lessonId})
+            }),
+            'Lesson added to feed!',
+            'Failed to add lesson'
+        );
     }
 
     function generateLesson() {
-        fetch('/generate_lesson', {method: 'POST'})
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Failed to generate lesson');
-            }
-        })
-        .catch(error => console.error('Error:', error));
+        handleFetch(
+            fetch('/generate_lesson', {method: 'POST'}),
+            'Lesson generated!',
+            'Failed to generate lesson'
+        );
     }
 </script>
 {% endblock %}
