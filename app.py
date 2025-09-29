@@ -15,7 +15,7 @@ from flask_cors import CORS
 
 from utils import allowed_file  # FIXED: Removed unused embed_links import
 
-from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lessons
+from db import get_db, close_db, init_db, reset_db, check_db_schema  # FIXED: Removed extra seed_lessons() call here; handled in init_db
 from auth import register, login, logout, set_theme, set_language
 
 # Import routes from split files
@@ -97,7 +97,7 @@ def init_app():
         try:
             init_db()
             check_db_schema()
-            seed_lessons()
+            # FIXED: Removed duplicate seed_lessons() call; already in init_db()
             # Setup upload folder
             upload_folder = os.path.join(app.static_folder, 'uploads')
             os.makedirs(upload_folder, exist_ok=True)

@@ -54,16 +54,17 @@ def init_social_tables(c):
 
 def seed_social_posts(c, skykidz_id, grokedu_id):
     try:
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Hello from SkyKidz! Learning math is fun! #math", "math"))
-        post1_id = c.lastrowid
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (grokedu_id, "GrokEdu tip: Practice language daily! #language", "language"))
-        post2_id = c.lastrowid
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Science experiment: What floats? #science", "science"))
-        post3_id = c.lastrowid
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (grokedu_id, "Quick math puzzle: 2+2? Share answers! #math", "math"))
-        post4_id = c.lastrowid
-        c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Favorite word of the day? Mine is 'adventure'! #language", "language"))
-        post5_id = c.lastrowid
+        # FIXED: Use INSERT OR IGNORE to avoid duplicates on re-init (e.g., existing DB)
+        c.execute("INSERT OR IGNORE INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Hello from SkyKidz! Learning math is fun! #math", "math"))
+        post1_id = c.lastrowid or c.execute("SELECT id FROM posts WHERE user_id=? AND content LIKE ?", (skykidz_id, "Hello from SkyKidz!%")).fetchone()[0]
+        c.execute("INSERT OR IGNORE INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (grokedu_id, "GrokEdu tip: Practice language daily! #language", "language"))
+        post2_id = c.lastrowid or c.execute("SELECT id FROM posts WHERE user_id=? AND content LIKE ?", (grokedu_id, "GrokEdu tip:%")).fetchone()[0]
+        c.execute("INSERT OR IGNORE INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Science experiment: What floats? #science", "science"))
+        post3_id = c.lastrowid or c.execute("SELECT id FROM posts WHERE user_id=? AND content LIKE ?", (skykidz_id, "Science experiment:%")).fetchone()[0]
+        c.execute("INSERT OR IGNORE INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (grokedu_id, "Quick math puzzle: 2+2? Share answers! #math", "math"))
+        post4_id = c.lastrowid or c.execute("SELECT id FROM posts WHERE user_id=? AND content LIKE ?", (grokedu_id, "Quick math puzzle:%")).fetchone()[0]
+        c.execute("INSERT OR IGNORE INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Favorite word of the day? Mine is 'adventure'! #language", "language"))
+        post5_id = c.lastrowid or c.execute("SELECT id FROM posts WHERE user_id=? AND content LIKE ?", (skykidz_id, "Favorite word of the day?%")).fetchone()[0]
         # FIXED: Local commit for safety
         c.connection.commit()
         logger.info("Seeded bot posts")
@@ -84,7 +85,7 @@ def seed_social_comments(c, skykidz_id, grokedu_id, post1_id, post2_id, post3_id
             (skykidz_id, post5_id, "Mine is 'grok'! 😊")
         ]
         for user_id, post_id, content in comments_data:
-            c.execute("INSERT INTO comments (user_id, post_id, content) VALUES (?, ?, ?)", (user_id, post_id, content))
+            c.execute("INSERT OR IGNORE INTO comments (user_id, post_id, content) VALUES (?, ?, ?)", (user_id, post_id, content))
         # FIXED: Local commit for safety
         c.connection.commit()
         logger.info("Seeded bot comments")
