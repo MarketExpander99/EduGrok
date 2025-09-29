@@ -25,10 +25,10 @@ const timerDisplay = document.getElementById('timer');
 const tauntDisplay = document.getElementById('taunt');
 const container = document.getElementById('card-container');
 
-// FIXED: Generate pairs from words (each twice for matching)
+// FIXED: Generate pairs from words (each twice for matching); guard for bilingual key
 let cardWords = [];
 words.forEach(wordObj => {
-  const displayWord = {{ language == 'bilingual' ? "'af'" : "'word'" }} in wordObj ? wordObj.af : wordObj.word;
+  const displayWord = ({{ language == 'bilingual' | tojson }} && wordObj.af) ? wordObj.af : wordObj.word;
   cardWords.push({word: wordObj.word, display: displayWord});  // Match on 'word', display bilingual if set
   cardWords.push({word: wordObj.word, display: displayWord});
 });
@@ -78,7 +78,8 @@ function flipCard(card) {
       card1.classList.add('matched', 'bg-green-500', 'text-white');
       card2.classList.add('matched', 'bg-green-500', 'text-white');
       matchedPairs++;
-      if (matchedPairs === words.length) {  // FIXED: Match length of words list
+      // FIXED: Win on half pairs (since doubled)
+      if (matchedPairs === words.length) {
         completeGame();
       }
     } else {

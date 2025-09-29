@@ -58,11 +58,15 @@ def check_users_schema(conn):
             conn.commit()
             logger.info("Added star_coins to users table")
             print("Added star_coins to users table")
-        # Add more migrations as needed (e.g., handle if missing)
+        # FIXED: Add handle if missing, with default logic
         if 'handle' not in columns:
             c.execute("ALTER TABLE users ADD COLUMN handle TEXT")
             conn.commit()
             logger.info("Added handle to users table")
+            print("Added handle to users table")
+        # Post-add default for existing rows
+        c.execute("UPDATE users SET handle = COALESCE(handle, email) WHERE handle IS NULL")
+        conn.commit()
         logger.debug("Users schema check passed")
     except Exception as e:
         logger.error(f"Users schema check failed: {str(e)}")

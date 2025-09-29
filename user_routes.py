@@ -42,15 +42,15 @@ def profile():
 def parent_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    # Simple: Redirect to profile for now (expand for multi-kid if needed)
+    # FIXED: Simple redirect to profile for now (expand for multi-kid if needed; check sub)
     c = get_db().cursor()
     c.execute("SELECT subscribed FROM users WHERE id = ?", (session['user_id'],))
     subscribed = c.fetchone()[0] or 0
     if not subscribed:
         flash('Premium subscription required for dashboard', 'error')
         return redirect(url_for('profile'))
-    return render_template('profile.html.j2',  # Reuse or create parent_dashboard.html.j2
-                           theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    # Stub: Reuse profile or render dedicated (assuming parent_dashboard.html.j2 exists minimally)
+    return redirect(url_for('profile'))  # Or render_template('parent_dashboard.html.j2', ...)
 
 def update_points():
     if 'user_id' not in session:

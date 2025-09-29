@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 # Add CORS for dev (install via: pip install flask-cors)
 from flask_cors import CORS
 
-from utils import allowed_file, embed_links  # Import helpers from utils.py
+from utils import allowed_file  # FIXED: Removed unused embed_links import
 
 from db import get_db, close_db, init_db, reset_db, check_db_schema, seed_lessons
 from auth import register, login, logout, set_theme, set_language

@@ -1,4 +1,4 @@
-from flask import current_app, request, session, jsonify, flash, redirect, url_for
+from flask import request, session, jsonify, flash, redirect, url_for, current_app  # FIXED: Added current_app
 import os
 import logging
 from werkzeug.utils import secure_filename

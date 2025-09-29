@@ -64,10 +64,13 @@ def seed_social_posts(c, skykidz_id, grokedu_id):
         post4_id = c.lastrowid
         c.execute("INSERT INTO posts (user_id, content, subject) VALUES (?, ?, ?)", (skykidz_id, "Favorite word of the day? Mine is 'adventure'! #language", "language"))
         post5_id = c.lastrowid
+        # FIXED: Local commit for safety
+        c.connection.commit()
         logger.info("Seeded bot posts")
         return post1_id, post2_id, post3_id, post4_id, post5_id
     except Exception as e:
         logger.error(f"Seed social posts failed: {e}")
+        c.connection.rollback()
         raise
 
 def seed_social_comments(c, skykidz_id, grokedu_id, post1_id, post2_id, post3_id, post4_id, post5_id):
@@ -82,9 +85,12 @@ def seed_social_comments(c, skykidz_id, grokedu_id, post1_id, post2_id, post3_id
         ]
         for user_id, post_id, content in comments_data:
             c.execute("INSERT INTO comments (user_id, post_id, content) VALUES (?, ?, ?)", (user_id, post_id, content))
+        # FIXED: Local commit for safety
+        c.connection.commit()
         logger.info("Seeded bot comments")
     except Exception as e:
         logger.error(f"Seed social comments failed: {e}")
+        c.connection.rollback()
         raise
 
 def check_social_schema(conn):
