@@ -3,26 +3,15 @@
 {% block content %}
 <div class="container mx-auto p-6 max-w-4xl">
   <h1 class="text-4xl font-bold mb-6 text-center text-gray-800 pirate-text">Mars Memory Match: Phonics Pirate Raid</h1>
-  <h2 id="timer" class="text-2xl font-bold text-center mb-6 text-green-600">Time: 30s</h2>
-  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the M-sound words before the space pirates steal them!</p>
+  <h2 id="timer" class="text-2xl font-bold text-center mb-6 text-green-600">Time: {{ timer_duration }}s</h2>
+  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the {{ 'M-sound' if language == 'en' else 'M-klank' }} words before the space pirates steal them!</p>
   <div id="taunt" class="text-center mb-6 text-red-600 font-semibold hidden"></div>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-    {% for word in ['moon', 'mars', 'mug', 'mat', 'moon', 'mars', 'mug', 'mat'] %}
-      <div class="w-full max-w-xs">
-        <div class="card h-full text-center bg-white border-0 shadow-lg game-input transform-transition rounded-xl" 
-             data-word="{{ word }}" 
-             onclick="flipCard(this)"
-             style="cursor: pointer; transition: transform 0.3s ease-in-out;">
-          <div class="card-body p-6 flex items-center justify-center min-h-[120px]">
-            <span class="front block text-2xl font-bold text-gray-800">{{ word }}</span>
-            <span class="back hidden text-2xl font-bold text-gray-800">?</span>
-          </div>
-        </div>
-      </div>
-    {% endfor %}
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center" id="card-container">
+    <!-- Cards dynamically generated in JS -->
   </div>
 </div>
 <script>
+const words = {{ words | tojson }};  // FIXED: Use dynamic words from route
 const taunts = [
   "Argh, ye missed me treasure!",
   "Shiver me timbers, try again!",
@@ -30,10 +19,38 @@ const taunts = [
 ];
 let flippedCards = [];
 let matchedPairs = 0;
-let timeLeft = 30;
+let timeLeft = {{ timer_duration }};  // FIXED: Use dynamic timer
 let timerId = null;
 const timerDisplay = document.getElementById('timer');
 const tauntDisplay = document.getElementById('taunt');
+const container = document.getElementById('card-container');
+
+// FIXED: Generate pairs from words (each twice for matching)
+let cardWords = [];
+words.forEach(wordObj => {
+  const displayWord = {{ language == 'bilingual' ? "'af'" : "'word'" }} in wordObj ? wordObj.af : wordObj.word;
+  cardWords.push({word: wordObj.word, display: displayWord});  // Match on 'word', display bilingual if set
+  cardWords.push({word: wordObj.word, display: displayWord});
+});
+
+// Shuffle and render cards
+cardWords.sort(() => Math.random() - 0.5);
+cardWords.forEach((item, index) => {
+  const card = document.createElement('div');
+  card.className = 'w-full max-w-xs';
+  card.innerHTML = `
+    <div class="card h-full text-center bg-white border-0 shadow-lg game-input transform-transition rounded-xl" 
+         data-word="${item.word}" 
+         onclick="flipCard(this)"
+         style="cursor: pointer; transition: transform 0.3s ease-in-out;">
+      <div class="card-body p-6 flex items-center justify-center min-h-[120px]">
+        <span class="front block text-2xl font-bold text-gray-800">${item.display}</span>
+        <span class="back hidden text-2xl font-bold text-gray-800">?</span>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+});
 
 function startTimer() {
   timerId = setInterval(() => {
@@ -61,7 +78,7 @@ function flipCard(card) {
       card1.classList.add('matched', 'bg-green-500', 'text-white');
       card2.classList.add('matched', 'bg-green-500', 'text-white');
       matchedPairs++;
-      if (matchedPairs === 4) {
+      if (matchedPairs === words.length) {  // FIXED: Match length of words list
         completeGame();
       }
     } else {
@@ -104,11 +121,6 @@ function completeGame() {
 
 document.addEventListener('DOMContentLoaded', () => {
   startTimer();
-  const cards = document.querySelectorAll('.card');
-  const shuffled = [...cards].sort(() => Math.random() - 0.5);
-  const container = document.querySelector('.grid');
-  container.innerHTML = '';
-  shuffled.forEach(card => container.appendChild(card));
 });
 </script>
 <style>

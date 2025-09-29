@@ -69,7 +69,8 @@ def take_test():
             c.execute("INSERT INTO tests (user_id, grade, score, date) VALUES (?, ?, ?, ?)", 
                       (session['user_id'], session['grade'], score, datetime.now().isoformat()))
             points_award = score * 2
-            c.execute("INSERT OR REPLACE INTO user_points (user_id, points) VALUES (?, COALESCE((SELECT points FROM user_points WHERE user_id = ?), 0) + ?)", (session['user_id'], session['user_id'], points_award))
+            # FIXED: Proper insert for earning event (not replace total)
+            c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, ?, datetime('now'))", (session['user_id'], points_award))
             conn.commit()
             flash('Test completed', 'success')
             logger.info(f"User {session['user_id']} completed test with score {score}, awarded {points_award} points")

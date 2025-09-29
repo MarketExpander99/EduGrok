@@ -64,6 +64,7 @@ def login():
                 logger.debug(f"Found user {email}, stored hash: {user['password']}")
                 if check_password_hash(user['password'], password):
                     session['user_id'] = user['id']
+                    session['email'] = email  # FIXED: Set email for fallback
                     session['grade'] = user['grade'] or 1
                     session['theme'] = user['theme'] or 'astronaut'
                     session['language'] = user['language'] or 'en'

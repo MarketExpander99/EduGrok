@@ -89,8 +89,6 @@ def reset_db():
         logger.info("Force reset: Dropped all tables")
         print("Dropped all tables")
         init_db()
-        seed_lessons(conn)
-        check_db_schema()
         logger.info("Force reset complete")
         print("DB reset complete")
     except Exception as e:

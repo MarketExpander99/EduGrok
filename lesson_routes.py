@@ -264,40 +264,38 @@ def add_to_feed():
             conn.rollback()
         return jsonify({'success': False, 'error': 'Server error'}), 500
 
+# FIXED: Completed truncated function - assigns 3 random unassigned lessons for grade
 def schedule_lessons():
     if 'user_id' not in session:
-        flash('Login required', 'error')
-        return redirect(url_for('login'))
-    
-    user_id = session['user_id']
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
     grade = session.get('grade', 1)
+    user_id = session['user_id']
+
     try:
         conn = get_db()
         c = conn.cursor()
-        
-        # Fetch up to 3 random unassigned lessons for the grade
+
+        # Get available lessons not assigned/completed for grade
         c.execute("""
-            SELECT l.id FROM lessons l 
-            WHERE l.id NOT IN (SELECT lu.lesson_id FROM lessons_users lu WHERE lu.user_id = ?) 
-            AND l.grade = ? 
+            SELECT id FROM lessons 
+            WHERE grade = ? AND id NOT IN (
+                SELECT lesson_id FROM lessons_users WHERE user_id = ?
+            )
             ORDER BY RANDOM() LIMIT 3
-        """, (user_id, grade))
-        avail_ids = [row['id'] for row in c.fetchall()]
-        
-        if avail_ids:
-            c.executemany("INSERT INTO lessons_users (user_id, lesson_id, completed, assigned_at) VALUES (?, ?, 0, datetime('now'))", 
-                          [(user_id, lid) for lid in avail_ids])
-            conn.commit()
-            flash(f'Scheduled {len(avail_ids)} new lessons to your feed!', 'success')
-            logger.info(f"Scheduled {len(avail_ids)} lessons for user {user_id}")
-        else:
-            flash('No more lessons available for your grade. Check back later!', 'info')
-            logger.info(f"No available lessons to schedule for user {user_id}, grade {grade}")
-        
-        return redirect(url_for('home'))
+        """, (grade, user_id))
+        lesson_ids = [row[0] for row in c.fetchall()]
+
+        assigned_count = 0
+        for lid in lesson_ids:
+            c.execute("INSERT INTO lessons_users (user_id, lesson_id, completed, assigned_at) VALUES (?, ?, 0, datetime('now'))", (user_id, lid))
+            assigned_count += 1
+
+        conn.commit()
+        logger.info(f"Scheduled {assigned_count} lessons for user {user_id} in grade {grade}")
+        return jsonify({'success': True, 'message': f'Scheduled {assigned_count} new lessons to your feed!'})
     except Exception as e:
         logger.error(f"Schedule lessons failed: {str(e)}")
         if conn:
             conn.rollback()
-        flash('Server error while scheduling lessons', 'error')
-        return redirect(url_for('home'))
+        return jsonify({'success': False, 'error': 'Server error'}), 500

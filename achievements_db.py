@@ -11,6 +11,16 @@ def init_achievements_tables(c):
         c.execute('''CREATE TABLE IF NOT EXISTS badges 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, badge_name TEXT, awarded_date TEXT,
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
+        # FIXED: Added missing tables for games, tests, feedback
+        c.execute('''CREATE TABLE IF NOT EXISTS games 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, score INTEGER, played_at TEXT DEFAULT (datetime('now')),
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS tests 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, grade INTEGER, score INTEGER, date TEXT,
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS feedback 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, rating INTEGER, comments TEXT, submitted_date TEXT DEFAULT (datetime('now')),
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
     except sqlite3.Error as e:
         logger.error(f"Error initializing achievements tables: {e}")
         raise
@@ -33,10 +43,14 @@ def check_achievements_schema(conn):
             logger.info("Added awarded_date column to badges table")
             print("Added awarded_date column to badges table")
         
-        for table in ['user_points', 'badges']:
-            c.execute(f"PRAGMA table_info({table})")
-            if not c.fetchall():
-                logger.error(f"Table {table} missing")
+        for table in ['user_points', 'badges', 'games', 'tests', 'feedback']:  # FIXED: Include new tables
+            try:
+                c.execute(f"PRAGMA table_info({table})")
+                if not c.fetchall():
+                    logger.error(f"Table {table} missing")
+                    raise ValueError(f"Table {table} missing")
+            except sqlite3.OperationalError:
+                logger.error(f"Table {table} does not exist")
                 raise ValueError(f"Table {table} missing")
     except Exception as e:
         logger.error(f"Achievements schema check failed: {str(e)}")
