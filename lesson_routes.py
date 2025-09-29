@@ -181,26 +181,15 @@ def lessons():
         """, (user_id, grade))
         raw_lessons = c.fetchall()
         lessons_list = []
-        unassigned_ids = []
 
         for r in raw_lessons:
             lesson_dict = dict(r)
-            original_completed = lesson_dict.get('completed')  # Capture before change
             if lesson_dict.get('mc_options'):
                 lesson_dict['mc_options'] = json.loads(lesson_dict['mc_options'])
-            # Treat NULL completed as 0 (incomplete/unassigned)
-            lesson_dict['completed'] = lesson_dict['completed'] or 0
+            # Keep completed as is (None if unassigned, 0 or 1 if assigned)
             lessons_list.append(lesson_dict)
-            # Append ONLY if originally unassigned (None)
-            if original_completed is None:
-                unassigned_ids.append(lesson_dict['id'])
 
-        # Auto-assign any unassigned ones (all at once, no limit)
-        if unassigned_ids:
-            c.executemany("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, completed) VALUES (?, ?, 0)", 
-                          [(user_id, lid) for lid in unassigned_ids])
-            conn.commit()
-            logger.info(f"Auto-assigned {len(unassigned_ids)} lessons for user {user_id} in grade {grade}")
+        # Removed auto-assign
 
         return render_template('lessons.html.j2', lessons=lessons_list, grade=grade)
     except Exception as e:
@@ -209,8 +198,71 @@ def lessons():
         return redirect(url_for('home'))
 
 def generate_lesson():
-    # Placeholder for generating lessons (if needed)
-    pass
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    grade = session.get('grade', 1)
+    user_id = session['user_id']
+
+    try:
+        conn = get_db()
+        c = conn.cursor()
+
+        # Example placeholder lesson (can be expanded with more logic or randomization)
+        subject = 'math'  # Example; could randomize or based on input
+        title = 'Generated Lesson'
+        description = 'This is a newly generated lesson for practice.'
+        content = 'Learn and complete the activities below!'
+
+        # Insert new lesson into DB
+        c.execute('''INSERT INTO lessons (grade, subject, title, description, content) 
+                     VALUES (?, ?, ?, ?, ?)''', (grade, subject, title, description, content))
+        lesson_id = c.lastrowid
+        conn.commit()
+
+        # Auto-assign the new lesson to the user's feed
+        c.execute("INSERT INTO lessons_users (user_id, lesson_id, completed, assigned_at) VALUES (?, ?, 0, datetime('now'))", (user_id, lesson_id))
+        conn.commit()
+
+        logger.info(f"Generated and assigned new lesson {lesson_id} for user {user_id} in grade {grade}")
+        return jsonify({'success': True, 'message': 'New lesson generated and added to your feed!'})
+    except Exception as e:
+        logger.error(f"Generate lesson failed: {str(e)}")
+        if conn:
+            conn.rollback()
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+def add_to_feed():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Login required'}), 401
+
+    data = request.get_json()
+    if not data or 'lesson_id' not in data:
+        return jsonify({'success': False, 'error': 'Missing lesson_id'}), 400
+
+    lesson_id = data['lesson_id']
+    user_id = session['user_id']
+
+    try:
+        conn = get_db()
+        c = conn.cursor()
+
+        # Check if already assigned
+        c.execute("SELECT completed FROM lessons_users WHERE user_id = ? AND lesson_id = ?", (user_id, lesson_id))
+        if c.fetchone():
+            return jsonify({'success': False, 'error': 'Lesson already added to feed'}), 400
+
+        # Assign to user
+        c.execute("INSERT INTO lessons_users (user_id, lesson_id, completed, assigned_at) VALUES (?, ?, 0, datetime('now'))", (user_id, lesson_id))
+        conn.commit()
+
+        logger.info(f"Added lesson {lesson_id} to feed for user {user_id}")
+        return jsonify({'success': True, 'message': 'Lesson added to your feed!'})
+    except Exception as e:
+        logger.error(f"Add to feed failed: {str(e)}")
+        if conn:
+            conn.rollback()
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 def schedule_lessons():
     if 'user_id' not in session:
@@ -233,7 +285,7 @@ def schedule_lessons():
         avail_ids = [row['id'] for row in c.fetchall()]
         
         if avail_ids:
-            c.executemany("INSERT INTO lessons_users (user_id, lesson_id, completed) VALUES (?, ?, 0)", 
+            c.executemany("INSERT INTO lessons_users (user_id, lesson_id, completed, assigned_at) VALUES (?, ?, 0, datetime('now'))", 
                           [(user_id, lid) for lid in avail_ids])
             conn.commit()
             flash(f'Scheduled {len(avail_ids)} new lessons to your feed!', 'success')

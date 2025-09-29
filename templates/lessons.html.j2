@@ -1,27 +1,43 @@
+# lessons.html.j2
 {% extends "base.html.j2" %}
+
 {% block title %}Lessons - EduGrok{% endblock %}
+
 {% block content %}
 <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6 text-grok-text">Lessons (Grade {{ grade }}) 📚</h1>
-    {% if available_lessons %}
-        <div class="grid gap-4">
-            {% for lesson in available_lessons %}
-                <div class="lesson-card bg-grok-surface p-6 rounded-lg border border-grok-border">
-                    <h2 class="text-xl font-semibold mb-2">{{ lesson.title or lesson.question }}</h2>
-                    <p class="text-grok-secondary mb-4">{{ lesson.description or lesson.question }}</p>
-                    <p class="mb-4"><strong>Question:</strong> {{ lesson.question }}</p>
-                    <button onclick="addToFeed({{ lesson.id }})" class="btn-primary px-4 py-2 rounded hover:bg-gray-600 transition-colors">Add to Feed</button>
+    <h1 class="text-3xl font-bold mb-6 text-white">Lessons (Grade {{ grade }}) 📚</h1>
+    
+    <div class="text-center mb-8">
+        <button onclick="generateLesson()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition">Generate New Lesson</button>
+    </div>
+
+    {% if lessons %}
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {% for lesson in lessons %}
+                <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200">
+                    <h2 class="text-xl font-semibold text-white mb-2">{{ lesson.title or 'Lesson ' ~ lesson.id }}</h2>
+                    <p class="text-gray-300 mb-4">{{ lesson.description or 'No description' }}</p>
+                    {% if lesson.completed is none %}
+                        <button onclick="addToFeed({{ lesson.id }})" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold transition">Add to Feed</button>
+                    {% else %}
+                        <p class="text-{{ 'green' if lesson.completed else 'yellow' }}-400 mb-4 font-medium">Status: {{ 'Completed' if lesson.completed else 'Incomplete' }}</p>
+                        {% if lesson.completed %}
+                            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-semibold transition">Reset</a>
+                        {% else %}
+                            <p class="text-gray-400 text-sm">Available in your feed</p>
+                        {% endif %}
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <div class="text-center bg-grok-surface p-8 rounded-lg border border-grok-border">
-            <h2 class="text-2xl font-bold mb-4">No Lessons Available for Your Grade</h2>
-            <p class="text-grok-secondary mb-6">Try generating a new one or check back later!</p>
-            <button onclick="generateLesson()" class="btn-primary px-6 py-3 rounded-lg text-lg">Generate Lesson</button>
+        <div class="text-center py-8 bg-black p-5 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-white">No Lessons Yet</h2>
+            <p class="text-gray-300 mb-6">Generate some lessons to get started!</p>
         </div>
     {% endif %}
 </div>
+
 <script>
     async function handleFetch(fetchPromise, successMsg, errorMsg) {
         try {

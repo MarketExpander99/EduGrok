@@ -22,7 +22,7 @@ from auth import register, login, logout, set_theme, set_language
 from db_routes import reset_db_route
 from home_routes import index, home, landing
 from post_routes import create_post, like_post, repost_post, add_comment
-from lesson_routes import check_lesson, complete_lesson, reset_lesson, lessons, generate_lesson, schedule_lessons
+from lesson_routes import check_lesson, complete_lesson, reset_lesson, lessons, generate_lesson, schedule_lessons, add_to_feed
 from assess_routes import assess, take_test, game
 from user_routes import profile, parent_dashboard, update_points, update_coins, beta, feedback
 from game_routes import phonics_game
@@ -145,6 +145,7 @@ app.add_url_rule('/complete_lesson/<int:lesson_id>', 'complete_lesson', complete
 app.add_url_rule('/reset_lesson/<int:lesson_id>', 'reset_lesson', reset_lesson, methods=['GET'])
 app.add_url_rule('/lessons', 'lessons', lessons, methods=['GET'])
 app.add_url_rule('/generate_lesson', 'generate_lesson', generate_lesson, methods=['POST'])
+app.add_url_rule('/add_to_feed', 'add_to_feed', add_to_feed, methods=['POST'])
 app.add_url_rule('/schedule_lessons', 'schedule_lessons', schedule_lessons, methods=['POST'])
 
 app.add_url_rule('/assess', 'assess', assess, methods=['GET', 'POST'])
