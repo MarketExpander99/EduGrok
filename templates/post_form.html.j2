@@ -1,28 +1,38 @@
-<div id="post-form-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div id="post-form" class="hidden bg-black p-6 rounded-xl shadow-xl border border-blue-200 max-w-xl w-full mx-4 transform scale-95 transition-all duration-300 text-white max-h-[80vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-blue-100">Create a Post</h2>
-            <button id="close-post-form" class="text-gray-400 hover:text-gray-200 text-2xl font-bold">&times;</button>
-        </div>
-        <form action="{{ url_for('create_post') }}" method="POST" enctype="multipart/form-data">
-            <textarea id="post-content" name="content" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Share something..." required rows="6"></textarea>
-            <div id="char-count" class="text-right text-sm text-gray-400 mb-4">0/280</div>
-            <select name="subject" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white">
-                <option value="math">Math</option>
-                <option value="science">Science</option>
-                <option value="language">Language</option>
+<!-- Newly created: Modal form for creating posts, referenced in home.html.j2 -->
+<div id="post-form-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden"></div>
+<div id="post-form" class="fixed top-0 left-0 w-full h-full flex items-center justify-center z-50 hidden scale-95 transition-transform duration-200">
+    <div class="bg-grok-surface p-6 rounded-lg max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4 text-grok-text">Create a Post</h2>
+        <form id="postForm" method="POST" action="{{ url_for('create_post') }}" enctype="multipart/form-data" class="space-y-4">
+            <textarea 
+                name="content" 
+                id="post-content" 
+                placeholder="What's happening? (max 280 chars)" 
+                rows="3" 
+                maxlength="280"
+                class="w-full p-3 bg-grok-bg border border-grok-border rounded-lg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent resize-none"
+                required
+            ></textarea>
+            <div id="char-count" class="text-right text-sm text-grok-secondary">0/280</div>
+            <input 
+                type="file" 
+                name="media" 
+                id="media-upload" 
+                accept="image/*,video/mp4" 
+                class="w-full p-2 bg-grok-bg border border-grok-border rounded-lg text-grok-text"
+            >
+            <div id="media-preview" class="p-2 bg-grok-bg rounded-lg"></div>
+            <select name="subject" class="w-full p-3 bg-grok-bg border border-grok-border rounded-lg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent">
                 <option value="General">General</option>
+                <option value="Math">Math</option>
+                <option value="Language">Language</option>
+                <option value="Science">Science</option>
             </select>
-            <input type="file" id="media-upload" name="media" accept="image/*,video/mp4" class="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400">
-            <div id="media-preview" class="mt-4 mb-4"></div>
-            <div class="flex justify-end space-x-3">
-                <button type="button" id="cancel-post" class="px-4 py-2 text-gray-400 border border-gray-600 rounded-md hover:bg-gray-700 transition">Cancel</button>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post</button>
+            <div class="flex justify-end space-x-2 pt-4 border-t border-grok-border">
+                <button type="button" id="cancel-post" class="px-4 py-2 bg-grok-secondary text-grok-text rounded-lg hover:bg-grok-accent transition-colors">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-grok-accent text-grok-text rounded-lg hover:bg-blue-600 transition-colors">Post</button>
             </div>
         </form>
     </div>
 </div>
-
-<button id="open-post-form" class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 z-40 text-2xl font-bold">
-    +
-</button>
+<button id="open-post-form" class="bg-grok-accent text-grok-text px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-semibold">New Post 💬</button>
