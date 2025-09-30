@@ -1,4 +1,4 @@
-<!-- home.html.j2 -->
+<!-- home.html.j2 (updated to include interactive questions and answers in lesson cards on home screen) -->
 {% extends "base.html.j2" %}
 
 {% block content %}
@@ -19,8 +19,76 @@
             <div id="lesson-{{ lesson.id }}" class="lesson-card bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-4 max-w-lg mx-auto">
                 <h3 class="text-xl font-semibold text-white mb-2">Lesson {{ lesson.id }}: {{ lesson.title or 'Untitled' }}</h3>
                 <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
+                <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
+                {% if lesson.subject == 'math' %}
+                    <!-- Math Fill-in -->
+                    <div class="mb-4" id="math-activity-{{ lesson.id }}">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Math Fill-in</h4>
+                        <input type="number" id="math-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Enter your answer">
+                        <button onclick="checkMath({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                    <!-- Match-3 Stub -->
+                    <div class="mb-4" id="match-game-{{ lesson.id }}">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Match Three</h4>
+                        <p class="text-gray-300 mb-2">Match numbers: Drag to pair (e.g., 2x3 to 6)</p>
+                        <!-- Simple buttons for demo -->
+                        <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 1</button>
+                    </div>
+                {% elif lesson.subject == 'language' %}
+                    <!-- Path Lesson: Word Tracing -->
+                    <div class="mb-4">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Trace the Word</h4>
+                        <p class="text-gray-300 mb-2">Type the word you see below to practice spelling:</p>
+                        <p class="text-white font-bold mb-2">{{ lesson.trace_word or 'cat' }}</p>
+                        <input type="text" id="trace-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Type the word here">
+                        <button onclick="checkTrace({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                    <!-- Spelling Lesson -->
+                    <div class="mb-4">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Spelling Practice</h4>
+                        <p class="text-gray-300 mb-2">Spell the word for the given sound: {{ lesson.sound or '/kæt/' }}</p>
+                        <input type="text" id="spell-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Type your answer here">
+                        <button onclick="checkSpelling({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                    <!-- Multiple Choice Questions -->
+                    <div class="mb-4">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Multiple Choice</h4>
+                        <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is the correct spelling?' }}</p>
+                        {% for option in lesson.mc_options or [] %}
+                            <label class="block mb-2 text-white">
+                                <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
+                                {{ option }}
+                            </label>
+                        {% endfor %}
+                        <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                    <!-- Sentence Completion -->
+                    <div class="mb-4">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Sentence Completion</h4>
+                        <p class="text-gray-300 mb-2">The cat sat on the ___.</p>
+                        <select id="sentence-select-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white">
+                            <option value="mat">mat</option>
+                            <option value="dog">dog</option>
+                            <option value="moon">moon</option>
+                        </select>
+                        <button onclick="checkSentence({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                {% elif lesson.subject == 'science' %}
+                    <!-- Science Multiple Choice -->
+                    <div class="mb-4">
+                        <h4 class="text-md font-semibold text-orange-200 mb-2">Science Quiz</h4>
+                        <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is this?' }}</p>
+                        {% for option in lesson.mc_options or [] %}
+                            <label class="block mb-2 text-white">
+                                <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
+                                {{ option }}
+                            </label>
+                        {% endfor %}
+                        <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+                    </div>
+                {% endif %}
                 <div class="flex justify-end space-x-2">
-                    <a href="{{ url_for('lessons') }}#lesson-{{ lesson.id }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition">Do Lesson</a>
+                    <button onclick="completeLesson({{ lesson.id }})" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition">Complete Lesson</button>
                     <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-semibold transition">Do Again</a>
                 </div>
             </div>
@@ -67,6 +135,156 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Lesson-specific JS (moved outside loop, with lessonId params)
+function checkMath(lessonId) {
+    const inputValue = document.getElementById(`math-input-${lessonId}`).value.trim();
+    if (!inputValue) { alert('Please enter an answer.'); return; }
+    const answer = parseFloat(inputValue) || 0;
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'math_fill',
+            response: answer,
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Correct! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function submitMatch(lessonId) {
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'match_game',
+            response: 'demo_match',
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Great match! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Keep trying!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function checkTrace(lessonId) {
+    const input = document.getElementById(`trace-input-${lessonId}`).value.trim().toLowerCase();
+    if (!input) { alert('Please enter the word.'); return; }
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'trace_complete',
+            response: input,
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Correct! Great job tracing the word. +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function checkSpelling(lessonId) {
+    const input = document.getElementById(`spell-input-${lessonId}`).value.trim().toLowerCase();
+    if (!input) { alert('Please enter your spelling.'); return; }
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'spelling_complete',
+            response: input,
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Correct! You spelled the word correctly. +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again! Check the spelling carefully.');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function checkMultipleChoice(lessonId) {
+    const selected = document.querySelector(`input[name="mc-${lessonId}"]:checked`);
+    if (!selected) {
+        alert('Please select an option.');
+        return;
+    }
+    const answer = selected.value.trim().toLowerCase();
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'mc_choice',
+            response: answer,
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Correct! You chose the right answer. +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Incorrect. Try again!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function checkSentence(lessonId) {
+    const answer = document.getElementById(`sentence-select-${lessonId}`).value.trim().toLowerCase();
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'sentence_complete',
+            response: answer,
+            complete_lesson: false
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success && data.is_correct) {
+            alert('Perfect! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function completeLesson(lessonId) {
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            complete_lesson: true
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.success) {
+            alert('Lesson completed! Check your points.');
+            // Optionally reload page or update UI
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to complete lesson.');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+</script>
 
 <script>
 // Shared JS for post form (modal toggle, media preview, char count) - kept in home for global access

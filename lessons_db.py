@@ -1,3 +1,4 @@
+# lessons_db.py
 import json
 import logging
 import sqlite3
@@ -55,13 +56,13 @@ def seed_lessons(conn):
         lessons_data = [
             # Grade 1 samples
             (1, 'math', 'Add Numbers', 'Learn to add simple numbers', 'What is 1 + 1?', None, None, None, None, None, '2', None, None),
-            (1, 'language', 'Trace Cat', 'Practice tracing the word "cat"', 'Type the traced word.', 'cat', None, None, None, None, None, None, None),
+            (1, 'language', 'Trace Cat', 'Practice tracing the word "cat"', 'Type the traced word.', 'cat', None, None, None, None, None, None, '/kæt/'),
             (1, 'language', 'Spell Dog', 'Spell the word for /dɒɡ/', 'Type the spelling.', None, 'dog', None, None, None, None, None, '/dɒɡ/'),
             (1, 'science', 'Plants Need Water', 'What do plants need?', 'Multiple choice.', None, None, 'What do plants need to grow?', json.dumps(['Water', 'Sand', 'Rocks']), 'Water', None, None, None),
             (1, 'language', 'Sentence: Cat on Mat', 'Complete the sentence.', 'The cat sat on the ___.', None, None, None, None, None, 'mat', None, None),
             # Grade 2 samples
             (2, 'math', 'Subtract Apples', '2 - 1 = ?', 'Simple subtraction.', None, None, None, None, None, '1', None, None),
-            (2, 'language', 'Trace Ship', 'Trace "ship"', 'Type the word.', 'ship', None, None, None, None, None, None, None),
+            (2, 'language', 'Trace Ship', 'Trace "ship"', 'Type the word.', 'ship', None, None, None, None, None, None, '/ʃɪp/'),
             (2, 'science', 'Animals Move', 'How do animals move?', 'Choice.', None, None, 'How do birds move?', json.dumps(['Fly', 'Swim', 'Crawl']), 'Fly', None, None, None),
             # Grade 3 samples
             (3, 'math', 'Multiply Basics', '2 x 3 = ?', 'Introduction to multiply.', None, None, None, None, None, '6', None, None),
@@ -86,7 +87,6 @@ def check_lessons_schema(conn):
             c.execute(f"PRAGMA table_info({table})")
             if not c.fetchall():
                 raise ValueError(f"Table {table} missing")
-        # Migrations: e.g., add columns if missing
         c.execute("PRAGMA table_info(lessons)")
         columns = [col[1] for col in c.fetchall()]
         if 'mc_options' not in columns:
