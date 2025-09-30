@@ -105,12 +105,12 @@ function submitMatch(lessonId) {
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+        body: JSON.stringify(
             lesson_id: lessonId,
             activity_type: 'match_game',
             response: 'demo_match',
-            complete_lesson: false  // Changed to false
-        })
+            complete_lesson: false
+        )
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {
             alert('Great match! +' + data.points + ' points');
@@ -130,7 +130,7 @@ function checkTrace(lessonId) {
             lesson_id: lessonId,
             activity_type: 'trace_complete',
             response: input,
-            complete_lesson: false  // Changed to false
+            complete_lesson: false
         })
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {
@@ -151,7 +151,7 @@ function checkSpelling(lessonId) {
             lesson_id: lessonId,
             activity_type: 'spelling_complete',
             response: input,
-            complete_lesson: false  // Changed to false
+            complete_lesson: false
         })
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {
@@ -176,7 +176,7 @@ function checkMultipleChoice(lessonId) {
             lesson_id: lessonId,
             activity_type: 'mc_choice',
             response: answer,
-            complete_lesson: false  // Changed to false
+            complete_lesson: false
         })
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {
@@ -196,7 +196,7 @@ function checkSentence(lessonId) {
             lesson_id: lessonId,
             activity_type: 'sentence_complete',
             response: answer,
-            complete_lesson: false  // Changed to false
+            complete_lesson: false
         })
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {

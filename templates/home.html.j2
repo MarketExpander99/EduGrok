@@ -141,7 +141,7 @@
 function checkMath(lessonId) {
     const inputValue = document.getElementById(`math-input-${lessonId}`).value.trim();
     if (!inputValue) { alert('Please enter an answer.'); return; }
-    const answer = parseFloat(inputValue) || 0;
+    const answer = parseFloat(inputValue) or 0;
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
