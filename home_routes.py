@@ -19,17 +19,30 @@ def home():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    # Fetch posts with likes, reposts, etc.
+    # FIXED: Updated query to use subquery for original_handle from posts table
     c.execute('''
-        SELECT p.*, u.handle as original_handle,
+        SELECT p.*, 
+        (SELECT handle FROM posts o WHERE o.id = p.original_post_id) as original_handle,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) as likes,
         (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id) as reposts,
         (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
         (SELECT 1 FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
-        FROM posts p LEFT JOIN users u ON p.original_post_id = u.id
+        FROM posts p 
         ORDER BY p.created_at DESC
     ''', (session['user_id'], session['user_id']))
     posts = [dict(row) for row in c.fetchall()]
+    
+    # FIXED: Increment views for new/unviewed posts (simple session-based tracking)
+    viewed_posts = set(session.get('viewed_posts', []))
+    new_viewed = [post['id'] for post in posts if post['id'] not in viewed_posts]
+    if new_viewed:
+        placeholders = ','.join(['?' for _ in new_viewed])
+        c.execute(f"UPDATE posts SET views = views + 1 WHERE id IN ({placeholders})", new_viewed)
+        conn.commit()
+        viewed_posts.update(new_viewed)
+        session['viewed_posts'] = list(viewed_posts)
+        logger.debug(f"Incremented views for posts: {new_viewed}")
+    
     # Fetch comments
     c.execute('SELECT * FROM comments ORDER BY created_at DESC')
     all_comments = [dict(row) for row in c.fetchall()]
