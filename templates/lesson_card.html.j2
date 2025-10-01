@@ -7,7 +7,7 @@
         <div class="mb-4" id="math-activity-{{ lesson.id }}">
             <h4 class="text-md font-semibold text-orange-200 mb-2">Math Fill-in</h4>
             <input type="number" id="math-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Enter your answer">
-            <button onclick="checkMath()" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+            <button onclick="checkMath({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
         </div>
         <!-- Match-3 Stub -->
         <div class="mb-4" id="match-game-{{ lesson.id }}">
@@ -79,15 +79,15 @@
 <script>
 // Lesson-specific JS (math/language checks, complete lesson)
 // Changed: Set complete_lesson: false for individual checks to avoid premature completion
-function checkMath() {
-    const inputValue = document.getElementById('math-input-{{ lesson.id }}').value.trim();
+function checkMath(lessonId) {
+    const inputValue = document.getElementById(`math-input-${lessonId}`).value.trim();
     if (!inputValue) { alert('Please enter an answer.'); return; }
     const answer = parseFloat(inputValue) || 0;
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            lesson_id: {{ lesson.id }},
+            lesson_id: lessonId,
             activity_type: 'math_fill',
             response: answer,
             complete_lesson: false  // Changed to false
@@ -105,12 +105,12 @@ function submitMatch(lessonId) {
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(
+        body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'match_game',
             response: 'demo_match',
             complete_lesson: false
-        )
+        })
     }).then(res => res.json()).then(data => {
         if (data.success && data.is_correct) {
             alert('Great match! +' + data.points + ' points');
