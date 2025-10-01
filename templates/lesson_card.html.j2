@@ -77,9 +77,9 @@
     </div>
 </div>
 
-<script>
+<script type="text/javascript">
 function checkMath(lessonId) {
-    const inputValue = document.getElementById(`math-input-${lessonId}`).value.trim();
+    const inputValue = document.getElementById('math-input-' + lessonId).value.trim();
     if (!inputValue) { alert('Please enter an answer.'); return; }
     const answer = parseFloat(inputValue) || 0;
     fetch('/check_lesson', {
@@ -120,7 +120,7 @@ function submitMatch(lessonId) {
 }
 
 function checkTrace(lessonId) {
-    const input = document.getElementById(`trace-input-${lessonId}`).value.trim().toLowerCase();
+    const input = document.getElementById('trace-input-' + lessonId).value.trim().toLowerCase();
     if (!input) { alert('Please enter the word.'); return; }
     fetch('/check_lesson', {
         method: 'POST',
@@ -141,7 +141,7 @@ function checkTrace(lessonId) {
 }
 
 function checkSpelling(lessonId) {
-    const input = document.getElementById(`spell-input-${lessonId}`).value.trim().toLowerCase();
+    const input = document.getElementById('spell-input-' + lessonId).value.trim().toLowerCase();
     if (!input) { alert('Please enter your spelling.'); return; }
     fetch('/check_lesson', {
         method: 'POST',
@@ -162,7 +162,7 @@ function checkSpelling(lessonId) {
 }
 
 function checkMultipleChoice(lessonId) {
-    const selected = document.querySelector(`input[name="mc-${lessonId}"]:checked`);
+    const selected = document.querySelector('input[name="mc-' + lessonId + '"]:checked');
     if (!selected) {
         alert('Please select an option.');
         return;
@@ -174,48 +174,4 @@ function checkMultipleChoice(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'mc_choice',
-            response: answer,
-            complete_lesson: false
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
-            alert('Correct! You chose the right answer. +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Incorrect. Try again!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function checkSentence(lessonId) {
-    const answer = document.getElementById(`sentence-select-${lessonId}`).value.trim().toLowerCase();
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'sentence_complete',
-            response: answer,
-            complete_lesson: false
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
-            alert('Perfect! +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function completeLesson(lessonId) {
-    fetch('/complete_lesson/' + lessonId, {  // FIXED: Use the GET route for complete_lesson
-        method: 'GET'
-    }).then(res => {
-        if (res.ok) {
-            alert('Lesson completed! Check your points.');
-            location.reload();
-        } else {
-            alert('Failed to complete lesson.');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-</script>
+            response:
