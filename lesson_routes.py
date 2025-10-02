@@ -1,5 +1,5 @@
 # lesson_routes.py
-from flask import session, request, flash, redirect, url_for, jsonify
+from flask import session, request, flash, redirect, url_for, jsonify, render_template
 from db import get_db
 import logging
 from datetime import datetime
@@ -64,7 +64,7 @@ def lessons():
     c = conn.cursor()
     c.execute("SELECT * FROM lessons")
     lessons = [dict(row) for row in c.fetchall()]
-    return render_template('lessons.html.j2', lessons=lessons, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+    return render_template('lessons.html.j2', lessons=lessons, grade=session.get('grade', 1), theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def generate_lesson():
     # Placeholder for generating lessons, perhaps using AI
