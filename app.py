@@ -25,7 +25,7 @@ from post_routes import create_post, like_post, repost_post, add_comment
 from lesson_routes import check_lesson, complete_lesson, reset_lesson, lessons, generate_lesson, schedule_lessons, add_to_feed
 from assess_routes import assess, take_test, game
 from user_routes import profile, parent_dashboard, update_points, update_coins, beta, feedback
-from game_routes import phonics_game
+from game_routes import phonics_game, games, number_game
 
 # Load .env file
 load_dotenv()
@@ -159,7 +159,9 @@ app.add_url_rule('/update_coins', 'update_coins', update_coins, methods=['POST']
 app.add_url_rule('/beta', 'beta', beta, methods=['GET', 'POST'])
 app.add_url_rule('/feedback', 'feedback', feedback, methods=['GET', 'POST'])
 
+app.add_url_rule('/games', 'games', games)
 app.add_url_rule('/phonics_game', 'phonics_game', phonics_game, methods=['GET', 'POST'])
+app.add_url_rule('/number_game', 'number_game', number_game, methods=['GET', 'POST'])
 
 if __name__ == '__main__':
     app.run(debug=True,  port=5001)

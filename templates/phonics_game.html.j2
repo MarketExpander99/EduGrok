@@ -1,17 +1,19 @@
+<!-- phonics_game.html.j2 -->
 {% extends 'base.html.j2' %}
 {% block title %}Phonics Game - EduGrok{% endblock %}
 {% block content %}
 <div class="container mx-auto p-6 max-w-4xl">
   <h1 class="text-4xl font-bold mb-6 text-center text-gray-800 pirate-text">Mars Memory Match: Phonics Pirate Raid</h1>
   <h2 id="timer" class="text-2xl font-bold text-center mb-6 text-green-600">Time: {{ timer_duration }}s</h2>
-  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the {{ 'M-sound' if language == 'en' else 'M-klank' }} words before the space pirates steal them!</p>
+  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the words to their sounds before the space pirates steal them!</p>
   <div id="taunt" class="text-center mb-6 text-red-600 font-semibold hidden"></div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center" id="card-container">
     <!-- Cards dynamically generated in JS -->
   </div>
 </div>
 <script>
-const words = {{ words | tojson }};  // FIXED: Use dynamic words from route
+const words = {{ words | tojson }};
+const lang = '{{ language }}';
 const taunts = [
   "Argh, ye missed me treasure!",
   "Shiver me timbers, try again!",
@@ -19,28 +21,29 @@ const taunts = [
 ];
 let flippedCards = [];
 let matchedPairs = 0;
-let timeLeft = {{ timer_duration }};  // FIXED: Use dynamic timer
+let timeLeft = {{ timer_duration }};
 let timerId = null;
 const timerDisplay = document.getElementById('timer');
 const tauntDisplay = document.getElementById('taunt');
 const container = document.getElementById('card-container');
 
-// FIXED: Generate pairs from words (each twice for matching)
-let cardWords = [];
+// Generate pairs: one for word/af, one for sound/af_sound
+let cardItems = [];
 words.forEach(wordObj => {
-  const displayWord = {{ language == 'bilingual' ? "'af'" : "'word'" }} in wordObj ? wordObj.af : wordObj.word;
-  cardWords.push({word: wordObj.word, display: displayWord});  // Match on 'word', display bilingual if set
-  cardWords.push({word: wordObj.word, display: displayWord});
+  const prop_word = lang === 'bilingual' ? 'af' : 'word';
+  const prop_sound = lang === 'bilingual' ? 'af_sound' : 'sound';
+  cardItems.push({match: wordObj.word, display: wordObj[prop_word]});
+  cardItems.push({match: wordObj.word, display: wordObj[prop_sound]});
 });
 
 // Shuffle and render cards
-cardWords.sort(() => Math.random() - 0.5);
-cardWords.forEach((item, index) => {
+cardItems.sort(() => Math.random() - 0.5);
+cardItems.forEach((item, index) => {
   const card = document.createElement('div');
   card.className = 'w-full max-w-xs';
   card.innerHTML = `
     <div class="card h-full text-center bg-white border-0 shadow-lg game-input transform-transition rounded-xl" 
-         data-word="${item.word}" 
+         data-match="${item.match}" 
          onclick="flipCard(this)"
          style="cursor: pointer; transition: transform 0.3s ease-in-out;">
       <div class="card-body p-6 flex items-center justify-center min-h-[120px]">
@@ -74,11 +77,11 @@ function flipCard(card) {
   flippedCards.push(card);
   if (flippedCards.length === 2) {
     const [card1, card2] = flippedCards;
-    if (card1.dataset.word === card2.dataset.word) {
+    if (card1.dataset.match === card2.dataset.match) {
       card1.classList.add('matched', 'bg-green-500', 'text-white');
       card2.classList.add('matched', 'bg-green-500', 'text-white');
       matchedPairs++;
-      if (matchedPairs === words.length) {  // FIXED: Match length of words list
+      if (matchedPairs === words.length) {
         completeGame();
       }
     } else {
@@ -101,16 +104,29 @@ function flipCard(card) {
 function completeGame() {
   if (timeLeft > 0) {
     clearInterval(timerId);
-    fetch('/update_coins', {
+    fetch(window.location.pathname, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coins: 5 })
+      body: JSON.stringify({ score: timeLeft })
     }).then(response => response.json()).then(data => {
       if (data.success) {
-        alert('You beat the pirates! +5 Star Coins');
-        window.location.href = '/profile';
+        fetch('/update_coins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coins: 5 })
+        }).then(response => response.json()).then(data => {
+          if (data.success) {
+            alert('You beat the pirates! +5 Star Coins');
+            window.location.href = '/profile';
+          } else {
+            alert('Failed to award coins: ' + (data.error || 'Unknown error'));
+          }
+        }).catch(error => {
+          alert('Error awarding coins');
+          console.error(error);
+        });
       } else {
-        alert('Failed to award coins: ' + (data.error || 'Unknown error'));
+        alert('Failed to save game score');
       }
     }).catch(error => {
       alert('Error completing game');
