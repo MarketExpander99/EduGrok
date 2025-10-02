@@ -1,219 +1,186 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farm Math Challenge</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .question-card {
-            transition: opacity 0.5s ease;
-        }
-        .question-card.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        .input-field {
-            @apply border border-gray-300 dark:border-gray-600 rounded px-2 py-1;
-        }
-        .mcq-option {
-            @apply cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700;
-        }
-        .mcq-option.selected {
-            @apply bg-blue-200 dark:bg-blue-800;
-        }
-    </style>
-</head>
-<body class="{% if theme == 'farm' %}farm{% elif theme == 'space' %}space{% elif theme == 'astronaut' %}astronaut{% else %}farm{% endif %} text-gray-900 dark:text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
-    <header class="w-full max-w-lg bg-gray-200 dark:bg-gray-700 p-4 flex justify-between items-center rounded-t-lg">
-        <h1 class="text-xl font-bold">Farm Math Challenge</h1>
-        <div class="flex items-center space-x-4">
-            <form action="/set_theme" method="POST" class="flex items-center">
-                <label for="theme" class="mr-2">Theme:</label>
-                <select id="theme" name="theme" class="p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded">
-                    <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
-                    <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
-                    <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
-                </select>
-                <button type="submit" class="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>
-            </form>
-        </div>
-    </header>
-    <main class="w-full max-w-lg bg-white dark:bg-gray-800 p-6 rounded-b-lg shadow-lg flex flex-col items-center">
-        <p class="text-lg mb-4">Solve 10 farm-themed math questions!</p>
-        <div id="question-area" class="w-full mb-4"></div>
-        <p id="score" class="text-lg mt-4">Correct: 0/10</p>
-        <p id="message" class="text-lg font-semibold mt-2"></p>
-        <div class="flex space-x-4 mt-4">
-            <button id="nextBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 hidden">Next Question</button>
-            <button id="restartBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 hidden">Restart</button>
-        </div>
-    </main>
-    <script>
-        const difficulty = new URLSearchParams(window.location.search).get('difficulty') || 'easy';
-        const pointsToAward = difficulty === 'easy' ? 5 : 15;
-        const questions = difficulty === 'easy' ? [
-            { type: 'text', question: '2 cows + 3 = ?', answer: '5', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '4 apples + 2 = ?', options: ['5', '6', '7', '8'], answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '5 sheep - 2 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '3 pigs + 4 = ?', options: ['6', '7', '8', '9'], answer: '7', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '6 eggs - 3 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '2 + 2 = ?', answer: '4', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '5 + 3 = ?', options: ['7', '8', '9', '10'], answer: '8', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '7 - 4 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '2 + 5 = ?', options: ['6', '7', '8', '9'], answer: '7', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '8 - 3 = ?', answer: '5', image: '{{ url_for('static', filename='cat.png') }}' }
-        ] : [
-            { type: 'text', question: '2 cows × 3 = ?', answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '4 apples ÷ 2 = ?', options: ['1', '2', '3', '4'], answer: '2', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '5 sheep + 7 = ?', answer: '12', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '3 pigs × 3 = ?', options: ['6', '9', '12', '15'], answer: '9', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '10 eggs - 4 = ?', answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '2 × 4 = ?', answer: '8', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '6 + 5 = ?', options: ['10', '11', '12', '13'], answer: '11', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '12 ÷ 3 = ?', answer: '4', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'mcq', question: '2 × 6 = ?', options: ['10', '12', '14', '16'], answer: '12', image: '{{ url_for('static', filename='cat.png') }}' },
-            { type: 'text', question: '15 - 7 = ?', answer: '8', image: '{{ url_for('static', filename='cat.png') }}' }
-        ];
+<!-- game.html.j2 -->
+{% extends 'base.html.j2' %}
+{% block title %}Math Game - EduGrok{% endblock %}
+{% block content %}
+<div class="container mx-auto p-6 max-w-4xl">
+  <h1 class="text-4xl font-bold mb-6 text-center text-white">Farm Math Challenge</h1>
+  <p class="text-center mb-6 text-lg text-gray-300 leading-relaxed">Solve 10 farm-themed math questions!</p>
+  <div id="question-area" class="w-full mb-4"></div>
+  <p id="score" class="text-lg mt-4 text-center text-white">Correct: 0/10</p>
+  <p id="message" class="text-lg font-semibold mt-2 text-center text-red-500"></p>
+  <div class="flex justify-center space-x-4 mt-4">
+    <button id="nextBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 hidden">Next Question</button>
+    <button id="restartBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 hidden">Restart</button>
+  </div>
+</div>
+<script>
+  const difficulty = new URLSearchParams(window.location.search).get('difficulty') || 'easy';
+  const pointsToAward = difficulty === 'easy' ? 5 : 15;
+  const questions = difficulty === 'easy' ? [
+      { type: 'text', question: '2 cows + 3 = ?', answer: '5', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '4 apples + 2 = ?', options: ['5', '6', '7', '8'], answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '5 sheep - 2 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '3 pigs + 4 = ?', options: ['6', '7', '8', '9'], answer: '7', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '6 eggs - 3 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '2 + 2 = ?', answer: '4', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '5 + 3 = ?', options: ['7', '8', '9', '10'], answer: '8', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '7 - 4 = ?', answer: '3', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '2 + 5 = ?', options: ['6', '7', '8', '9'], answer: '7', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '8 - 3 = ?', answer: '5', image: '{{ url_for('static', filename='cat.png') }}' }
+  ] : [
+      { type: 'text', question: '2 cows × 3 = ?', answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '4 apples ÷ 2 = ?', options: ['1', '2', '3', '4'], answer: '2', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '5 sheep + 7 = ?', answer: '12', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '3 pigs × 3 = ?', options: ['6', '9', '12', '15'], answer: '9', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '10 eggs - 4 = ?', answer: '6', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '2 × 4 = ?', answer: '8', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '6 + 5 = ?', options: ['10', '11', '12', '13'], answer: '11', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '12 ÷ 3 = ?', answer: '4', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'mcq', question: '2 × 6 = ?', options: ['10', '12', '14', '16'], answer: '12', image: '{{ url_for('static', filename='cat.png') }}' },
+      { type: 'text', question: '15 - 7 = ?', answer: '8', image: '{{ url_for('static', filename='cat.png') }}' }
+  ];
 
-        let currentQuestion = 0;
-        let correctAnswers = 0;
-        const questionArea = document.getElementById('question-area');
-        const scoreDisplay = document.getElementById('score');
-        const messageDisplay = document.getElementById('message');
-        const nextBtn = document.getElementById('nextBtn');
-        const restartBtn = document.getElementById('restartBtn');
-        let timer = null;
+  let currentQuestion = 0;
+  let correctAnswers = 0;
+  const questionArea = document.getElementById('question-area');
+  const scoreDisplay = document.getElementById('score');
+  const messageDisplay = document.getElementById('message');
+  const nextBtn = document.getElementById('nextBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  let timer = null;
 
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
+  function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+  }
 
-        function displayQuestion() {
-            const q = questions[currentQuestion];
-            questionArea.innerHTML = `
-                <div class="question-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                    <img src="${q.image}" alt="Farm animal placeholder" class="w-16 h-16 mb-2 mx-auto" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNjY2MiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiI+Q2F0PC90ZXh0Pjwvc3ZnPg=='">
-                    <p class="text-lg mb-2">${q.question}</p>
-                    ${q.type === 'text' ? `
-                        <input type="text" class="input-field w-full" placeholder="Enter answer">
-                        <button class="submit-btn mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Submit</button>
-                    ` : `
-                        <div class="grid grid-cols-2 gap-2">
-                            ${q.options.map(opt => `<button class="mcq-option" data-value="${opt}">${opt}</button>`).join('')}
-                        </div>
-                    `}
-                </div>
-            `;
-            if (difficulty === 'hard') {
-                startTimer();
-            }
-            bindQuestionEvents();
-        }
+  function displayQuestion() {
+      const q = questions[currentQuestion];
+      questionArea.innerHTML = `
+          <div class="question-card bg-grok-surface p-4 rounded-lg shadow border border-grok-border">
+              <img src="${q.image}" alt="Farm animal placeholder" class="w-16 h-16 mb-2 mx-auto" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNjY2MiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiI+Q2F0PC90ZXh0Pjwvc3ZnPg=='">
+              <p class="text-lg mb-2 text-white">${q.question}</p>
+              ${q.type === 'text' ? `
+                  <input type="text" class="w-full p-2 bg-grok-bg text-white border border-grok-border rounded" placeholder="Enter answer">
+                  <button class="submit-btn mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 w-full">Submit</button>
+              ` : `
+                  <div class="grid grid-cols-2 gap-2">
+                      ${q.options.map(opt => `<button class="mcq-option p-2 rounded hover:bg-grok-accent bg-grok-surface text-white border border-grok-border" data-value="${opt}">${opt}</button>`).join('')}
+                  </div>
+              `}
+          </div>
+      `;
+      if (difficulty === 'hard') {
+          startTimer();
+      }
+      bindQuestionEvents();
+  }
 
-        function startTimer() {
-            let timeLeft = 15; // 15 seconds for hard mode
-            messageDisplay.textContent = `Time left: ${timeLeft}s`;
-            timer = setInterval(() => {
-                timeLeft--;
-                messageDisplay.textContent = `Time left: ${timeLeft}s`;
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    messageDisplay.textContent = 'Time’s up!';
-                    nextQuestion();
-                }
-            }, 1000);
-        }
+  function startTimer() {
+      let timeLeft = 15; // 15 seconds for hard mode
+      messageDisplay.textContent = `Time left: ${timeLeft}s`;
+      timer = setInterval(() => {
+          timeLeft--;
+          messageDisplay.textContent = `Time left: ${timeLeft}s`;
+          if (timeLeft <= 0) {
+              clearInterval(timer);
+              messageDisplay.textContent = 'Time’s up!';
+              nextQuestion();
+          }
+      }, 1000);
+  }
 
-        function bindQuestionEvents() {
-            const card = questionArea.querySelector('.question-card');
-            if (questions[currentQuestion].type === 'text') {
-                const submitBtn = card.querySelector('.submit-btn');
-                const input = card.querySelector('.input-field');
-                submitBtn.addEventListener('click', () => checkAnswer(input.value.trim(), card));
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        checkAnswer(input.value.trim(), card);
-                    }
-                });
-            } else {
-                const options = card.querySelectorAll('.mcq-option');
-                options.forEach(opt => {
-                    opt.addEventListener('click', () => {
-                        options.forEach(o => o.classList.remove('selected'));
-                        opt.classList.add('selected');
-                        checkAnswer(opt.dataset.value, card);
-                    });
-                });
-            }
-        }
+  function bindQuestionEvents() {
+      const card = questionArea.querySelector('.question-card');
+      if (questions[currentQuestion].type === 'text') {
+          const submitBtn = card.querySelector('.submit-btn');
+          const input = card.querySelector('input');
+          submitBtn.addEventListener('click', () => checkAnswer(input.value.trim(), card));
+          input.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                  e.preventDefault();
+                  checkAnswer(input.value.trim(), card);
+              }
+          });
+      } else {
+          const options = card.querySelectorAll('.mcq-option');
+          options.forEach(opt => {
+              opt.addEventListener('click', () => {
+                  options.forEach(o => o.classList.remove('bg-blue-800'));
+                  opt.classList.add('bg-blue-800');
+                  checkAnswer(opt.dataset.value, card);
+              });
+          });
+      }
+  }
 
-        function checkAnswer(answer, card) {
-            clearInterval(timer);
-            if (answer === questions[currentQuestion].answer) {
-                correctAnswers++;
-                scoreDisplay.textContent = `Correct: ${correctAnswers}/10`;
-                card.classList.add('hidden');
-                setTimeout(nextQuestion, 500);
-            } else {
-                messageDisplay.textContent = 'Incorrect, try again!';
-                if (difficulty === 'hard') {
-                    startTimer();
-                }
-            }
-        }
+  function checkAnswer(answer, card) {
+      clearInterval(timer);
+      if (answer === questions[currentQuestion].answer) {
+          correctAnswers++;
+          scoreDisplay.textContent = `Correct: ${correctAnswers}/10`;
+          card.classList.add('hidden');
+          setTimeout(nextQuestion, 500);
+      } else {
+          messageDisplay.textContent = 'Incorrect, try again!';
+          if (difficulty === 'hard') {
+              startTimer();
+          }
+      }
+  }
 
-        function nextQuestion() {
-            clearInterval(timer);
-            currentQuestion++;
-            if (currentQuestion < questions.length) {
-                displayQuestion();
-                messageDisplay.textContent = difficulty === 'hard' ? 'Time left: 15s' : '';
-                nextBtn.classList.add('hidden');
-            } else {
-                winGame();
-            }
-        }
+  function nextQuestion() {
+      clearInterval(timer);
+      currentQuestion++;
+      if (currentQuestion < questions.length) {
+          displayQuestion();
+          messageDisplay.textContent = difficulty === 'hard' ? 'Time left: 15s' : '';
+          nextBtn.classList.add('hidden');
+      } else {
+          winGame();
+      }
+  }
 
-        function winGame() {
-            messageDisplay.textContent = `You Win! +${pointsToAward} points`;
-            fetch('/update_points', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ points: pointsToAward })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) console.error('Failed to update points');
-            })
-            .catch(error => console.error('Error:', error));
-            restartBtn.classList.remove('hidden');
-        }
+  function winGame() {
+      messageDisplay.textContent = `You Win! +${pointsToAward} points`;
+      fetch('/update_points', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ points: pointsToAward })
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (!data.success) console.error('Failed to update points');
+      })
+      .catch(error => console.error('Error:', error));
+      restartBtn.classList.remove('hidden');
+  }
 
-        restartBtn.addEventListener('click', () => {
-            currentQuestion = 0;
-            correctAnswers = 0;
-            scoreDisplay.textContent = 'Correct: 0/10';
-            messageDisplay.textContent = '';
-            clearInterval(timer);
-            shuffle(questions);
-            displayQuestion();
-            restartBtn.classList.add('hidden');
-        });
+  restartBtn.addEventListener('click', () => {
+      currentQuestion = 0;
+      correctAnswers = 0;
+      scoreDisplay.textContent = 'Correct: 0/10';
+      messageDisplay.textContent = '';
+      clearInterval(timer);
+      shuffle(questions);
+      displayQuestion();
+      restartBtn.classList.add('hidden');
+  });
 
-        // Responsive image fallback
-        function handleImageError(img) {
-            img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNjY2MiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiI+Q2F0PC90ZXh0Pjwvc3ZnPg==';
-        }
-
-        // Start game
-        shuffle(questions);
-        displayQuestion();
-    </script>
-</body>
-</html>
+  // Start game
+  shuffle(questions);
+  displayQuestion();
+</script>
+<style>
+.question-card {
+    transition: opacity 0.5s ease;
+}
+.question-card.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+</style>
+{% endblock %} 
