@@ -1,0 +1,147 @@
+<!-- number_game.html.j2 -->
+{% extends 'base.html.j2' %}
+{% block title %}Number Game - EduGrok{% endblock %}
+{% block content %}
+<div class="container mx-auto p-6 max-w-4xl">
+  <h1 class="text-4xl font-bold mb-6 text-center text-gray-800 pirate-text">Asteroid Number Match: Space Adventure</h1>
+  <h2 id="timer" class="text-2xl font-bold text-center mb-6 text-green-600">Time: {{ timer_duration }}s</h2>
+  <p class="text-center mb-6 text-lg text-gray-700 leading-relaxed">Match the numbers to their words before the asteroids collide!</p>
+  <div id="taunt" class="text-center mb-6 text-red-600 font-semibold hidden"></div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center" id="card-container">
+    <!-- Cards dynamically generated in JS -->
+  </div>
+</div>
+<script>
+const numbers = {{ numbers | tojson }};
+const lang = '{{ language }}';
+const taunts = [
+  "Boom! Missed that asteroid!",
+  "Space dust! Try again!",
+  "You'll never match 'em all!"
+];
+let flippedCards = [];
+let matchedPairs = 0;
+let timeLeft = {{ timer_duration }};
+let timerId = null;
+const timerDisplay = document.getElementById('timer');
+const tauntDisplay = document.getElementById('taunt');
+const container = document.getElementById('card-container');
+
+// Generate pairs: one for num, one for word/af
+let cardItems = [];
+numbers.forEach(item => {
+  const prop = lang === 'bilingual' ? 'af' : 'word';
+  cardItems.push({match: item.num, display: item.num});
+  cardItems.push({match: item.num, display: item[prop]});
+});
+
+// Shuffle and render cards
+cardItems.sort(() => Math.random() - 0.5);
+cardItems.forEach((item, index) => {
+  const card = document.createElement('div');
+  card.className = 'w-full max-w-xs';
+  card.innerHTML = `
+    <div class="card h-full text-center bg-white border-0 shadow-lg game-input transform-transition rounded-xl" 
+         data-match="${item.match}" 
+         onclick="flipCard(this)"
+         style="cursor: pointer; transition: transform 0.3s ease-in-out;">
+      <div class="card-body p-6 flex items-center justify-center min-h-[120px]">
+        <span class="front block text-2xl font-bold text-gray-800">${item.display}</span>
+        <span class="back hidden text-2xl font-bold text-gray-800">?</span>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+});
+
+function startTimer() {
+  timerId = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = `Time: ${timeLeft}s`;
+    timerDisplay.className = `text-2xl font-bold text-center mb-6 ${timeLeft <= 10 ? 'text-red-600' : 'text-green-600'}`;
+    if (timeLeft <= 0) {
+      clearInterval(timerId);
+      alert("Time's up! The asteroids collided!");
+      document.querySelectorAll('.game-input').forEach(input => input.style.cursor = 'not-allowed');
+      document.querySelectorAll('.card').forEach(card => card.onclick = null);
+    }
+  }, 1000);
+}
+
+function flipCard(card) {
+  if (timeLeft <= 0 || flippedCards.length >= 2 || card.classList.contains('matched')) return;
+  card.classList.add('rotate-y-180');
+  card.querySelector('.front').classList.add('hidden');
+  card.querySelector('.back').classList.remove('hidden');
+  flippedCards.push(card);
+  if (flippedCards.length === 2) {
+    const [card1, card2] = flippedCards;
+    if (card1.dataset.match === card2.dataset.match) {
+      card1.classList.add('matched', 'bg-green-500', 'text-white');
+      card2.classList.add('matched', 'bg-green-500', 'text-white');
+      matchedPairs++;
+      if (matchedPairs === numbers.length) {
+        completeGame();
+      }
+    } else {
+      tauntDisplay.textContent = taunts[Math.floor(Math.random() * taunts.length)];
+      tauntDisplay.classList.remove('hidden');
+      setTimeout(() => {
+        card1.classList.remove('rotate-y-180');
+        card2.classList.remove('rotate-y-180');
+        card1.querySelector('.front').classList.remove('hidden');
+        card1.querySelector('.back').classList.add('hidden');
+        card2.querySelector('.front').classList.remove('hidden');
+        card2.querySelector('.back').classList.add('hidden');
+        tauntDisplay.classList.add('hidden');
+      }, 1000);
+    }
+    flippedCards = [];
+  }
+}
+
+function completeGame() {
+  if (timeLeft > 0) {
+    clearInterval(timerId);
+    fetch(window.location.pathname, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score: timeLeft })
+    }).then(response => response.json()).then(data => {
+      if (data.success) {
+        fetch('/update_coins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ coins: 5 })
+        }).then(response => response.json()).then(data => {
+          if (data.success) {
+            alert('You saved the spaceship! +5 Star Coins');
+            window.location.href = '/profile';
+          } else {
+            alert('Failed to award coins: ' + (data.error || 'Unknown error'));
+          }
+        }).catch(error => {
+          alert('Error awarding coins');
+          console.error(error);
+        });
+      } else {
+        alert('Failed to save game score');
+      }
+    }).catch(error => {
+      alert('Error completing game');
+      console.error(error);
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  startTimer();
+});
+</script>
+<style>
+.card { transition: transform 0.3s; }
+.card.matched { pointer-events: none; }
+.rotate-y-180 { transform: rotateY(180deg); }
+.transform-transition { /* Fallback for smoother hovers if needed */ }
+</style>
+{% endblock %}
