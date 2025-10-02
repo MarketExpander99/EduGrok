@@ -1,5 +1,6 @@
 ﻿# db.py
 import sqlite3
+import os
 from flask import g
 import logging
 
@@ -26,7 +27,8 @@ def init_db():
                   password TEXT, 
                   grade INTEGER, 
                   handle TEXT, 
-                  theme TEXT DEFAULT 'astronaut', 
+                  theme TEXT DEFAULT 'astronaut',
+                  subscribed INTEGER DEFAULT 0, 
                   language TEXT DEFAULT 'en', 
                   star_coins INTEGER DEFAULT 0, 
                   points INTEGER DEFAULT 0)''')
@@ -95,6 +97,12 @@ def init_db():
     conn.commit()
     conn.close()
 
+def reset_db():
+    if os.path.exists('database.db'):
+        os.remove('database.db')
+    init_db()
+    logger.info("Database reset complete")
+
 def seed_lessons():
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
@@ -111,27 +119,37 @@ def seed_lessons():
     conn.commit()
     conn.close()
 
-def reset_db():
+def check_db_schema():
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    tables = ['users', 'lessons', 'posts', 'comments', 'likes', 'reposts', 'user_lessons', 'user_points', 'badges', 'games', 'tests', 'feedback']
-    for table in tables:
-        c.execute(f'DROP TABLE IF EXISTS {table}')
-    conn.commit()
-    conn.close()
-    init_db()
-
-def check_db_schema():
-    conn = get_db()
-    c = conn.cursor()
-    # Check lessons
-    c.execute("PRAGMA table_info(lessons)")
-    columns = [col[1] for col in c.fetchall()]
-    if 'type' not in columns:
-        c.execute("ALTER TABLE lessons ADD COLUMN type TEXT")
-    if 'correct_answer' not in columns:
-        c.execute("ALTER TABLE lessons ADD COLUMN correct_answer TEXT")
-    # Similar checks for other tables if needed
-    conn.commit()
-    from achievements_db import check_achievements_schema
-    check_achievements_schema(conn)
+    try:
+        # Check lessons table
+        c.execute("PRAGMA table_info(lessons)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'type' not in columns:
+            c.execute("ALTER TABLE lessons ADD COLUMN type TEXT")
+            conn.commit()
+            logger.info("Added type column to lessons table")
+            print("Added type column to lessons table")
+        if 'correct_answer' not in columns:
+            c.execute("ALTER TABLE lessons ADD COLUMN correct_answer TEXT")
+            conn.commit()
+            logger.info("Added correct_answer column to lessons table")
+            print("Added correct_answer column to lessons table")
+        
+        # Check users table for subscribed
+        c.execute("PRAGMA table_info(users)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'subscribed' not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN subscribed INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added subscribed column to users table")
+            print("Added subscribed column to users table")
+        
+        from achievements_db import check_achievements_schema
+        check_achievements_schema(conn)
+    except Exception as e:
+        logger.error(f"DB schema check failed: {str(e)}")
+        raise
+    finally:
+        conn.close()
