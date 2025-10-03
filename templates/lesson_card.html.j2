@@ -1,6 +1,8 @@
 <!-- lesson_card.html.j2 -->
 <div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-    <h3 class="text-lg font-semibold text-orange-100 mb-3">{{ lesson.subject }}</h3>
+    <h2 class="text-xl font-bold text-white mb-2">{{ lesson.title or 'Untitled' }}</h2>
+    <h3 class="text-lg font-semibold text-orange-100 mb-3">{{ lesson.subject | capitalize }}</h3>
+    <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
     <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
     {% if lesson.subject == 'math' %}
         <!-- Math Fill-in -->
@@ -70,9 +72,12 @@
             <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
         </div>
     {% endif %}
-    <div class="flex justify-end">
+    <div class="flex justify-end space-x-2">
         <button onclick="completeLesson({{ lesson.id }})" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
             Complete Lesson
+        </button>
+        <button onclick="doAgain({{ lesson.id }})" class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition inline-flex items-center">
+            Do Again
         </button>
     </div>
 </div>
@@ -88,11 +93,10 @@ function checkMath(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'math_fill',
-            response: answer,
-            complete_lesson: false
+            response: answer
         })
     }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
+        if (data.is_correct) {
             alert('Correct! +' + data.points + ' points');
         } else {
             alert(data.message || 'Try again!');
@@ -107,11 +111,10 @@ function submitMatch(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'match_game',
-            response: 'demo_match',
-            complete_lesson: false
+            response: 'demo_match'
         })
     }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
+        if (data.is_correct) {
             alert('Great match! +' + data.points + ' points');
         } else {
             alert(data.message || 'Keep trying!');
@@ -128,11 +131,10 @@ function checkTrace(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'trace_complete',
-            response: input,
-            complete_lesson: false
+            response: input
         })
     }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
+        if (data.is_correct) {
             alert('Correct! Great job tracing the word. +' + data.points + ' points');
         } else {
             alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
@@ -149,11 +151,10 @@ function checkSpelling(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'spelling_complete',
-            response: input,
-            complete_lesson: false
+            response: input
         })
     }).then(res => res.json()).then(data => {
-        if (data.success && data.is_correct) {
+        if (data.is_correct) {
             alert('Correct! You spelled the word correctly. +' + data.points + ' points');
         } else {
             alert(data.message || 'Try again! Check the spelling carefully.');
@@ -174,4 +175,46 @@ function checkMultipleChoice(lessonId) {
         body: JSON.stringify({
             lesson_id: lessonId,
             activity_type: 'mc_choice',
-            response:
+            response: answer
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.is_correct) {
+            alert('Correct! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function checkSentence(lessonId) {
+    const select = document.getElementById('sentence-select-' + lessonId);
+    if (!select.value) {
+        alert('Please select an option.');
+        return;
+    }
+    const answer = select.value.trim().toLowerCase();
+    fetch('/check_lesson', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            lesson_id: lessonId,
+            activity_type: 'sentence_complete',
+            response: answer
+        })
+    }).then(res => res.json()).then(data => {
+        if (data.is_correct) {
+            alert('Correct! +' + data.points + ' points');
+        } else {
+            alert(data.message || 'Try again!');
+        }
+    }).catch(err => console.error('Error:', err));
+}
+
+function completeLesson(lessonId) {
+    window.location.href = `/complete_lesson/${lessonId}`;
+}
+
+function doAgain(lessonId) {
+    window.location.href = `/reset_lesson/${lessonId}`;
+}
+</script>

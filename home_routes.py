@@ -19,7 +19,7 @@ def home():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    # FIXED: Updated query to use subquery for original_handle from posts table
+    # Fetch posts
     c.execute('''
         SELECT p.*, 
         (SELECT handle FROM posts o WHERE o.id = p.original_post_id) as original_handle,
@@ -32,7 +32,7 @@ def home():
     ''', (session['user_id'], session['user_id']))
     posts = [dict(row) for row in c.fetchall()]
     
-    # FIXED: Increment views for new/unviewed posts (simple session-based tracking)
+    # Increment views
     viewed_posts = set(session.get('viewed_posts', []))
     new_viewed = [post['id'] for post in posts if post['id'] not in viewed_posts]
     if new_viewed:
@@ -52,17 +52,26 @@ def home():
         if post_id not in comments:
             comments[post_id] = []
         comments[post_id].append(comment)
-    # Fetch lessons, process content if needed
-    c.execute('SELECT * FROM lessons')
+    
+    # Fetch assigned lessons (in feed)
+    c.execute('''SELECT l.* FROM lessons l 
+                 JOIN lessons_users lu ON l.id = lu.lesson_id 
+                 LEFT JOIN completed_lessons cl ON l.id = cl.lesson_id AND cl.user_id = lu.user_id
+                 WHERE lu.user_id = ? AND cl.id IS NULL''', (session['user_id'],))
     raw_lessons = c.fetchall()
     lessons = []
     for row in raw_lessons:
         lesson = dict(row)
-        if lesson['type'] == 'multiple_choice':
+        if lesson['mc_options']:
             try:
-                lesson['content'] = json.loads(lesson['content'])
+                lesson['mc_options'] = json.loads(lesson['mc_options'])
             except json.JSONDecodeError:
-                lesson['content'] = {'question': 'Error loading question', 'options': []}
+                lesson['mc_options'] = []
+        if lesson['sentence_options']:
+            try:
+                lesson['sentence_options'] = json.loads(lesson['sentence_options'])
+            except json.JSONDecodeError:
+                lesson['sentence_options'] = []
         lessons.append(lesson)
     theme = session.get('theme', 'astronaut')
     language = session.get('language', 'en')

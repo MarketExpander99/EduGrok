@@ -30,7 +30,11 @@ def check_achievements_schema(conn):
     try:
         # Check badges table for awarded_date (migrate from earned_at if exists)
         c.execute("PRAGMA table_info(badges)")
-        columns = {col[1]: col[2] for col in c.fetchall()}
+        columns_list = c.fetchall()
+        if not columns_list:
+            logger.error("Table badges missing")
+            raise ValueError("Table badges missing")
+        columns = {col[1]: col[2] for col in columns_list}
         if 'earned_at' in columns and 'awarded_date' not in columns:
             # Migrate earned_at to awarded_date
             c.execute("ALTER TABLE badges RENAME COLUMN earned_at TO awarded_date")

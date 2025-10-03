@@ -96,7 +96,6 @@ def init_app():
     with app.app_context():
         try:
             init_db()
-            check_db_schema()
             # FIXED: Removed duplicate seed_lessons() call; already in init_db()
             # Setup upload folder
             upload_folder = os.path.join(app.static_folder, 'uploads')

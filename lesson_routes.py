@@ -1,4 +1,5 @@
 # lesson_routes.py
+import json
 from flask import session, request, flash, redirect, url_for, jsonify, render_template
 from db import get_db
 import logging
@@ -12,28 +13,67 @@ def check_lesson():
             return jsonify({'success': False, 'error': 'Not logged in'}), 401
         data = request.get_json()
         lesson_id = data.get('lesson_id')
-        user_input = data.get('user_input')
-        if not lesson_id or user_input is None:
+        activity_type = data.get('activity_type')
+        user_input = data.get('response')
+        if not lesson_id or not activity_type or user_input is None:
             return jsonify({'success': False, 'error': 'Missing data'}), 400
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT type, correct_answer FROM lessons WHERE id = ?", (lesson_id,))
-        lesson = c.fetchone()
-        if not lesson:
-            return jsonify({'success': False, 'error': 'Lesson not found'}), 404
-        correct_answer = lesson['correct_answer']
-        lesson_type = lesson['type']
         success = False
-        if lesson_type in ['trace', 'spelling', 'sentence']:
-            success = user_input.strip().lower() == correct_answer.lower()
-        elif lesson_type == 'multiple_choice':
-            success = user_input == correct_answer
+        correct_answer = None
+        points = 10
+        if activity_type == 'math_fill':
+            c.execute("SELECT math_answer FROM lessons WHERE id = ?", (lesson_id,))
+            result = c.fetchone()
+            if result:
+                correct_answer = result['math_answer']
+                success = str(user_input).strip() == str(correct_answer).strip()
+        elif activity_type == 'trace_complete':
+            c.execute("SELECT trace_word FROM lessons WHERE id = ?", (lesson_id,))
+            result = c.fetchone()
+            if result:
+                correct_answer = result['trace_word']
+                success = str(user_input).strip().lower() == str(correct_answer).lower()
+        elif activity_type == 'spelling_complete':
+            c.execute("SELECT spell_word FROM lessons WHERE id = ?", (lesson_id,))
+            result = c.fetchone()
+            if result:
+                correct_answer = result['spell_word']
+                success = str(user_input).strip().lower() == str(correct_answer).lower()
+        elif activity_type == 'mc_choice':
+            c.execute("SELECT mc_answer FROM lessons WHERE id = ?", (lesson_id,))
+            result = c.fetchone()
+            if result:
+                correct_answer = result['mc_answer']
+                success = str(user_input).strip().lower() == str(correct_answer).lower()
+        elif activity_type == 'sentence_complete':
+            c.execute("SELECT sentence_answer FROM lessons WHERE id = ?", (lesson_id,))
+            result = c.fetchone()
+            if result:
+                correct_answer = result['sentence_answer']
+                success = str(user_input).strip().lower() == str(correct_answer).lower()
+        else:
+            return jsonify({'success': False, 'error': 'Invalid activity type'}), 400
+        
+        if not correct_answer:
+            return jsonify({'success': False, 'error': 'Lesson or activity not found'}), 404
+        
         message = 'Correct!' if success else 'Try again.'
         if success:
-            c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, 10, ?)",
-                      (session['user_id'], datetime.now().isoformat()))
+            # Insert response
+            c.execute('''INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) 
+                         VALUES (?, ?, ?, ?, 1, ?)''', (lesson_id, session['user_id'], activity_type, user_input, points))
+            # Award points
+            c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, ?, ?)",
+                      (session['user_id'], points, datetime.now().isoformat()))
             conn.commit()
-        return jsonify({'success': success, 'message': message})
+            return jsonify({'success': True, 'is_correct': True, 'message': message, 'points': points})
+        else:
+            # Log incorrect response
+            c.execute('''INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) 
+                         VALUES (?, ?, ?, ?, 0, 0)''', (lesson_id, session['user_id'], activity_type, user_input))
+            conn.commit()
+            return jsonify({'success': True, 'is_correct': False, 'message': message})
     return jsonify({'success': False, 'error': 'Invalid method'}), 405
 
 def complete_lesson(lesson_id):
@@ -41,7 +81,7 @@ def complete_lesson(lesson_id):
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO user_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)",
+    c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)",
               (session['user_id'], lesson_id, datetime.now().isoformat()))
     conn.commit()
     flash('Lesson completed!', 'success')
@@ -52,7 +92,7 @@ def reset_lesson(lesson_id):
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM user_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
+    c.execute("DELETE FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
     conn.commit()
     flash('Lesson reset!', 'success')
     return redirect(url_for('home'))
@@ -62,8 +102,26 @@ def lessons():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM lessons")
-    lessons = [dict(row) for row in c.fetchall()]
+    c.execute("SELECT * FROM lessons WHERE grade = ?", (session.get('grade', 1),))
+    raw_lessons = c.fetchall()
+    lessons = []
+    for row in raw_lessons:
+        lesson = dict(row)
+        if lesson['mc_options']:
+            try:
+                lesson['mc_options'] = json.loads(lesson['mc_options'])
+            except json.JSONDecodeError:
+                lesson['mc_options'] = []
+        if lesson['sentence_options']:
+            try:
+                lesson['sentence_options'] = json.loads(lesson['sentence_options'])
+            except json.JSONDecodeError:
+                lesson['sentence_options'] = []
+        c.execute("SELECT 1 FROM lessons_users WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson['id']))
+        lesson['added'] = bool(c.fetchone())
+        c.execute("SELECT 1 FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson['id']))
+        lesson['completed'] = bool(c.fetchone())
+        lessons.append(lesson)
     return render_template('lessons.html.j2', lessons=lessons, grade=session.get('grade', 1), theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def generate_lesson():
@@ -75,5 +133,21 @@ def schedule_lessons():
     return jsonify({'success': False, 'error': 'Not implemented'})
 
 def add_to_feed():
-    # Placeholder
-    return jsonify({'success': False, 'error': 'Not implemented'})
+    if request.method == 'POST':
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        data = request.get_json()
+        lesson_id = data.get('lesson_id')
+        if not lesson_id:
+            return jsonify({'success': False, 'error': 'Missing lesson_id'}), 400
+        conn = get_db()
+        c = conn.cursor()
+        try:
+            c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, assigned_at) VALUES (?, ?, ?)",
+                      (session['user_id'], lesson_id, datetime.now().isoformat()))
+            conn.commit()
+            return jsonify({'success': True})
+        except Exception as e:
+            logger.error(f"Add to feed failed: {str(e)}")
+            return jsonify({'success': False, 'error': 'Server error'}), 500
+    return jsonify({'success': False, 'error': 'Invalid method'}), 405
