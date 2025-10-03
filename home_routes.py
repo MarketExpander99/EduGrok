@@ -1,8 +1,9 @@
 # home_routes.py
-from flask import render_template, session, redirect, url_for
+from flask import render_template, session, redirect, url_for, request
 from db import get_db
 import json
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,17 @@ def home():
         return redirect(url_for('login'))
     conn = get_db()
     c = conn.cursor()
-    # Fetch posts
-    c.execute('''
+    # Fetch posts with sort
+    sort = request.args.get('sort', 'latest')
+    if sort == 'latest':
+        order_by = 'p.created_at DESC'
+    elif sort == 'most_views':
+        order_by = 'p.views DESC'
+    else:
+        order_by = 'p.created_at DESC'
+        sort = 'latest'  # fallback
+
+    c.execute(f'''
         SELECT p.*, 
         (SELECT handle FROM posts o WHERE o.id = p.original_post_id) as original_handle,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) as likes,
@@ -28,13 +38,18 @@ def home():
         (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
         (SELECT 1 FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
         FROM posts p 
-        ORDER BY p.created_at DESC
+        ORDER BY {order_by}
     ''', (session['user_id'], session['user_id']))
-    posts = [dict(row) for row in c.fetchall()]
+    raw_posts = c.fetchall()
+    posts = [dict(row) for row in raw_posts]
     
-    # Increment views
+    # Add is_new for highlighting
     viewed_posts = set(session.get('viewed_posts', []))
-    new_viewed = [post['id'] for post in posts if post['id'] not in viewed_posts]
+    for post in posts:
+        post['is_new'] = post['id'] not in viewed_posts
+    
+    # Increment views for new posts
+    new_viewed = [post['id'] for post in posts if post['is_new']]
     if new_viewed:
         placeholders = ','.join(['?' for _ in new_viewed])
         c.execute(f"UPDATE posts SET views = views + 1 WHERE id IN ({placeholders})", new_viewed)
@@ -73,7 +88,17 @@ def home():
             except json.JSONDecodeError:
                 lesson['sentence_options'] = []
         lessons.append(lesson)
-    theme = session.get('theme', 'astronaut')
-    language = session.get('language', 'en')
-    logger.info(f"Home loaded for user {session['user_id']}")
-    return render_template('home.html.j2', posts=posts, comments=comments, lessons=lessons, theme=theme, language=language)
+    
+    # Interleave posts and lessons (insert lessons between posts)
+    combined = []
+    lessons_copy = lessons[:]
+    for post in posts:
+        combined.append({'type': 'post', **post})
+        if lessons_copy:
+            lesson = lessons_copy.pop(0)
+            combined.append({'type': 'lesson', **lesson})
+    # Append remaining lessons if any
+    for remaining_lesson in lessons_copy:
+        combined.append({'type': 'lesson', **remaining_lesson})
+    
+    return render_template('home.html.j2', combined=combined, comments=comments, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'), sort_option=sort)

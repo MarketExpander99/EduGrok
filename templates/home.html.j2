@@ -1,275 +1,309 @@
+<!-- home.html.j2 -->
 {% extends "base.html.j2" %}
 
+{% block title %}EduGrok Home{% endblock %}
+
 {% block content %}
-<div class="max-w-lg mx-auto mb-6">
-    <h2 class="text-2xl font-semibold mb-6 text-white">Welcome to EduGrok, Dino Cowboy!</h2>
-</div>
-
-<!-- Create Post Form -->
-<div class="bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-    <h3 class="text-lg font-semibold text-orange-100 mb-4">Create a Post</h3>
-    <form action="/create_post" method="POST" enctype="multipart/form-data">
-        <textarea name="content" placeholder="What's on your mind? Share your thoughts or questions!" class="w-full p-3 border border-gray-600 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" required rows="3"></textarea>
-        <div class="flex flex-col mb-3">
-            <label for="media" class="text-gray-300 mb-2">Upload Image or Video (optional):</label>
-            <input type="file" name="media" id="media" accept="image/*,video/mp4" class="text-gray-300">
-        </div>
-        <div class="flex flex-col mb-3">
-            <label for="subject" class="text-gray-300 mb-2">Subject:</label>
-            <select name="subject" id="subject" class="w-full p-3 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white">
-                <option value="Math">Math</option>
-                <option value="Language">Language</option>
-                <option value="Science">Science</option>
-                <option value="General">General</option>
-            </select>
-        </div>
-        <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition w-full">Post</button>
-    </form>
-</div>
-
-<!-- Lessons Section -->
-<div class="lessons-section mb-8">
-    <h2 class="text-xl font-semibold mb-4 text-gray-300">Today's Lessons</h2>
-    {% for lesson in lessons %}
-    <div class="lesson-card bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-        <h3 class="text-lg font-semibold text-blue-100 mb-2">{{ lesson.title }}</h3>
-        <p class="text-gray-400 mb-4">{{ lesson.description or 'No description available.' }}</p>
-        {% if lesson.type == 'match' %}
-            <p>Match numbers: Drag to pair (e.g., 2x3 to 6)</p>
-            <!-- Placeholder for drag-and-drop; implement if needed -->
-            <button class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">Match 1</button>
-        {% elif lesson.type == 'trace' %}
-            <p>Trace the Word</p>
-            <p>Type the word you see below to practice spelling:</p>
-            <p class="trace-word" id="trace-word-{{ lesson.id }}">{{ lesson.content }}</p>
-            <input type="text" id="trace-input-{{ lesson.id }}" class="input-field bg-gray-800 text-white border border-gray-600 rounded-lg p-2 w-full mb-2">
-            <button onclick="checkLesson({{ lesson.id }}, 'trace')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">Check</button>
-            <div id="trace-feedback-{{ lesson.id }}" class="feedback mt-2 font-bold"></div>
-        {% elif lesson.type == 'spelling' %}
-            <p>Spelling Practice</p>
-            <p>Spell the word for the given sound: {{ lesson.content }}</p>
-            <input type="text" id="spelling-input-{{ lesson.id }}" class="input-field bg-gray-800 text-white border border-gray-600 rounded-lg p-2 w-full mb-2">
-            <button onclick="checkLesson({{ lesson.id }}, 'spelling')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">Check</button>
-            <div id="spelling-feedback-{{ lesson.id }}" class="feedback mt-2 font-bold"></div>
-        {% elif lesson.type == 'multiple_choice' %}
-            <p>Multiple Choice Question</p>
-            <p>{{ lesson.content.question }}</p>
-            {% for option in lesson.content.options %}
-                <label class="block"><input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}"> {{ option }}</label>
-            {% endfor %}
-            <button onclick="checkLesson({{ lesson.id }}, 'multiple_choice')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition mt-2">Check</button>
-            <div id="multiple_choice-feedback-{{ lesson.id }}" class="feedback mt-2 font-bold"></div>
-        {% elif lesson.type == 'sentence' %}
-            <p>Sentence Completion</p>
-            <p>Complete the sentence: {{ lesson.content }}</p>
-            <input type="text" id="sentence-input-{{ lesson.id }}" class="input-field bg-gray-800 text-white border border-gray-600 rounded-lg p-2 w-full mb-2">
-            <button onclick="checkLesson({{ lesson.id }}, 'sentence')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">Check</button>
-            <div id="sentence-feedback-{{ lesson.id }}" class="feedback mt-2 font-bold"></div>
-        {% else %}
-            <p class="text-white">Content: {{ lesson.content }}</p>
-        {% endif %}
-        <button onclick="completeLesson({{ lesson.id }})" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition mt-4">Complete Lesson</button>
-        <button onclick="doAgain({{ lesson.id }})" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition mt-4 ml-2">Do Again</button>
-    </div>
-    {% endfor %}
-</div>
-
-<!-- Posts Section -->
-<div class="posts-section">
-    <h2 class="text-xl font-semibold mb-4 text-gray-300">Community Feed</h2>
-    {% for post in posts %}
-    <div id="post-{{ post.id }}" class="post-card bg-black p-5 rounded-xl shadow-lg border border-orange-300 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
-        <div class="flex items-center mb-3">
-            <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm">
-                {{ post.handle[0] | upper if post.handle else 'U' }}
-            </div>
-            <div>
-                <h3 class="text-sm font-semibold text-blue-100">{{ post.handle }} (Grade {{ post.grade }})</h3>
-                <p class="text-xs text-gray-400">{{ post.created_at }}</p>
-            </div>
-        </div>
-        {% if post.original_handle %}
-            <div class="text-gray-400 text-xs mb-2 flex items-center">
-                <span class="text-lg mr-1">🔄</span>
-                <span>Reposted from {{ post.original_handle }}</span>
-            </div>
-        {% endif %}
-        <p class="text-white leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
-        {% if post.media_url %}
-            {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
-                <img src="{{ post.media_url }}" alt="Post media" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 1rem;">
-            {% elif post.media_url.endswith('.mp4') %}
-                <video controls style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem;">
-                    <source src="{{ post.media_url }}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            {% endif %}
-        {% endif %}
-        <!-- View Count -->
-        <div class="flex items-center text-gray-400 text-xs mb-3">
-            <span class="mr-1">👁️</span>
-            <span>{{ post.views or 0 }} views</span>
-        </div>
-        <div class="flex flex-wrap gap-2 mb-3">
-            <span class="bg-blue-900 text-blue-100 text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
-            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes or 0 }}</span>
-            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Reposts: {{ post.reposts or 0 }}</span>
-        </div>
-        <!-- Social Interactions Bar -->
-        <div class="flex justify-between items-center pt-3 border-t border-gray-700">
-            <div class="flex space-x-6">
-                <!-- Like Button with Icon -->
-                <button onclick="likePost({{ post.id }})" class="text-gray-400 hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
-                    <span class="text-lg">❤️</span>
-                    <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
-                </button>
-                <!-- Repost Button -->
-                <button onclick="repostPost({{ post.id }})" class="text-gray-400 hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
-                    <span class="text-lg">🔄</span>
-                    <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
-                </button>
-                <!-- Comment Button -->
-                <button onclick="toggleComments({{ post.id }})" class="text-gray-400 hover:text-blue-400 transition flex items-center space-x-1">
-                    <span class="text-lg">💬</span>
-                    <span class="text-sm">Comment</span>
-                </button>
-            </div>
-            <!-- Share Button -->
-            <button onclick="sharePost({{ post.id }})" class="text-gray-400 hover:text-indigo-400 transition flex items-center space-x-1">
-                <span class="text-lg">📤</span>
-                <span class="text-sm">Share</span>
-            </button>
-        </div>
-        {% if post.id in comments %}
-        {% set sorted_comments = comments[post.id] | sort(attribute='created_at', reverse=True) %}
-        {% set visible_comments = sorted_comments[:5] %}
-        {% set hidden_comments = sorted_comments[5:] %}
-        <div class="comments-section mt-4 p-3 bg-gray-900 rounded-lg">
-            <h4 class="text-sm font-semibold text-blue-100 mb-2">Comments:</h4>
-            {% for comment in visible_comments %}
-            <div class="comment mb-2 text-sm text-gray-300">
-                <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
-                {{ comment.content | safe }}
-            </div>
-            {% endfor %}
-            {% if hidden_comments %}
-            <div id="hidden-comments-{{ post.id }}" style="display: none;">
-                {% for comment in hidden_comments %}
-                <div class="comment mb-2 text-sm text-gray-300">
-                    <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
-                    {{ comment.content | safe }}
-                </div>
+<div class="container mx-auto p-6 max-w-4xl">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg {% if category == 'success' %}bg-green-900 text-green-100{% elif category == 'error' %}bg-red-900 text-red-100{% else %}bg-blue-900 text-blue-100{% endif %}">
+                        {{ message }}
+                    </div>
                 {% endfor %}
             </div>
-            <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-blue-400 hover:text-blue-300 text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
-            {% endif %}
-        </div>
         {% endif %}
-        <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
-            <form method="POST" action="/comment/{{ post.id }}">
-                <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400" required rows="2"></textarea>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post Comment</button>
-            </form>
-        </div>
+    {% endwith %}
+
+    <!-- Sort Dropdown -->
+    <div class="mb-6 flex justify-end">
+        <label for="sort" class="mr-2 text-gray-300 font-medium">Sort by:</label>
+        <select id="sort" class="p-2 bg-gray-800 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="window.location.href = '?sort=' + this.value">
+            <option value="latest" {% if sort_option == 'latest' %}selected{% endif %}>Latest</option>
+            <option value="most_views" {% if sort_option == 'most_views' %}selected{% endif %}>Most Views</option>
+        </select>
     </div>
-{% endfor %}
 
-<script>
-// Post-specific JS (likes, reposts, comments toggle)
-function likePost(postId) {
-    fetch(`/like/${postId}`, {method: 'POST'})
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) {
-            location.reload();
-        } else {
-            alert(d.error);
+    <!-- Create Post Button -->
+    <div class="mb-6 text-center">
+        <button id="open-post-form" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-semibold flex items-center justify-center mx-auto">
+            <span class="text-xl mr-2">+</span> Create Post
+        </button>
+    </div>
+
+    <!-- Feed -->
+    {% if combined %}
+        <div class="space-y-6">
+            {% for item in combined %}
+                {% if item.type == 'post' %}
+                    {% set post = item %}
+                    {% include 'post_card.html.j2' %}
+                {% else %}
+                    {% set lesson = item %}
+                    {% include 'lesson_card.html.j2' %}
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-8 bg-black p-5 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-white">No Posts Yet</h2>
+            <p class="text-gray-300 mb-6">Create a post or add lessons to get started!</p>
+        </div>
+    {% endif %}
+
+    <!-- Include Post Form Modal -->
+    {% include 'post_form.html.j2' %}
+
+    <script>
+        // Modal JS
+        const openBtn = document.getElementById('open-post-form');
+        const modal = document.getElementById('post-form');
+        const backdrop = document.getElementById('post-form-backdrop');
+        const cancelBtn = document.getElementById('cancel-post');
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            backdrop.classList.remove('hidden');
+            modal.classList.remove('scale-95');
         }
-    });
-}
 
-function repostPost(postId) {
-    fetch(`/repost/${postId}`, {method: 'POST'})
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) {
-            location.reload();
-        } else {
-            alert(d.error);
+        function closeModal() {
+            modal.classList.add('hidden');
+            backdrop.classList.add('hidden');
+            modal.classList.add('scale-95');
         }
-    });
-}
 
-function toggleComments(postId) {
-    const form = document.getElementById(`comment-form-${postId}`);
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-}
+        openBtn.addEventListener('click', openModal);
+        cancelBtn.addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
 
-function toggleCommentsExtra(postId) {
-    const hiddenDiv = document.getElementById(`hidden-comments-${postId}`);
-    const btn = document.getElementById(`toggle-btn-${postId}`);
-    if (hiddenDiv.style.display === 'none') {
-        hiddenDiv.style.display = 'block';
-        btn.textContent = 'Show less';
-    } else {
-        hiddenDiv.style.display = 'none';
-        btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
-    }
-}
+        // Media Preview
+        const fileInput = document.getElementById('media-upload');
+        const preview = document.getElementById('media-preview');
 
-function sharePost(postId) {
-    const url = `${window.location.origin}/home#post-${postId}`;
-    navigator.clipboard.writeText(url).then(() => {
-        const btn = event.target;
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>';
-        btn.style.color = '#a78bfa';
-        setTimeout(() => {
-            btn.innerHTML = originalHTML;
-            btn.style.color = '';
-        }, 2000);
-    }).catch(() => {
-        alert('Failed to copy link. Please copy manually: ' + url);
-    });
-}
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            preview.innerHTML = '';
+            if (file) {
+                const type = file.type;
+                if (type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    img.className = 'max-w-full h-auto rounded-lg';
+                    preview.appendChild(img);
+                } else if (type === 'video/mp4') {
+                    const video = document.createElement('video');
+                    video.src = URL.createObjectURL(file);
+                    video.controls = true;
+                    video.className = 'max-w-full h-auto rounded-lg';
+                    preview.appendChild(video);
+                }
+            }
+        });
 
-// Lesson check function
-function checkLesson(lessonId, type) {
-    let userInput;
-    if (type === 'multiple_choice') {
-        const selected = document.querySelector(`input[name="mc-${lessonId}"]:checked`);
-        if (!selected) {
-            alert('Please select an option');
-            return;
+        // Char count
+        const textarea = document.getElementById('post-content');
+        const charCount = document.getElementById('char-count');
+        textarea.addEventListener('input', () => {
+            charCount.textContent = `${textarea.value.length}/280`;
+        });
+
+        // Post-specific JS (likes, reposts, comments toggle)
+        function likePost(postId) {
+            fetch(`/like/${postId}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    location.reload();
+                } else {
+                    alert(d.error);
+                }
+            });
         }
-        userInput = selected.value;
-    } else {
-        userInput = document.getElementById(`${type}-input-${lessonId}`).value;
-        if (!userInput.trim()) {
-            alert('Please enter your answer');
-            return;
+
+        function repostPost(postId) {
+            fetch(`/repost/${postId}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    location.reload();
+                } else {
+                    alert(d.error);
+                }
+            });
         }
-    }
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lesson_id: lessonId, user_input: userInput })
-    })
-    .then(response => response.json())
-    .then(data => {
-        const feedback = document.getElementById(`${type}-feedback-${lessonId}`);
-        feedback.innerText = data.message;
-        feedback.style.color = data.success ? 'green' : 'red';
-    })
-    .catch(error => console.error('Error:', error));
-}
 
-function completeLesson(lessonId) {
-    window.location.href = `/complete_lesson/${lessonId}`;
-}
+        function toggleComments(postId) {
+            const form = document.getElementById(`comment-form-${postId}`);
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
 
-function doAgain(lessonId) {
-    window.location.href = `/reset_lesson/${lessonId}`;
-}
-</script>
+        function toggleCommentsExtra(postId) {
+            const hiddenDiv = document.getElementById(`hidden-comments-${postId}`);
+            const btn = document.getElementById(`toggle-btn-${postId}`);
+            if (hiddenDiv.style.display === 'none') {
+                hiddenDiv.style.display = 'block';
+                btn.textContent = 'Show less';
+            } else {
+                hiddenDiv.style.display = 'none';
+                btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
+            }
+        }
+
+        function sharePost(postId) {
+            const url = `${window.location.origin}/home#post-${postId}`;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = event.target;
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>';
+                btn.style.color = '#a78bfa';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.color = '';
+                }, 2000);
+            }).catch(() => {
+                alert('Failed to copy link. Please copy manually: ' + url);
+            });
+        }
+
+        // Lesson check functions
+        function checkMath(lessonId) {
+            const inputValue = document.getElementById('math-input-' + lessonId).value.trim();
+            if (!inputValue) { alert('Please enter an answer.'); return; }
+            const answer = parseFloat(inputValue) || 0;
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'math_fill',
+                    response: answer
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Correct! +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Try again!');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function submitMatch(lessonId) {
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'match_game',
+                    response: 'demo_match'
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Great match! +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Keep trying!');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function checkTrace(lessonId) {
+            const input = document.getElementById('trace-input-' + lessonId).value.trim().toLowerCase();
+            if (!input) { alert('Please enter the word.'); return; }
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'trace_complete',
+                    response: input
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Correct! Great job tracing the word. +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function checkSpelling(lessonId) {
+            const input = document.getElementById('spell-input-' + lessonId).value.trim().toLowerCase();
+            if (!input) { alert('Please enter your spelling.'); return; }
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'spelling_complete',
+                    response: input
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Correct! You spelled the word correctly. +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Try again! Check the spelling carefully.');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function checkMultipleChoice(lessonId) {
+            const selected = document.querySelector('input[name="mc-' + lessonId + '"]:checked');
+            if (!selected) {
+                alert('Please select an option.');
+                return;
+            }
+            const answer = selected.value.trim().toLowerCase();
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'mc_choice',
+                    response: answer
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Correct! +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Try again!');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function checkSentence(lessonId) {
+            const select = document.getElementById('sentence-select-' + lessonId);
+            if (!select.value) {
+                alert('Please select an option.');
+                return;
+            }
+            const answer = select.value.trim().toLowerCase();
+            fetch('/check_lesson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lesson_id: lessonId,
+                    activity_type: 'sentence_complete',
+                    response: answer
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.is_correct) {
+                    alert('Correct! +' + data.points + ' points');
+                } else {
+                    alert(data.message || 'Try again!');
+                }
+            }).catch(err => console.error('Error:', err));
+        }
+
+        function completeLesson(lessonId) {
+            window.location.href = `/complete_lesson/${lessonId}`;
+        }
+
+        function doAgain(lessonId) {
+            window.location.href = `/reset_lesson/${lessonId}`;
+        }
+    </script>
+</div>
 {% endblock %}
