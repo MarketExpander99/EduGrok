@@ -1,99 +1,113 @@
 <!-- Filename: post_card.html.j2 -->
-<!-- Updates: Updated all elements with grok- classes for theme consistency. Improved avatar, tags, and interaction buttons with better icons, colors, and transitions. Added shadows to comments section and form for polish. Made media rounded and responsive. -->
+<!-- Updates: Changed bg-grok-surface-light to #5b5b66 for darker gray background. Fixed sparkly border to ensure rounded corners using pseudo-element with rounded-xl (border-radius: 0.75rem). Maintained theme consistency with grok- classes. Ensured responsiveness and transitions. -->
 
-<!-- post_card.html.j2 -->
-<div id="post-{{ post.id }}" class="post-card card bg-grok-surface p-5 rounded-xl shadow-lg border {% if post.is_new %}border-yellow-500{% else %}border-grok-border{% endif %} hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+<div class="card bg-grok-surface {% if post.is_new %}bg-grok-surface-light sparkly-border{% else %}border-grok-border{% endif %} p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6" id="post-{{ post.id }}">
+    <!-- Post Header -->
     <div class="flex items-center mb-3">
-        <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
-            {{ post.handle[0] | upper if post.handle else 'U' }}
-        </div>
-        <div>
-            <h3 class="text-sm font-semibold text-grok-text">{{ post.handle }} (Grade {{ post.grade }})</h3>
-            <p class="text-xs text-grok-secondary">{{ post.created_at }}</p>
+        <div class="flex-1">
+            <p class="text-grok-text font-semibold">{{ post.handle }}{% if post.original_handle %} (reposted from {{ post.original_handle }}){% endif %}</p>
+            <p class="text-grok-secondary text-sm">{{ post.created_at }}</p>
         </div>
     </div>
-    {% if post.original_handle %}
-        <div class="text-grok-secondary text-xs mb-2 flex items-center">
-            <span class="text-lg mr-1">🔄</span>
-            <span>Reposted from {{ post.original_handle }}</span>
-        </div>
-    {% endif %}
-    <p class="text-grok-text leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
+
+    <!-- Post Content -->
+    <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.content | safe }}</p>
     {% if post.media_url %}
-        {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
+        {% if post.media_url.endswith(('.png', '.jpg', '.jpeg', '.gif')) %}
             <img src="{{ post.media_url }}" alt="Post media" class="max-w-full h-auto rounded-lg shadow-md mb-4">
         {% elif post.media_url.endswith('.mp4') %}
-            <video controls class="max-w-full h-auto rounded-lg shadow-md mb-4">
-                <source src="{{ post.media_url }}" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
+            <video src="{{ post.media_url }}" controls class="max-w-full h-auto rounded-lg shadow-md mb-4"></video>
         {% endif %}
     {% endif %}
-    <!-- View Count -->
-    <div class="flex items-center text-grok-secondary text-xs mb-3">
-        <span class="mr-1">👁️</span>
-        <span>{{ post.views or 0 }} views</span>
+
+    <!-- Post Stats -->
+    <div class="flex justify-between text-grok-secondary mb-4">
+        <span><i class="fas fa-eye mr-1"></i>{{ post.views }} Views</span>
+        <span><i class="fas fa-heart mr-1"></i>{{ post.likes }} Likes</span>
+        <span><i class="fas fa-retweet mr-1"></i>{{ post.reposts }} Reposts</span>
+        <span><i class="fas fa-comment mr-1"></i>{{ comments[post.id] | length if comments[post.id] else 0 }} Comments</span>
     </div>
-    <div class="flex flex-wrap gap-2 mb-3">
-        <span class="bg-grok-accent/50 text-grok-text text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
-        <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Likes: {{ post.likes or 0 }}</span>
-        <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Reposts: {{ post.reposts or 0 }}</span>
-    </div>
-    <!-- Social Interactions Bar -->
-    <div class="flex justify-between items-center pt-3 border-t border-grok-border">
-        <div class="flex space-x-6">
-            <!-- Like Button with Icon -->
-            <button onclick="likePost({{ post.id }})" class="text-grok-secondary hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
-                <span class="text-lg">❤️</span>
-                <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
-            </button>
-            <!-- Repost Button -->
-            <button onclick="repostPost({{ post.id }})" class="text-grok-secondary hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
-                <span class="text-lg">🔄</span>
-                <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
-            </button>
-            <!-- Comment Button -->
-            <button onclick="toggleComments({{ post.id }})" class="text-grok-secondary hover:text-blue-400 transition flex items-center space-x-1">
-                <span class="text-lg">💬</span>
-                <span class="text-sm">Comment</span>
-            </button>
-        </div>
-        <!-- Share Button -->
-        <button onclick="sharePost({{ post.id }})" class="text-grok-secondary hover:text-indigo-400 transition flex items-center space-x-1">
-            <span class="text-lg">📤</span>
-            <span class="text-sm">Share</span>
+
+    <!-- Post Actions -->
+    <div class="flex justify-between border-t border-grok-border pt-3">
+        <button onclick="likePost({{ post.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center {% if post.liked_by_user %}text-red-500{% endif %}">
+            <i class="fas fa-heart mr-1"></i> {% if post.liked_by_user %}Unlike{% else %}Like{% endif %}
+        </button>
+        <button onclick="repostPost({{ post.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center {% if post.reposted_by_user %}text-green-500{% endif %}">
+            <i class="fas fa-retweet mr-1"></i> {% if post.reposted_by_user %}Unrepost{% else %}Repost{% endif %}
+        </button>
+        <button onclick="toggleComments({{ post.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center">
+            <i class="fas fa-comment mr-1"></i> Comment
+        </button>
+        <button onclick="sharePost({{ post.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center">
+            <i class="fas fa-share mr-1"></i> Share
         </button>
     </div>
-    {% set post_comments = comments[post.id] %}
-    {% if post_comments %}
-        {% set sorted_comments = post_comments | sort(attribute='created_at', reverse=True) %}
-        {% set visible_comments = sorted_comments[:5] %}
-        {% set hidden_comments = sorted_comments[5:] %}
-        <div class="comments-section mt-4 p-3 bg-grok-bg rounded-lg shadow-inner border border-grok-border">
-            <h4 class="text-sm font-semibold text-grok-text mb-2">Comments:</h4>
-            {% for comment in visible_comments %}
-                <div class="comment mb-2 text-sm text-grok-secondary">
-                    <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
-                    {{ comment.content | safe }}
-                </div>
-            {% endfor %}
-            {% if hidden_comments %}
-                <div id="hidden-comments-{{ post.id }}" style="display: none;">
-                    {% for comment in hidden_comments %}
-                        <div class="comment mb-2 text-sm text-grok-secondary">
-                            <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
-                            {{ comment.content | safe }}
+
+    <!-- Comment Form -->
+    <form id="comment-form-{{ post.id }}" style="display: none;" method="POST" action="{{ url_for('add_comment', post_id=post.id) }}" class="mt-4">
+        <textarea name="content" class="w-full p-3 border border-grok-border rounded-lg bg-grok-bg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent" rows="3" placeholder="Add a comment..." required></textarea>
+        <button type="submit" class="mt-2 bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition">Post Comment</button>
+    </form>
+
+    <!-- Comments -->
+    {% if comments[post.id] %}
+        <div class="mt-4">
+            {% set comment_count = comments[post.id] | length %}
+            {% for comment in comments[post.id] | sort(attribute='created_at') %}
+                {% if loop.index <= 2 %}
+                    <div class="border-l-2 border-grok-accent pl-4 mb-2">
+                        <p class="text-grok-text font-semibold">{{ comment.handle }}</p>
+                        <p class="text-grok-secondary text-sm">{{ comment.created_at }}</p>
+                        <p class="text-grok-text">{{ comment.content }}</p>
+                    </div>
+                {% else %}
+                    <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                        <div class="border-l-2 border-grok-accent pl-4 mb-2">
+                            <p class="text-grok-text font-semibold">{{ comment.handle }}</p>
+                            <p class="text-grok-secondary text-sm">{{ comment.created_at }}</p>
+                            <p class="text-grok-text">{{ comment.content }}</p>
                         </div>
-                    {% endfor %}
-                </div>
-                <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-grok-accent hover:text-grok-accent-hover text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {% if comment_count > 2 %}
+                <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-grok-accent hover:underline mt-2">
+                    Show more ({{ comment_count - 2 }} more)
+                </button>
             {% endif %}
         </div>
     {% endif %}
-    <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
-        <form method="POST" action="/comment/{{ post.id }}">
-            <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-grok-border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text placeholder-grok-secondary" required rows="2"></textarea>
-            <button type="submit" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Post Comment</button>
-        </form>
-    </div>
 </div>
+
+<style>
+/* Sparkly border effect for new posts with rounded corners using pseudo-element */
+.sparkly-border {
+    position: relative;
+    border: 2px solid transparent;
+    border-radius: 0.75rem; /* Matches rounded-xl */
+}
+.sparkly-border::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 0.75rem; /* Matches rounded-xl */
+    background: linear-gradient(45deg, #ff6f61, #ffd700, #00ffcc, #ff6f61);
+    background-size: 400%;
+    animation: sparkle 5s linear infinite;
+    z-index: -1;
+}
+
+/* Dark gray background for new posts */
+.bg-grok-surface-light {
+    background-color: #5b5b66; /* Dark gray as specified */
+}
+
+@keyframes sparkle {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+}
+</style>
