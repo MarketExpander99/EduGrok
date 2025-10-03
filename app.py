@@ -30,7 +30,7 @@ cors_origins = ["https://your-production-domain.com"] if production else ["*"]
 CORS(app, origins=cors_origins, supports_credentials=True, methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 
 app.config.update(
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=False,  # Changed to False for PythonAnywhere HTTP
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax'
 )

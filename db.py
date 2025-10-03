@@ -213,6 +213,13 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
+        # Check posts table for views column
+        c.execute("PRAGMA table_info(posts)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'views' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN views INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added views column to posts table")
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:

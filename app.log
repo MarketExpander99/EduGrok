@@ -67,3 +67,7 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-09-18 11:50:38,028 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
 2025-09-18 11:50:54,704 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
 2025-09-18 11:51:04,378 - __main__ - ERROR - Lessons route failed: 'tracing_paths' is undefined
+2025-10-03 13:05:51,758 - __main__ - ERROR - App init failed: name 'Only' is not defined
+2025-10-03 13:05:51,759 - __main__ - CRITICAL - Failed to initialize app: name 'Only' is not defined
+2025-10-03 13:06:22,391 - __main__ - ERROR - App init failed: name 'Only' is not defined
+2025-10-03 13:06:22,392 - __main__ - CRITICAL - Failed to initialize app: name 'Only' is not defined
