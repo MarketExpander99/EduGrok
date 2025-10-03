@@ -12,4 +12,4 @@ database.db
 *.sqlite3
 .env
 venv/
-*.log
+*.logdatabase.db
