@@ -1,27 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Assessment - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body class="{{ theme }}">
-    <h1>Assessment</h1>
+<!-- Filename: assess.html.j2 -->
+<!-- Updates: Made the template extend base.html.j2 for consistent navigation and styling. Updated form elements with Tailwind classes for better responsiveness, spacing, and theme consistency. Removed external stylesheet link as styles are now inherited from base. -->
+
+{% extends "base.html.j2" %}
+
+{% block title %}Assessment - EduGrok{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 max-w-4xl">
+    <h1 class="text-3xl font-bold mb-6 text-center text-grok-text">Assessment</h1>
     {% if error %}
-        <p class="error">{{ error }}</p>
+        <p class="text-red-500 mb-4 text-center">{{ error }}</p>
     {% endif %}
-    <form method="POST">
+    <form method="POST" class="space-y-6">
         {% for q in questions %}
-            <div class="lesson-card">
-                <p>{{ q.q }}</p>
-                <div class="radio-group">
+            <div class="bg-grok-surface p-6 rounded-lg shadow border border-grok-border">
+                <p class="text-lg mb-4 text-grok-text">{{ q.q }}</p>
+                <div class="space-y-2">
                     {% for a in q.a %}
-                        <label><input type="radio" name="q{{ loop.index }}" value="{{ a }}" {{ 'required' if loop.first }}>{{ a }}</label>
+                        <label class="flex items-center text-grok-text">
+                            <input type="radio" name="q{{ loop.index }}" value="{{ a }}" class="mr-2 form-radio text-grok-accent" {{ 'required' if loop.first }}>
+                            <span>{{ a }}</span>
+                        </label>
                     {% endfor %}
                 </div>
             </div>
         {% endfor %}
-        <button type="submit" class="btn">Submit</button>
+        <button type="submit" class="btn-primary w-full py-3 rounded-lg font-semibold hover:shadow-md transition-shadow">Submit</button>
     </form>
-</body>
-</html>
+</div>
+{% endblock %}

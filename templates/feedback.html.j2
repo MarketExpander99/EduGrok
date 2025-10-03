@@ -1,13 +1,16 @@
+<!-- Filename: feedback.html.j2 -->
+<!-- Updates: Removed theme defaults and updated classes to use grok- variables for consistency with base theme. Added better spacing, shadows, and transitions for a polished look. Ensured inputs and button match the theme colors. -->
+
 {% extends "base.html.j2" %}
 {% block content %}
 <div class="container mx-auto px-4 py-8 max-w-2xl">
-  <h1 class="text-3xl font-bold text-center mb-6 {{ theme.text_color | default('text-gray-800') }}">Submit Feedback</h1>
-  <form method="POST" class="flex flex-col gap-4">
-    <label for="rating" class="text-lg {{ theme.text_color | default('text-gray-600') }}">Rate your experience (1-5):</label>
-    <input type="number" name="rating" id="rating" min="1" max="5" required class="p-4 border rounded-lg {{ theme.border_color | default('border-gray-300') }} focus:outline-none focus:ring-2 {{ theme.focus_ring | default('focus:ring-blue-500') }}" aria-label="Rating (1 to 5)">
-    <label for="comments" class="text-lg {{ theme.text_color | default('text-gray-600') }}">Comments:</label>
-    <textarea name="comments" id="comments" class="p-4 border rounded-lg {{ theme.border_color | default('border-gray-300') }} focus:outline-none focus:ring-2 {{ theme.focus_ring | default('focus:ring-blue-500') }}" rows="5" placeholder="Your feedback..." aria-label="Feedback comments"></textarea>
-    <button type="submit" class="bg-{{ theme.button_bg | default('blue-500') }} text-white px-6 py-3 rounded-lg shadow-md hover:bg-{{ theme.button_hover | default('blue-600') }} transition duration-200" aria-label="Submit feedback">Submit</button>
+  <h1 class="text-3xl font-bold text-center mb-6 text-grok-text">Submit Feedback</h1>
+  <form method="POST" class="flex flex-col gap-4 bg-grok-surface p-6 rounded-lg shadow border border-grok-border">
+    <label for="rating" class="text-lg text-grok-secondary">Rate your experience (1-5):</label>
+    <input type="number" name="rating" id="rating" min="1" max="5" required class="p-4 border rounded-lg border-grok-border focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" aria-label="Rating (1 to 5)">
+    <label for="comments" class="text-lg text-grok-secondary">Comments:</label>
+    <textarea name="comments" id="comments" class="p-4 border rounded-lg border-grok-border focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" rows="5" placeholder="Your feedback..." aria-label="Feedback comments"></textarea>
+    <button type="submit" class="bg-grok-accent text-grok-text px-6 py-3 rounded-lg shadow-md hover:bg-grok-accent-hover transition duration-200" aria-label="Submit feedback">Submit</button>
   </form>
 </div>
 {% endblock %}

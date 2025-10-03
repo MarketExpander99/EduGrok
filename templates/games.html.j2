@@ -1,24 +1,26 @@
-<!-- games.html.j2 -->
+<!-- Filename: games.html.j2 -->
+<!-- Updates: Updated headings, cards, and buttons with grok- classes for theme consistency. Added shadows, transitions, and better spacing for polish. Made list items more responsive. -->
+
 {% extends "base.html.j2" %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-8 text-center text-white">Available Games</h1>
+    <h1 class="text-3xl font-bold mb-8 text-center text-grok-text">Available Games</h1>
     <ul class="space-y-6">
-        <li class="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-semibold text-blue-100 mb-2">Phonics Game</h2>
-            <p class="text-gray-300 mb-4">Match words to their sounds in this exciting memory challenge!</p>
-            <a href="{{ url_for('phonics_game') }}" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">Play Now</a>
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+            <h2 class="text-2xl font-semibold text-grok-text mb-2">Phonics Game</h2>
+            <p class="text-grok-secondary mb-4">Match words to their sounds in this exciting memory challenge!</p>
+            <a href="{{ url_for('phonics_game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
-        <li class="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-semibold text-blue-100 mb-2">Number Match</h2>
-            <p class="text-gray-300 mb-4">Match numbers to their word representations!</p>
-            <a href="{{ url_for('number_game') }}" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">Play Now</a>
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+            <h2 class="text-2xl font-semibold text-grok-text mb-2">Number Match</h2>
+            <p class="text-grok-secondary mb-4">Match numbers to their word representations!</p>
+            <a href="{{ url_for('number_game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
-        <li class="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-semibold text-blue-100 mb-2">Math Challenge</h2>
-            <p class="text-gray-300 mb-4">Solve math questions in a farm-themed adventure!</p>
-            <a href="{{ url_for('game') }}" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition">Play Now</a>
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+            <h2 class="text-2xl font-semibold text-grok-text mb-2">Math Challenge</h2>
+            <p class="text-grok-secondary mb-4">Solve math questions in a farm-themed adventure!</p>
+            <a href="{{ url_for('game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
     </ul>
 </div>

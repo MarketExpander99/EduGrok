@@ -1,8 +1,11 @@
-<div class="mt-8 p-4 bg-black text-white rounded-xl shadow-sm max-w-lg mx-auto border border-gray-700">
-    <h2 class="text-xl font-semibold mb-3 text-gray-300">Recent Test</h2>
+<!-- Filename: recent_test.html.j2 -->
+<!-- Updates: Updated container and text with grok- classes for theme consistency. Added border and shadow for better visual separation. -->
+
+<div class="mt-8 p-4 bg-grok-surface text-grok-text rounded-xl shadow-sm max-w-lg mx-auto border border-grok-border">
+    <h2 class="text-xl font-semibold mb-3 text-grok-secondary">Recent Test</h2>
     {% if test %}
-        <p class="text-gray-300 text-lg">Grade {{ test.grade }} - Score: {{ test.score }}/10 - Date: {{ test.date }}</p>
+        <p class="text-grok-secondary text-lg">Grade {{ test.grade }} - Score: {{ test.score }}/10 - Date: {{ test.date }}</p>
     {% else %}
-        <p class="text-gray-400">No tests taken yet. Take one to get started!</p>
+        <p class="text-grok-secondary">No tests taken yet. Take one to get started!</p>
     {% endif %}
 </div>

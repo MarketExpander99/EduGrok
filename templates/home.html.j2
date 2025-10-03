@@ -1,4 +1,6 @@
-<!-- home.html.j2 -->
+<!-- Filename: home.html.j2 -->
+<!-- Updates: Changed create post button to a floating action button (+) for hovering in the feed. Updated card stylings, flash messages, and no-content section with grok- classes. Improved script organization and added theme-consistent colors. Ensured better responsiveness and transitions. -->
+
 {% extends "base.html.j2" %}
 
 {% block title %}EduGrok Home{% endblock %}
@@ -10,7 +12,7 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg {% if category == 'success' %}bg-green-900 text-green-100{% elif category == 'error' %}bg-red-900 text-red-100{% else %}bg-blue-900 text-blue-100{% endif %}">
+                    <div class="p-4 rounded-lg border border-grok-border {% if category == 'success' %}bg-green-900/50 text-green-100{% elif category == 'error' %}bg-red-900/50 text-red-100{% else %}bg-blue-900/50 text-blue-100{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -20,19 +22,17 @@
 
     <!-- Sort Dropdown -->
     <div class="mb-6 flex justify-end">
-        <label for="sort" class="mr-2 text-gray-300 font-medium">Sort by:</label>
-        <select id="sort" class="p-2 bg-gray-800 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="window.location.href = '?sort=' + this.value">
+        <label for="sort" class="mr-2 text-grok-secondary font-medium">Sort by:</label>
+        <select id="sort" class="p-2 bg-grok-surface text-grok-text border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent" onchange="window.location.href = '?sort=' + this.value">
             <option value="latest" {% if sort_option == 'latest' %}selected{% endif %}>Latest</option>
             <option value="most_views" {% if sort_option == 'most_views' %}selected{% endif %}>Most Views</option>
         </select>
     </div>
 
-    <!-- Create Post Button -->
-    <div class="mb-6 text-center">
-        <button id="open-post-form" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-semibold flex items-center justify-center mx-auto">
-            <span class="text-xl mr-2">+</span> Create Post
-        </button>
-    </div>
+    <!-- Create Post Button as Floating + -->
+    <button id="open-post-form" class="fixed bottom-8 right-8 bg-grok-accent text-grok-text w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-grok-accent-hover hover:shadow-xl transition-all duration-200 z-10">
+        +
+    </button>
 
     <!-- Feed -->
     {% if combined %}
@@ -48,9 +48,9 @@
             {% endfor %}
         </div>
     {% else %}
-        <div class="text-center py-8 bg-black p-5 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
-            <h2 class="text-2xl font-bold mb-4 text-white">No Posts Yet</h2>
-            <p class="text-gray-300 mb-6">Create a post or add lessons to get started!</p>
+        <div class="text-center py-8 card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border max-w-lg mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-grok-text">No Posts Yet</h2>
+            <p class="text-grok-secondary mb-6">Create a post or add lessons to get started!</p>
         </div>
     {% endif %}
 
@@ -92,13 +92,13 @@
                 if (type.startsWith('image/')) {
                     const img = document.createElement('img');
                     img.src = URL.createObjectURL(file);
-                    img.className = 'max-w-full h-auto rounded-lg';
+                    img.className = 'max-w-full h-auto rounded-lg shadow-md';
                     preview.appendChild(img);
                 } else if (type === 'video/mp4') {
                     const video = document.createElement('video');
                     video.src = URL.createObjectURL(file);
                     video.controls = true;
-                    video.className = 'max-w-full h-auto rounded-lg';
+                    video.className = 'max-w-full h-auto rounded-lg shadow-md';
                     preview.appendChild(video);
                 }
             }

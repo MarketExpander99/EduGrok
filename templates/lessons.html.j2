@@ -1,38 +1,41 @@
+<!-- Filename: lessons.html.j2 -->
+<!-- Updates: Updated headings, buttons, and cards with grok- classes for theme consistency. Added shadows, transitions, and better grid layout for responsiveness. Improved no-lessons section styling. -->
+
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6 text-white">Lessons (Grade {{ grade }}) 📚</h1>
+    <h1 class="text-3xl font-bold mb-6 text-center text-grok-text">Lessons (Grade {{ grade }}) 📚</h1>
     
     <div class="text-center mb-8">
-        <button onclick="generateLesson()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition">Generate New Lesson</button>
+        <button onclick="generateLesson()" class="bg-grok-accent hover:bg-grok-accent-hover text-grok-text px-6 py-3 rounded-lg font-semibold transition shadow-md">Generate New Lesson</button>
     </div>
 
     {% if lessons %}
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {% for lesson in lessons %}
-                <div class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200">
-                    <h2 class="text-xl font-bold text-white mb-2">{{ lesson.title or 'Lesson ' ~ lesson.id }}</h2>
-                    <p class="text-gray-300 mb-4">{{ lesson.description or 'No description' }}</p>
+                <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200">
+                    <h2 class="text-xl font-bold text-grok-text mb-2">{{ lesson.title or 'Lesson ' ~ lesson.id }}</h2>
+                    <p class="text-grok-secondary mb-4">{{ lesson.description or 'No description' }}</p>
                     {% if not lesson.added %}
-                        <button onclick="addToFeed({{ lesson.id }})" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold transition">Add to Feed</button>
+                        <button onclick="addToFeed({{ lesson.id }})" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-semibold transition shadow-md">Add to Feed</button>
                     {% else %}
                         <p class="text-yellow-400 mb-4 font-medium">Added to Feed</p>
                         {% if lesson.completed %}
-                            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-semibold transition">Reset</a>
+                            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="bg-grok-secondary hover:bg-grok-accent-hover text-grok-text px-4 py-2 rounded-md font-semibold transition shadow-md">Reset</a>
                         {% else %}
-                            <p class="text-gray-400 text-sm">Available in your feed</p>
+                            <p class="text-grok-secondary text-sm">Available in your feed</p>
                         {% endif %}
                     {% endif %}
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <div class="text-center py-8 bg-black p-5 rounded-xl shadow-lg border border-blue-200 max-w-lg mx-auto">
-            <h2 class="text-2xl font-bold mb-4 text-white">No Lessons Yet</h2>
-            <p class="text-gray-300 mb-6">Generate some lessons to get started!</p>
+        <div class="text-center py-8 card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border max-w-lg mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-grok-text">No Lessons Yet</h2>
+            <p class="text-grok-secondary mb-6">Generate some lessons to get started!</p>
         </div>
     {% endif %}
 </div>

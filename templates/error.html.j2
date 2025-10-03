@@ -1,20 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Error - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body class="{{ theme | default('astronaut') }}">
-    <div class="sidebar">
-        <a href="/">Home</a>
-        <a href="/assess">Assess</a>
-        <a href="/lessons">Lessons</a>
-        <a href="/profile">Profile</a>
-        <a href="/logout">Logout</a>
-    </div>
-    <h1>Error</h1>
-    <p class="error">{{ error }}</p>
-    <a href="/" class="btn">Back to Home</a>
-</body>
-</html>
+<!-- Filename: error.html.j2 -->
+<!-- Updates: Made the template extend base.html.j2 for consistent navigation and theme. Updated error display and button with Tailwind classes for better visual appeal and responsiveness. Removed sidebar links as they are now in base. Removed external stylesheet. -->
+
+{% extends "base.html.j2" %}
+
+{% block title %}Error - EduGrok{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6 max-w-4xl text-center">
+    <h1 class="text-3xl font-bold mb-6 text-grok-text">Error</h1>
+    <p class="text-red-500 mb-6 text-lg">{{ error }}</p>
+    <a href="/" class="btn-primary px-6 py-3 rounded-lg font-semibold hover:shadow-md transition-shadow inline-block">Back to Home</a>
+</div>
+{% endblock %}

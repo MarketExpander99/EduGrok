@@ -1,62 +1,65 @@
+<!-- Filename: posts.html.j2 -->
+<!-- Updates: Updated post cards with grok- classes for theme consistency. Improved interaction buttons and comments section with shadows and transitions. Made consistent with post_card.html.j2 styling. -->
+
 {% for post in posts %}
-    <div id="post-{{ post.id }}" class="bg-black p-5 rounded-xl shadow-lg border border-blue-200 hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+    <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
         <div class="flex items-center mb-3">
-            <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm">
+            <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
                 {{ post.handle[0] | upper if post.handle else 'U' }}
             </div>
             <div>
-                <h3 class="text-sm font-semibold text-blue-100">{{ post.handle }} (Grade {{ post.grade }})</h3>
-                <p class="text-xs text-gray-400">{{ post.created_at }}</p>
+                <h3 class="text-sm font-semibold text-grok-text">{{ post.handle }} (Grade {{ post.grade }})</h3>
+                <p class="text-xs text-grok-secondary">{{ post.created_at }}</p>
             </div>
         </div>
         {% if post.original_handle %}
-            <div class="text-gray-400 text-xs mb-2 flex items-center">
+            <div class="text-grok-secondary text-xs mb-2 flex items-center">
                 <span class="text-lg mr-1">🔄</span>
                 <span>Reposted from {{ post.original_handle }}</span>
             </div>
         {% endif %}
-        <p class="text-white leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
+        <p class="text-grok-text leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
         {% if post.media_url %}
             {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
-                <img src="{{ post.media_url }}" alt="Post media" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 1rem;">
+                <img src="{{ post.media_url }}" alt="Post media" class="max-w-full h-auto rounded-lg shadow-md mb-4">
             {% elif post.media_url.endswith('.mp4') %}
-                <video controls style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem;">
+                <video controls class="max-w-full h-auto rounded-lg shadow-md mb-4">
                     <source src="{{ post.media_url }}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
             {% endif %}
         {% endif %}
         <!-- View Count -->
-        <div class="flex items-center text-gray-400 text-xs mb-3">
+        <div class="flex items-center text-grok-secondary text-xs mb-3">
             <span class="mr-1">👁️</span>
             <span>{{ post.views or 0 }} views</span>
         </div>
         <div class="flex flex-wrap gap-2 mb-3">
-            <span class="bg-blue-900 text-blue-100 text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
-            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Likes: {{ post.likes or 0 }}</span>
-            <span class="bg-gray-700 text-gray-200 text-sm px-3 py-1 rounded-full font-medium">Reposts: {{ post.reposts or 0 }}</span>
+            <span class="bg-grok-accent/50 text-grok-text text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
+            <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Likes: {{ post.likes or 0 }}</span>
+            <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Reposts: {{ post.reposts or 0 }}</span>
         </div>
         <!-- Social Interactions Bar -->
-        <div class="flex justify-between items-center pt-3 border-t border-gray-700">
+        <div class="flex justify-between items-center pt-3 border-t border-grok-border">
             <div class="flex space-x-6">
                 <!-- Like Button with Icon -->
-                <button onclick="likePost({{ post.id }})" class="text-gray-400 hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
+                <button onclick="likePost({{ post.id }})" class="text-grok-secondary hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
                     <span class="text-lg">❤️</span>
                     <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
                 </button>
                 <!-- Repost Button -->
-                <button onclick="repostPost({{ post.id }})" class="text-gray-400 hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
+                <button onclick="repostPost({{ post.id }})" class="text-grok-secondary hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
                     <span class="text-lg">🔄</span>
                     <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
                 </button>
                 <!-- Comment Button -->
-                <button onclick="toggleComments({{ post.id }})" class="text-gray-400 hover:text-blue-400 transition flex items-center space-x-1">
+                <button onclick="toggleComments({{ post.id }})" class="text-grok-secondary hover:text-blue-400 transition flex items-center space-x-1">
                     <span class="text-lg">💬</span>
                     <span class="text-sm">Comment</span>
                 </button>
             </div>
             <!-- Share Button -->
-            <button onclick="sharePost({{ post.id }})" class="text-gray-400 hover:text-indigo-400 transition flex items-center space-x-1">
+            <button onclick="sharePost({{ post.id }})" class="text-grok-secondary hover:text-indigo-400 transition flex items-center space-x-1">
                 <span class="text-lg">📤</span>
                 <span class="text-sm">Share</span>
             </button>
@@ -65,31 +68,31 @@
         {% set sorted_comments = comments[post.id] | sort(attribute='created_at', reverse=True) %}
         {% set visible_comments = sorted_comments[:5] %}
         {% set hidden_comments = sorted_comments[5:] %}
-        <div class="comments-section mt-4 p-3 bg-gray-900 rounded-lg">
-            <h4 class="text-sm font-semibold text-blue-100 mb-2">Comments:</h4>
+        <div class="comments-section mt-4 p-3 bg-grok-bg rounded-lg shadow-inner border border-grok-border">
+            <h4 class="text-sm font-semibold text-grok-text mb-2">Comments:</h4>
             {% for comment in visible_comments %}
-            <div class="comment mb-2 text-sm text-gray-300">
-                <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
+            <div class="comment mb-2 text-sm text-grok-secondary">
+                <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
                 {{ comment.content | safe }}
             </div>
             {% endfor %}
             {% if hidden_comments %}
             <div id="hidden-comments-{{ post.id }}" style="display: none;">
                 {% for comment in hidden_comments %}
-                <div class="comment mb-2 text-sm text-gray-300">
-                    <strong class="text-blue-100">{{ comment.handle }}</strong> - <small class="text-gray-500">{{ comment.created_at }}</small><br>
+                <div class="comment mb-2 text-sm text-grok-secondary">
+                    <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
                     {{ comment.content | safe }}
                 </div>
                 {% endfor %}
             </div>
-            <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-blue-400 hover:text-blue-300 text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
+            <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-grok-accent hover:text-grok-accent-hover text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
             {% endif %}
         </div>
         {% endif %}
         <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
             <form method="POST" action="/comment/{{ post.id }}">
-                <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white placeholder-gray-400" required rows="2"></textarea>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Post Comment</button>
+                <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-grok-border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text placeholder-grok-secondary" required rows="2"></textarea>
+                <button type="submit" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Post Comment</button>
             </form>
         </div>
     </div>
