@@ -1,30 +1,30 @@
-<!-- Filename: test.html.j2 -->
-<!-- Updates: Made the template extend base.html.j2 for consistent navigation and styling. Updated form elements with Tailwind classes for better responsiveness, spacing, and theme consistency. Removed external stylesheet link as styles are now inherited from base. -->
+{% extends "base.html.j2" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Weekly Test - EduGrok</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body class="{{ theme }}">
-    <h1>Weekly Test</h1>
+{% block title %}Weekly Test - EduGrok{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-6 text-center text-grok-text">Weekly Test</h1>
     {% if error %}
-        <p class="error">{{ error }}</p>
+        <p class="text-red-400 text-center mb-4">{{ error }}</p>
     {% endif %}
-    <form method="POST">
+    <form method="POST" class="space-y-6">
         {% for q in questions %}
-            <div class="lesson-card">
-                <p>{{ q.q }}</p>
-                <div class="radio-group">
+            <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border">
+                <p class="text-grok-text text-lg mb-4">{{ q.q }}</p>
+                <div class="space-y-2">
                     {% for a in q.a %}
-                        <label><input type="radio" name="q{{ loop.index }}" value="{{ a }}" {{ 'required' if loop.first }}>{{ a }}</label>
+                        <label class="flex items-center space-x-2 text-grok-text">
+                            <input type="radio" name="q{{ loop.index }}" value="{{ a }}" {{ 'required' if loop.first }} class="form-radio text-grok-accent focus:ring-grok-accent">
+                            <span>{{ a }}</span>
+                        </label>
                     {% endfor %}
                 </div>
             </div>
         {% endfor %}
-        <button type="submit" class="btn">Submit Test</button>
+        <div class="text-center">
+            <button type="submit" class="bg-grok-accent text-grok-text px-6 py-3 rounded-lg font-semibold hover:bg-grok-accent-hover transition shadow-md">Submit Test</button>
+        </div>
     </form>
-</body>
-</html>
+</div>
+{% endblock %}
