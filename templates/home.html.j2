@@ -9,7 +9,7 @@
         {% if messages %}
             <div class="mb-6 space-y-2">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg border border-grok-border {% if category == 'success' %}bg-green-900/50 text-green-100{% elif category == 'error' %}bg-red-900/50 text-red-100{% else %}bg-blue-900/50 text-blue-100{% endif %}">
+                    <div class="p-4 rounded-lg bg-grok-surface {% if category == 'success' %}bg-green-900/50 text-green-100{% elif category == 'error' %}bg-red-900/50 text-red-100{% else %}bg-blue-900/50 text-blue-100{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -23,6 +23,7 @@
         <select id="sort" class="p-2 bg-grok-surface text-grok-text border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent" onchange="window.location.href = '?sort=' + this.value">
             <option value="latest" {% if sort_option == 'latest' %}selected{% endif %}>Latest</option>
             <option value="most_views" {% if sort_option == 'most_views' %}selected{% endif %}>Most Views</option>
+            <option value="most_likes" {% if sort_option == 'most_likes' %}selected{% endif %}>Most Liked</option>
         </select>
     </div>
 
@@ -37,15 +38,22 @@
             {% for item in combined %}
                 {% if item.type == 'post' %}
                     {% set post = item %}
-                    {% include 'post_card.html.j2' %}
+                    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-md mx-auto relative {% if post.is_new %}new-post{% endif %}">
+                        {% if post.is_new %}
+                            <span class="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full"></span>
+                        {% endif %}
+                        {% include 'post_card.html.j2' %}
+                    </div>
                 {% else %}
                     {% set lesson = item %}
-                    {% include 'lesson_card.html.j2' %}
+                    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-md mx-auto">
+                        {% include 'lesson_card.html.j2' %}
+                    </div>
                 {% endif %}
             {% endfor %}
         </div>
     {% else %}
-        <div class="text-center py-8 card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border w-full max-w-md mx-2">
+        <div class="text-center py-8 card bg-grok-surface p-4 rounded-xl shadow-lg max-w-md mx-auto">
             <h2 class="text-2xl font-bold mb-4 text-grok-text">No Posts Yet</h2>
             <p class="text-grok-secondary mb-6">Create a post or add lessons to get started!</p>
         </div>
@@ -304,19 +312,29 @@
     </script>
 
     <style>
-    @media (max-width: 640px) {
-        .container {
-            padding-left: 0.5rem;
-            padding-right: 0.5rem;
+        .new-post::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            background-color: #22c55e; /* Green-500 */
+            border-radius: 50%;
         }
-        .card {
-            width: 100%;
-            max-width: 100%;
-            margin-left: 0.5rem;
-            margin-right: 0.5rem;
-            padding: 1rem;
+        @media (max-width: 640px) {
+            .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            .card {
+                width: 100%;
+                max-width: 100%;
+                margin-left: 0.5rem;
+                margin-right: 0.5rem;
+                padding: 1rem;
+            }
         }
-    }
     </style>
 </div>
 {% endblock %}

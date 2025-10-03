@@ -29,6 +29,8 @@ def home():
             order_by = 'p.created_at DESC'
         elif sort == 'most_views':
             order_by = 'p.views DESC'
+        elif sort == 'most_likes':
+            order_by = 'p.likes DESC'
         else:
             order_by = 'p.created_at DESC'
             sort = 'latest'  # fallback
@@ -118,7 +120,7 @@ def home():
                              comments=comments,
                              theme=session.get('theme', 'astronaut'),
                              language=session.get('language', 'en'),
-                             sort=sort)
+                             sort_option=sort)
     
     except Exception as e:
         logger.error(f"Home route failed: {str(e)}")
