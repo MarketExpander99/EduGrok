@@ -1,49 +1,18 @@
-<!-- Filename: subscribe.html.j2 -->
-<!-- Updates: Added Tailwind for better styling, used grok- classes for theme consistency. Improved button with shadow and transition. Made page more responsive. -->
+{% extends "base.html.j2" %}
 
-<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <title>Subscribe to EduGrok</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        'grok-bg': 'var(--grok-bg)',
-                        'grok-surface': 'var(--grok-surface)',
-                        'grok-text': 'var(--grok-text)',
-                        'grok-secondary': 'var(--grok-secondary)',
-                        'grok-border': 'var(--grok-border)',
-                        'grok-accent': 'var(--grok-accent)',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body {
-            --grok-bg: #000000;
-            --grok-surface: #0a0a0a;
-            --grok-text: #ffffff;
-            --grok-secondary: #71767b;
-            --grok-border: #333333;
-            --grok-accent: #4b5563;
-            --grok-accent-hover: #374151;
-            background-color: var(--grok-bg);
-            color: var(--grok-text);
-        }
-    </style>
-</head>
-<body class="min-h-screen flex items-center justify-center">
-    <div class="text-center">
-        <h1 class="text-3xl font-bold mb-6">Subscribe for Premium Content ($5/month)</h1>
-        <form method="POST">
-            <button type="submit" class="bg-grok-accent text-grok-text px-8 py-4 rounded-xl font-semibold hover:bg-grok-accent-hover transition-all duration-200 shadow-lg hover:shadow-xl">Subscribe Now</button>
+{% block title %}Subscribe - EduGrok{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto p-6">
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200">
+        <h1 class="text-3xl font-bold mb-6 text-center text-grok-text">Subscribe for Premium Content</h1>
+        <p class="text-grok-secondary mb-4 text-center">Unlock premium features for $5/month!</p>
+        <form method="POST" action="{{ url_for('subscribe') }}">
+            <button type="submit" class="bg-grok-accent text-grok-text px-8 py-4 rounded-xl font-semibold hover:bg-grok-accent-hover transition-all duration-200 shadow-lg w-full">Subscribe Now</button>
         </form>
+        <p class="mt-4 text-center text-grok-secondary">
+            <a href="{{ url_for('home') }}" class="text-grok-accent hover:underline">Back to Home</a>
+        </p>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
