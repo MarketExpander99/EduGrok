@@ -29,7 +29,7 @@
     </div>
 
     <!-- Post Actions -->
-    <div class="flex justify-between border-t border-grok-border pt-3">
+    <div class="flex justify-between border-t border-grok-border pt-3" style="font-size:80%;">
         <button onclick="likePost({{ post.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center {% if post.liked_by_user %}text-red-500{% endif %}">
             <i class="fas fa-heart mr-1"></i> {% if post.liked_by_user %}Unlike{% else %}Like{% endif %}
         </button>
