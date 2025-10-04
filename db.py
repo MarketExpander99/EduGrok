@@ -1,4 +1,5 @@
-﻿import sqlite3
+﻿# db.py
+import sqlite3
 import os
 from flask import g
 import logging
@@ -29,7 +30,7 @@ def init_tables():
     try:
         conn = sqlite3.connect('database.db')
         c = conn.cursor()
-        # Users table
+        # Users table - UPDATED: Added parent_id, role
         c.execute('''CREATE TABLE IF NOT EXISTS users 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       email TEXT UNIQUE, 
@@ -40,7 +41,10 @@ def init_tables():
                       subscribed INTEGER DEFAULT 0, 
                       language TEXT DEFAULT 'en', 
                       star_coins INTEGER DEFAULT 0, 
-                      points INTEGER DEFAULT 0)''')
+                      points INTEGER DEFAULT 0,
+                      parent_id INTEGER,
+                      role TEXT DEFAULT 'kid',
+                      FOREIGN KEY (parent_id) REFERENCES users(id))''')
         # Lessons table
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -129,6 +133,16 @@ def init_tables():
                       responded_at TEXT DEFAULT (datetime('now')),
                       FOREIGN KEY (lesson_id) REFERENCES lessons(id),
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
+        # UPDATED: Added friendships table
+        c.execute('''CREATE TABLE IF NOT EXISTS friendships 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      requester_id INTEGER,
+                      target_id INTEGER,
+                      status TEXT DEFAULT 'requested',  -- requested, approved, rejected
+                      requested_at TEXT DEFAULT (datetime('now')),
+                      approved_at TEXT,
+                      FOREIGN KEY (requester_id) REFERENCES users(id),
+                      FOREIGN KEY (target_id) REFERENCES users(id))''')
         conn.commit()
     except sqlite3.Error as e:
         logger.error(f"Error initializing tables: {str(e)}")
@@ -203,14 +217,14 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
                 conn.commit()
                 logger.info(f"Added {col} column to lessons table")
-        # Check users table for required columns
+        # Check users table for required columns - UPDATED: Add parent_id, role
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col[2] for col in c.fetchall()}
-        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points']
+        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role']
         for col in required_user_columns:
             if col not in columns:
-                default = 0 if col in ['subscribed', 'star_coins', 'points'] else "'en'" if col == 'language' else "'astronaut'" if col == 'theme' else "''"
-                c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}")
+                default = "NULL" if col == 'parent_id' else "'kid'" if col == 'role' else 0 if col in ['subscribed', 'star_coins', 'points'] else "'en'" if col == 'language' else "'astronaut'" if col == 'theme' else "''"
+                c.execute(f"ALTER TABLE users ADD COLUMN {col} {'INTEGER' if col in ['parent_id'] else 'TEXT'} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
         # Check posts table for views column
@@ -220,6 +234,17 @@ def check_db_schema():
             c.execute("ALTER TABLE posts ADD COLUMN views INTEGER DEFAULT 0")
             conn.commit()
             logger.info("Added views column to posts table")
+        # UPDATED: Check friendships table
+        c.execute("PRAGMA table_info(friendships)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        required_friend_columns = ['requester_id', 'target_id', 'status', 'requested_at', 'approved_at']
+        for col in required_friend_columns:
+            if col not in columns:
+                default = "datetime('now')" if col == 'requested_at' else "NULL" if col == 'approved_at' else "'requested'" if col == 'status' else "NULL"
+                col_type = "TEXT" if col in ['status', 'requested_at', 'approved_at'] else "INTEGER"
+                c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
+                conn.commit()
+                logger.info(f"Added {col} column to friendships table")
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:
