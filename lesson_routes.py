@@ -1,153 +1,174 @@
 # lesson_routes.py
-import json
-from flask import session, request, flash, redirect, url_for, jsonify, render_template
-from db import get_db
+# lesson_routes.py (updated: Changed add_to_feed to assign lesson via lessons_users; added assigned_lessons fetch in lessons() and pass as added_lessons)
+from flask import session, request, jsonify, render_template, redirect, url_for, flash
 import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+from db import get_db
+
 def check_lesson():
-    if request.method == 'POST':
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'error': 'Not logged in'}), 401
-        data = request.get_json()
-        lesson_id = data.get('lesson_id')
-        activity_type = data.get('activity_type')
-        user_input = data.get('response')
-        if not lesson_id or not activity_type or user_input is None:
-            return jsonify({'success': False, 'error': 'Missing data'}), 400
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json()
+    lesson_id = data.get('lesson_id')
+    activity_type = data.get('activity_type')
+    response = data.get('response')
+    if not all([lesson_id, activity_type, response]):
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    try:
         conn = get_db()
         c = conn.cursor()
-        success = False
-        correct_answer = None
-        points = 10
-        if activity_type == 'math_fill':
-            c.execute("SELECT math_answer FROM lessons WHERE id = ?", (lesson_id,))
-            result = c.fetchone()
-            if result:
-                correct_answer = result['math_answer']
-                success = str(user_input).strip() == str(correct_answer).strip()
-        elif activity_type == 'trace_complete':
-            c.execute("SELECT trace_word FROM lessons WHERE id = ?", (lesson_id,))
-            result = c.fetchone()
-            if result:
-                correct_answer = result['trace_word']
-                success = str(user_input).strip().lower() == str(correct_answer).lower()
-        elif activity_type == 'spelling_complete':
-            c.execute("SELECT spell_word FROM lessons WHERE id = ?", (lesson_id,))
-            result = c.fetchone()
-            if result:
-                correct_answer = result['spell_word']
-                success = str(user_input).strip().lower() == str(correct_answer).lower()
-        elif activity_type == 'mc_choice':
-            c.execute("SELECT mc_answer FROM lessons WHERE id = ?", (lesson_id,))
-            result = c.fetchone()
-            if result:
-                correct_answer = result['mc_answer']
-                success = str(user_input).strip().lower() == str(correct_answer).lower()
-        elif activity_type == 'sentence_complete':
-            c.execute("SELECT sentence_answer FROM lessons WHERE id = ?", (lesson_id,))
-            result = c.fetchone()
-            if result:
-                correct_answer = result['sentence_answer']
-                success = str(user_input).strip().lower() == str(correct_answer).lower()
-        else:
-            return jsonify({'success': False, 'error': 'Invalid activity type'}), 400
-        
-        if not correct_answer:
-            return jsonify({'success': False, 'error': 'Lesson or activity not found'}), 404
-        
-        message = 'Correct!' if success else 'Try again.'
-        if success:
-            # Insert response
-            c.execute('''INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) 
-                         VALUES (?, ?, ?, ?, 1, ?)''', (lesson_id, session['user_id'], activity_type, user_input, points))
-            # Award points
-            c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, ?, ?)",
-                      (session['user_id'], points, datetime.now().isoformat()))
-            conn.commit()
-            return jsonify({'success': True, 'is_correct': True, 'message': message, 'points': points})
-        else:
-            # Log incorrect response
-            c.execute('''INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) 
-                         VALUES (?, ?, ?, ?, 0, 0)''', (lesson_id, session['user_id'], activity_type, user_input))
-            conn.commit()
-            return jsonify({'success': True, 'is_correct': False, 'message': message})
-    return jsonify({'success': False, 'error': 'Invalid method'}), 405
+        c.execute(f"SELECT {activity_type}_answer FROM lessons WHERE id = ?", (lesson_id,))
+        correct_answer = c.fetchone()[0]
+        is_correct = response == correct_answer
+        points = 5 if is_correct else 0
+        c.execute("INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) VALUES (?, ?, ?, ?, ?, ?)",
+                  (lesson_id, session['user_id'], activity_type, response, int(is_correct), points))
+        conn.commit()
+        logger.info(f"User {session['user_id']} responded to {activity_type} in lesson {lesson_id}, correct: {is_correct}")
+        return jsonify({'success': True, 'is_correct': is_correct, 'points': points})
+    except Exception as e:
+        logger.error(f"Check lesson failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 def complete_lesson(lesson_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)",
-              (session['user_id'], lesson_id, datetime.now().isoformat()))
-    conn.commit()
-    flash('Lesson completed!', 'success')
-    return redirect(url_for('home'))
+    conn = None
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, datetime('now'))", (session['user_id'], lesson_id))
+        c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, 10, datetime('now'))", (session['user_id'],))
+        conn.commit()
+        flash('Lesson completed! +10 points', 'success')
+        logger.info(f"User {session['user_id']} completed lesson {lesson_id}")
+        return redirect(url_for('lessons'))
+    except Exception as e:
+        logger.error(f"Complete lesson failed: {str(e)}")
+        if conn:
+            conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('lessons'))
+    finally:
+        if conn:
+            conn.close()
 
 def reset_lesson(lesson_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("DELETE FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
-    conn.commit()
-    flash('Lesson reset!', 'success')
-    return redirect(url_for('home'))
+    conn = None
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("DELETE FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
+        c.execute("DELETE FROM lesson_responses WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
+        conn.commit()
+        flash('Lesson reset', 'success')
+        logger.info(f"User {session['user_id']} reset lesson {lesson_id}")
+        return redirect(url_for('lessons'))
+    except Exception as e:
+        logger.error(f"Reset lesson failed: {str(e)}")
+        if conn:
+            conn.rollback()
+        flash('Server error', 'error')
+        return redirect(url_for('lessons'))
+    finally:
+        if conn:
+            conn.close()
 
 def lessons():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM lessons WHERE grade = ?", (session.get('grade', 1),))
-    raw_lessons = c.fetchall()
-    lessons = []
-    for row in raw_lessons:
-        lesson = dict(row)
-        if lesson['mc_options']:
-            try:
-                lesson['mc_options'] = json.loads(lesson['mc_options'])
-            except json.JSONDecodeError:
-                lesson['mc_options'] = []
-        if lesson['sentence_options']:
-            try:
-                lesson['sentence_options'] = json.loads(lesson['sentence_options'])
-            except json.JSONDecodeError:
-                lesson['sentence_options'] = []
-        c.execute("SELECT 1 FROM lessons_users WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson['id']))
-        lesson['added'] = bool(c.fetchone())
-        c.execute("SELECT 1 FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson['id']))
-        lesson['completed'] = bool(c.fetchone())
-        lessons.append(lesson)
-    return render_template('lessons.html.j2', lessons=lessons, grade=session.get('grade', 1), theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
-
-def generate_lesson():
-    # Placeholder for generating lessons, perhaps using AI
-    return jsonify({'success': False, 'error': 'Not implemented'})
-
-def schedule_lessons():
-    # Placeholder
-    return jsonify({'success': False, 'error': 'Not implemented'})
-
-def add_to_feed():
-    if request.method == 'POST':
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-        data = request.get_json()
-        lesson_id = data.get('lesson_id')
-        if not lesson_id:
-            return jsonify({'success': False, 'error': 'Missing lesson_id'}), 400
+    conn = None
+    try:
         conn = get_db()
         c = conn.cursor()
-        try:
-            c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, assigned_at) VALUES (?, ?, ?)",
-                      (session['user_id'], lesson_id, datetime.now().isoformat()))
-            conn.commit()
-            return jsonify({'success': True})
-        except Exception as e:
-            logger.error(f"Add to feed failed: {str(e)}")
-            return jsonify({'success': False, 'error': 'Server error'}), 500
-    return jsonify({'success': False, 'error': 'Invalid method'}), 405
+        grade = session.get('grade', 1)
+        c.execute("SELECT * FROM lessons WHERE grade = ? ORDER BY id ASC", (grade,))
+        lessons = c.fetchall()
+        c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (session['user_id'],))
+        completed_lessons = [row['lesson_id'] for row in c.fetchall()]
+        # NEW: Fetch assigned_lessons for added_lessons
+        c.execute("SELECT lesson_id FROM lessons_users WHERE user_id = ?", (session['user_id'],))
+        added_lessons = [row['lesson_id'] for row in c.fetchall()]
+        logger.info(f"User {session['user_id']} accessed lessons, {len(lessons)} available")
+        return render_template('lessons.html.j2', 
+                               lessons=lessons, 
+                               completed_lessons=completed_lessons, 
+                               added_lessons=added_lessons,
+                               theme=session.get('theme', 'astronaut'), 
+                               language=session.get('language', 'en'))
+    except Exception as e:
+        logger.error(f"Lessons route failed: {str(e)}")
+        if conn:
+            conn.rollback()
+        flash('Error loading lessons', 'error')
+        return redirect(url_for('home'))
+    finally:
+        if conn:
+            conn.close()
+
+def generate_lesson():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        grade = session.get('grade', 1)
+        now = datetime.now().isoformat()
+        # Simple generation for demo
+        title = f"Generated Lesson for Grade {grade}"
+        content = "Generated content"
+        description = "This is a generated lesson."
+        c.execute('''INSERT INTO lessons (title, grade, subject, content, description, created_at) 
+                     VALUES (?, ?, 'generated', ?, ?, ?)''', (title, grade, content, description, now))
+        conn.commit()
+        logger.info(f"Generated lesson for user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Generate lesson failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+def add_to_feed():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json()
+    lesson_id = data.get('lesson_id')
+    if not lesson_id:
+        return jsonify({'success': False, 'error': 'Missing lesson_id'}), 400
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT id FROM lessons_users WHERE user_id = ? AND lesson_id = ?", (session['user_id'], lesson_id))
+        if c.fetchone():
+            return jsonify({'success': False, 'error': 'Already added to feed'}), 400
+        now = datetime.now().isoformat()
+        c.execute("INSERT INTO lessons_users (user_id, lesson_id, assigned_at) VALUES (?, ?, ?)", (session['user_id'], lesson_id, now))
+        conn.commit()
+        logger.info(f"Lesson {lesson_id} added to feed (assigned) for user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Add to feed failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+
+def schedule_lessons():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        grade = session.get('grade', 1)
+        c.execute("SELECT id FROM lessons WHERE grade = ?", (grade,))
+        lesson_ids = [row['id'] for row in c.fetchall()]
+        now = datetime.now().isoformat()
+        values = [(session['user_id'], lid, now) for lid in lesson_ids]
+        c.executemany("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, assigned_at) VALUES (?, ?, ?)", values)
+        conn.commit()
+        logger.info(f"Scheduled {len(lesson_ids)} lessons for user {session['user_id']}")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Schedule lessons failed: {str(e)}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500

@@ -1,4 +1,3 @@
-# home_routes.py (updated: Added update to last_feed_view in home() function)
 # home_routes.py
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
@@ -108,6 +107,12 @@ def home():
         c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (user_id,))
         feedbacks = c.fetchall()
         
+        # NEW: Fetch assigned lessons and completed_lessons for lesson cards in feed
+        c.execute("SELECT l.* FROM lessons l JOIN lessons_users lu ON l.id = lu.lesson_id WHERE lu.user_id = ? ORDER BY lu.assigned_at DESC", (user_id,))
+        assigned_lessons = c.fetchall()
+        c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (user_id,))
+        completed_lessons = [row['lesson_id'] for row in c.fetchall()]
+        
         return render_template('home.html.j2', 
                                posts=posts, 
                                comments=comments, 
@@ -120,6 +125,8 @@ def home():
                                feedbacks=feedbacks,
                                friend_count=len(friend_ids),
                                sort=sort,
+                               assigned_lessons=assigned_lessons,
+                               completed_lessons=completed_lessons,
                                theme=session.get('theme', 'astronaut'),
                                language=session.get('language', 'en'))
     except Exception as e:
