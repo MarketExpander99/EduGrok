@@ -1,139 +1,170 @@
-<!-- base.html.j2 -->
+<!-- base.html.j2 (updated: Replaced desktop top nav with fixed left sidebar like X/Twitter; Sidebar hidden on mobile; Main content shifted right on desktop; Bottom nav only on mobile with scroll behavior; Notifications in both with shared badge logic) -->
 <!DOCTYPE html>
-<html lang="{{ language or 'en' }}" class="dark">
+<html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% else %}astronaut-theme{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EduGrok{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        'grok-bg': '#000000',
-                        'grok-surface': '#0a0a0a',
-                        'grok-text': '#ffffff',
-                        'grok-secondary': '#71767b',
-                        'grok-border': '#333333',
-                        'grok-accent': '#4b5563', // Dark grey instead of blue
-                    }
-                }
-            }
-        }
-    </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background-color: #000000; color: #ffffff; }
-        h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
-        p { color: #e5e7eb !important; } /* Light gray for better readability on black */
-        .sidebar { background-color: #0a0a0a; border-right: 1px solid #333333; }
-        .card { background-color: #0a0a0a; border: 1px solid #333333; }
-        .btn-primary { background-color: #4b5563; border-color: #4b5563; color: #ffffff; }
-        .btn-primary:hover { background-color: #374151; }
-        .lesson-card { max-width: 600px; margin: 20px auto; text-align: center; }
-        .lesson-nav { display: flex; justify-content: center; gap: 1rem; margin-top: 20px; }
-        .lesson-nav button:disabled { opacity: 0.5; cursor: not-allowed; }
+        :root {
+            --grok-bg: #000000;
+            --grok-text: #ffffff;
+            --grok-surface: #1a1a1a;
+            --grok-border: #333333;
+            --grok-accent: #00d4ff;
+            --grok-secondary: #a0a0a0;
+        }
+        .bg-grok-bg { background-color: var(--grok-bg); }
+        .text-grok-text { color: var(--grok-text); }
+        .bg-grok-surface { background-color: var(--grok-surface); }
+        .border-grok-border { border-color: var(--grok-border); }
+        .bg-grok-accent { background-color: var(--grok-accent); }
+        .text-grok-accent { color: var(--grok-accent); }
+        .text-grok-secondary { color: var(--grok-secondary); }
+        .focus\:ring-grok-accent:focus { --tw-ring-color: var(--grok-accent); }
+        .farm-theme { --grok-bg: #f0f8e8; --grok-text: #2d5016; --grok-surface: #e8f5e8; --grok-border: #90ee90; --grok-accent: #228b22; }
+        .space-theme { --grok-bg: #000011; --grok-text: #00ffff; --grok-surface: #000022; --grok-border: #000044; --grok-accent: #ff00ff; }
+        .astronaut-theme { --grok-bg: #0a0a0a; --grok-text: #e0e0e0; --grok-surface: #1f1f1f; --grok-border: #404040; --grok-accent: #4a90e2; }
+        .card { @apply bg-grok-surface p-4 rounded-lg shadow-md border border-grok-border; }
+        .hover\:bg-grok-accent-hover:hover { background-color: color-mix(in srgb, var(--grok-accent) 80%, black); }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-grok-bg text-grok-text min-h-screen flex">
-    <!-- Side Menu (X-style) -->
-    <nav class="sidebar fixed left-0 top-0 h-full w-64 flex flex-col z-50 -translate-x-full md:translate-x-0 transition-transform duration-300" id="sidebar">
-        <div class="p-4 border-b border-grok-border">
-            <h1 class="text-xl font-bold text-grok-text">EduGrok</h1>
-        </div>
-        <ul class="flex-1 p-4 space-y-2">
-            <li>
-                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-home text-grok-accent"></i>
-                    <span>Home</span>
+<body class="bg-grok-bg text-grok-text min-h-screen">
+    <!-- Desktop Sidebar: Fixed left like X/Twitter, hidden on mobile -->
+    <aside id="desktop-sidebar" class="fixed left-0 top-0 h-full w-64 bg-grok-surface border-r border-grok-border z-50 hidden md:block overflow-y-auto">
+        <div class="p-4">
+            <a href="/home" class="text-2xl font-bold text-grok-accent mb-8 block">EduGrok</a>
+            <nav class="space-y-1">
+                <a href="/home" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-home w-5 mr-3"></i>
+                    <span>Feed</span>
                 </a>
-            </li>
-            <li>
-                <a href="{{ url_for('lessons') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-book text-grok-accent"></i>
+                <a href="/lessons" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-book w-5 mr-3"></i>
                     <span>Lessons</span>
                 </a>
-            </li>
-            <li>
-                <a href="{{ url_for('games') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-gamepad text-grok-accent"></i>
+                <a href="/games" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-gamepad w-5 mr-3"></i>
                     <span>Games</span>
                 </a>
-            </li>
-            <li>
-                <a href="{{ url_for('profile') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-user text-grok-accent"></i>
-                    <span>Profile</span>
-                </a>
-            </li>
-            <li>
-                <a href="{{ url_for('parent_dashboard') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-chart-bar text-grok-accent"></i>
+                <a href="/parent_dashboard" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-tachometer-alt w-5 mr-3"></i>
                     <span>Dashboard</span>
                 </a>
-            </li>
-            {% if user_id %}
-            <li>
-                <a href="{{ url_for('logout') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors">
-                    <i class="fas fa-sign-out-alt text-grok-accent"></i>
+                <a href="#" onclick="markReadAndGoHome(); return false;" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition relative">
+                    <i class="fas fa-bell w-5 mr-3"></i>
+                    <span>Notifications</span>
+                    <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs px-1.5 py-0.5 min-w-[1.5em] hidden">0</span>
+                </a>
+                <a href="/profile" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-user w-5 mr-3"></i>
+                    <span>Profile</span>
+                </a>
+                <a href="/logout" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt w-5 mr-3"></i>
                     <span>Logout</span>
                 </a>
-            </li>
-            {% endif %}
-        </ul>
-        <div class="p-4 border-t border-grok-border">
-            <a href="{{ url_for('feedback') }}" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-grok-surface transition-colors w-full">
-                <i class="fas fa-comment-dots text-grok-accent"></i>
-                <span>Feedback</span>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Main Content: Shifted right on desktop -->
+    <main class="ml-0 md:ml-64 pt-4 pb-20 md:pb-0 px-4 md:px-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Mobile Bottom Nav: Hides on scroll down, shows on scroll up (desktop hidden) -->
+    <nav id="mobile-bottom-nav" class="fixed bottom-0 left-0 right-0 bg-grok-surface border-t border-grok-border z-40 md:hidden transition-transform duration-300 ease-in-out translate-y-0">
+        <div class="flex justify-around p-3">
+            <a href="/home" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs">Feed</span>
+            </a>
+            <a href="/lessons" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-book text-xl"></i>
+                <span class="text-xs">Lessons</span>
+            </a>
+            <a href="/games" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-gamepad text-xl"></i>
+                <span class="text-xs">Games</span>
+            </a>
+            <a href="/parent_dashboard" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-tachometer-alt text-xl"></i>
+                <span class="text-xs">Dashboard</span>
+            </a>
+            <a href="#" onclick="markReadAndGoHome(); return false;" class="flex flex-col items-center relative p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-bell text-xl"></i>
+                <span class="text-xs">Notifications</span>
+            </a>
+            <a href="/profile" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+                <i class="fas fa-user text-xl"></i>
+                <span class="text-xs">Profile</span>
             </a>
         </div>
     </nav>
 
-    <!-- Overlay for mobile -->
-    <div class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" id="overlay"></div>
-
-    <!-- Main Content -->
-    <main class="flex-1 ml-0 md:ml-64 p-4 transition-all duration-300">
-        <!-- Mobile menu toggle -->
-        <button class="md:hidden mb-4 p-2 bg-grok-surface rounded" onclick="toggleSidebar()">
-            <i class="fas fa-bars text-grok-text"></i>
-        </button>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <ul class="mb-4 max-w-md mx-auto">
-            {% for category, message in messages %}
-            <li class="{% if category == 'error' %}text-red-500{% elif category == 'success' %}text-green-500{% else %}text-yellow-500{% endif %} p-2 rounded bg-gray-800">{{ message }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
-    </main>
-
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hidden');
+        // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
+        let lastScrollTop = 0;
+        let ticking = false;
+        const mobileBottomNav = document.getElementById('mobile-bottom-nav');
+
+        function updateNavPosition() {
+            let st = window.pageYOffset || document.documentElement.scrollTop;
+            const isScrollingDown = st > lastScrollTop;
+
+            // Mobile bottom nav: hide on down, show on up
+            if (mobileBottomNav) {
+                if (isScrollingDown) {
+                    mobileBottomNav.classList.add('translate-y-full');
+                } else {
+                    mobileBottomNav.classList.remove('translate-y-full');
+                }
+            }
+
+            lastScrollTop = st <= 0 ? 0 : st;
+            ticking = false;
         }
 
-        document.getElementById('overlay').addEventListener('click', toggleSidebar);
-
-        // Close sidebar on window resize if mobile
-        window.addEventListener('resize', () => {
-            if (window.innerWidth >= 768) {
-                document.getElementById('sidebar').classList.remove('-translate-x-full');
-                document.getElementById('overlay').classList.add('hidden');
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(updateNavPosition);
+                ticking = true;
             }
         });
-    </script>
 
+        // Initial check on load
+        updateNavPosition();
+
+        // Fetch and display notifications count (shared for sidebar and bottom nav)
+        if ('{{ 'user_id' in session }}' === 'True') {
+            fetch('/api/notifications_count')
+                .then(response => response.json())
+                .then(data => {
+                    const countEl = document.getElementById('notif-count');
+                    if (data.count > 0) {
+                        countEl.textContent = data.count;
+                        countEl.classList.remove('hidden');
+                    }
+                })
+                .catch(error => console.error('Error fetching notifications count:', error));
+        }
+
+        // Mark notifications as read and go to home
+        function markReadAndGoHome() {
+            fetch('/api/mark_notifications_read', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/home?highlight_first=true';
+                })
+                .catch(error => {
+                    console.error('Error marking notifications read:', error);
+                    window.location.href = '/home?highlight_first=true'; // Proceed anyway
+                });
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

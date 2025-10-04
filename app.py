@@ -1,3 +1,4 @@
+# app.py (updated: Added /api/notifications_count and /api/mark_notifications_read routes)
 import os
 import secrets
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash, send_from_directory, abort
@@ -8,6 +9,7 @@ from urllib.parse import urlparse
 import mimetypes
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
+from datetime import datetime
 
 from db import get_db, close_db, init_db, reset_db, check_db_schema
 from auth import register, login, logout, set_theme, set_language
@@ -91,6 +93,34 @@ def view_logs():
     except Exception as e:
         logger.error(f"Failed to read logs: {e}")
         return render_template('error.html.j2', error="Cannot read logs", theme=session.get('theme', 'astronaut'), language=session.get('language', 'en')), 500
+
+# NEW: API route for notifications count
+@app.route('/api/notifications_count')
+def notifications_count():
+    if 'user_id' not in session:
+        return jsonify({'count': 0})
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT last_feed_view FROM users WHERE id=?", (session['user_id'],))
+    row = c.fetchone()
+    last_view = row['last_feed_view'] if row else None
+    if not last_view:
+        return jsonify({'count': 0})
+    c.execute("SELECT COUNT(*) FROM posts WHERE created_at > ?", (last_view,))
+    count = c.fetchone()[0]
+    return jsonify({'count': count})
+
+# NEW: API route to mark notifications as read
+@app.route('/api/mark_notifications_read', methods=['POST'])
+def mark_notifications_read():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    conn = get_db()
+    c = conn.cursor()
+    now = datetime.now().isoformat()
+    c.execute("UPDATE users SET last_feed_view = ? WHERE id=?", (now, session['user_id']))
+    conn.commit()
+    return jsonify({'success': True})
 
 def init_app():
     with app.app_context():

@@ -1,4 +1,4 @@
-﻿# db.py
+﻿# db.py (updated: Added last_feed_view column check in check_db_schema)
 import sqlite3
 import os
 from flask import g
@@ -245,6 +245,13 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to friendships table")
+        # NEW: Add last_feed_view column to users
+        c.execute("PRAGMA table_info(users)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'last_feed_view' not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN last_feed_view TEXT")
+            conn.commit()
+            logger.info("Added last_feed_view column to users table")
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:

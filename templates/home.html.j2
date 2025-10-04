@@ -1,367 +1,138 @@
+<!-- home.html.j2 (updated: Changed Create Post button to a floating action button (FAB) positioned fixed bottom-right for better UX, removed full-width button) -->
 {% extends "base.html.j2" %}
 
-{% block title %}EduGrok Home{% endblock %}
+{% block title %}Home - EduGrok{% endblock %}
 
 {% block content %}
-<div class="container w-full max-w-4xl mx-auto p-4 sm:p-6">
-    <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg bg-grok-surface {% if category == 'success' %}bg-green-900/50 text-green-100{% elif category == 'error' %}bg-red-900/50 text-red-100{% else %}bg-blue-900/50 text-blue-100{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-
-    <!-- Header with Friend Count -->
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-grok-text">Your Feed</h1>
-        <!-- UPDATED: Friend count badge -->
-        <div class="flex items-center space-x-4">
-            <span class="bg-grok-accent/20 text-grok-accent px-3 py-1 rounded-full text-sm font-medium">
-                Friends: {{ friend_count | default(0) }}
-            </span>
-            <a href="{{ url_for('profile') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Profile</a>
-        </div>
-    </div>
-
-    <!-- Sort Dropdown -->
-    <div class="mb-6 flex justify-end">
-        <label for="sort" class="mr-2 text-grok-secondary font-medium">Sort by:</label>
-        <select id="sort" class="p-2 bg-grok-surface text-grok-text border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent" onchange="window.location.href = '?sort=' + this.value">
+<div class="max-w-2xl mx-auto">
+    <!-- Sorting Options (Dropdown for compactness) -->
+    <div class="flex justify-center mb-8">
+        <select id="sort-select" onchange="changeSort()" class="bg-grok-surface text-grok-text px-4 py-2 rounded-lg border border-grok-border focus:outline-none focus:ring-2 focus:ring-grok-accent">
             <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
+            <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Likes</option>
             <option value="most_views" {% if sort == 'most_views' %}selected{% endif %}>Most Views</option>
-            <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Liked</option>
         </select>
     </div>
 
-    <!-- Create Post Button as Floating + -->
-    <button id="open-post-form" class="fixed bottom-8 right-8 bg-grok-accent text-grok-text w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-grok-accent-hover hover:shadow-xl transition-all duration-200 z-10">
-        +
-    </button>
-
-    <!-- Posts Section -->
+    <!-- Posts Feed -->
     {% if posts %}
-        <div class="space-y-4 mb-8">
-            {% for post in posts %}
-                <div class="card bg-grok-surface p-4 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-md mx-auto relative {% if post.is_new %}new-post{% endif %}" style="
-    padding-left: 0px;
-    padding-right: 0px;
-    border-right-width: 0px;
-    border-left-width: 0px;
-    border-bottom-width: 0px;
-    border-top-width: 0px;
-    padding-top: 0px;
-    padding-bottom: 0px;
-">
-                    {% if post.is_new %}
-                        <span class="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full"></span>
-                    {% endif %}
-                    {% include 'post_card.html.j2' with context %}
-                </div>
-            {% endfor %}
+        {% for post in posts %}
+            <div class="mb-8 {% if highlight_first and loop.first %}animate-pulse border-2 border-grok-accent rounded-lg p-2{% endif %}" id="post-{{ post.id }}">
+                {% include 'post_card.html.j2' %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-12">
+            <p class="text-grok-secondary text-lg">No posts yet. Create the first one!</p>
         </div>
     {% endif %}
 
-    <!-- Lessons Section -->
-    {% if lessons %}
-        <div class="space-y-4">
-            <h2 class="text-2xl font-bold mb-4 text-grok-text">Your Lessons</h2>
-            {% for lesson in lessons %}
-                <div class="card bg-grok-surface p-4 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-md mx-auto">
-                    {% include 'lesson_card.html.j2' %}
-                </div>
-            {% endfor %}
+    <!-- Recent Test -->
+    {% include 'recent_test.html.j2' %}
+
+    <!-- Progress Cards -->
+    <div class="grid md:grid-cols-2 gap-6 mb-8">
+        <div class="card p-6">
+            <h3 class="font-semibold text-grok-text mb-3 text-lg">Lessons Completed</h3>
+            <p class="text-3xl font-bold text-grok-accent">{{ lessons_completed }}</p>
+        </div>
+        <div class="card p-6">
+            <h3 class="font-semibold text-grok-text mb-3 text-lg">Games Played</h3>
+            <p class="text-3xl font-bold text-grok-accent">{{ games_played }}</p>
+        </div>
+    </div>
+
+    <!-- Badges -->
+    {% if badges %}
+        <div class="card p-6 mb-8">
+            <h3 class="font-semibold text-grok-text mb-4 text-lg">Badges</h3>
+            <div class="flex flex-wrap gap-3">
+                {% for badge in badges %}
+                    <span class="bg-yellow-500 text-white px-4 py-2 rounded-full text-sm font-medium">{{ badge.badge_name }}</span>
+                {% endfor %}
+            </div>
         </div>
     {% endif %}
 
-    {% if not posts and not lessons %}
-        <div class="text-center py-8 card bg-grok-surface p-4 rounded-xl shadow-lg max-w-md mx-auto">
-            <h2 class="text-2xl font-bold mb-4 text-grok-text">No Activity Yet</h2>
-            <p class="text-grok-secondary mb-6">Create a post or add lessons to get started!</p>
-        </div>
-    {% endif %}
-
-    <!-- Include Post Form Modal -->
     {% include 'post_form.html.j2' %}
+</div>
 
-    <script>
-        // Modal JS
-        const openBtn = document.getElementById('open-post-form');
-        const modal = document.getElementById('post-form');
-        const backdrop = document.getElementById('post-form-backdrop');
-        const cancelBtn = document.getElementById('cancel-post');
+<!-- Floating Action Button (FAB) for Create Post -->
+<button onclick="openPostForm()" class="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 bg-grok-accent hover:bg-grok-accent-hover text-grok-text w-16 h-16 rounded-full text-2xl font-bold shadow-lg transition-all duration-200 flex items-center justify-center md:w-14 md:h-14 md:text-xl">+</button>
 
-        function openModal() {
-            modal.classList.remove('hidden');
-            backdrop.classList.remove('hidden');
-            modal.classList.remove('scale-95');
-        }
+<script>
+    // Post interaction functions
+    function openPostForm() {
+        document.getElementById('post-form').classList.remove('hidden', 'scale-95');
+        document.getElementById('post-form-backdrop').classList.remove('hidden');
+    }
 
-        function closeModal() {
-            modal.classList.add('hidden');
-            backdrop.classList.add('hidden');
-            modal.classList.add('scale-95');
-        }
+    function changeSort() {
+        const select = document.getElementById('sort-select');
+        window.location.href = `?sort=${select.value}`;
+    }
 
-        openBtn.addEventListener('click', openModal);
-        cancelBtn.addEventListener('click', closeModal);
-        backdrop.addEventListener('click', closeModal);
+    function likePost(postId) {
+        fetch(`/like/${postId}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { if (d.success) location.reload(); else alert(d.error); });
+    }
 
-        // Media Preview
-        const fileInput = document.getElementById('media-upload');
-        const preview = document.getElementById('media-preview');
+    function repostPost(postId) {
+        fetch(`/repost/${postId}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { if (d.success) location.reload(); else alert(d.error); });
+    }
 
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            preview.innerHTML = '';
-            if (file) {
-                const type = file.type;
-                if (type.startsWith('image/')) {
-                    const img = document.createElement('img');
-                    img.src = URL.createObjectURL(file);
-                    img.className = 'max-w-full h-auto rounded-lg shadow-md';
-                    preview.appendChild(img);
-                } else if (type === 'video/mp4') {
-                    const video = document.createElement('video');
-                    video.src = URL.createObjectURL(file);
-                    video.controls = true;
-                    video.className = 'max-w-full h-auto rounded-lg shadow-md';
-                    preview.appendChild(video);
-                }
-            }
-        });
+    function toggleComments(postId) {
+        const form = document.getElementById(`comment-form-${postId}`);
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
 
-        // Char count
-        const textarea = document.getElementById('post-content');
-        const charCount = document.getElementById('char-count');
+    function sharePost(postId) {
+        const url = `${window.location.origin}/home#post-${postId}`;
+        navigator.clipboard.writeText(url).then(() => alert('Link copied!'));
+    }
+
+    // Close post form
+    document.getElementById('cancel-post')?.addEventListener('click', () => {
+        document.getElementById('post-form').classList.add('hidden', 'scale-95');
+        document.getElementById('post-form-backdrop').classList.add('hidden');
+    });
+
+    document.getElementById('post-form-backdrop')?.addEventListener('click', () => {
+        document.getElementById('post-form').classList.add('hidden', 'scale-95');
+        document.getElementById('post-form-backdrop').classList.add('hidden');
+    });
+
+    // Char count for post
+    const textarea = document.getElementById('post-content');
+    const charCount = document.getElementById('char-count');
+    if (textarea && charCount) {
         textarea.addEventListener('input', () => {
             charCount.textContent = `${textarea.value.length}/280`;
         });
+    }
 
-        // Post-specific JS (likes, reposts, comments toggle)
-        function likePost(postId) {
-            fetch(`/like/${postId}`, {method: 'POST'})
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    location.reload();
-                } else {
-                    alert(d.error);
-                }
-            });
-        }
-
-        function repostPost(postId) {
-            fetch(`/repost/${postId}`, {method: 'POST'})
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) {
-                    location.reload();
-                } else {
-                    alert(d.error);
-                }
-            });
-        }
-
-        function toggleComments(postId) {
-            const form = document.getElementById(`comment-form-${postId}`);
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function toggleCommentsExtra(postId) {
-            const hiddenDiv = document.getElementById(`hidden-comments-${postId}`);
-            const btn = document.getElementById(`toggle-btn-${postId}`);
-            if (hiddenDiv.style.display === 'none') {
-                hiddenDiv.style.display = 'block';
-                btn.textContent = 'Show less';
-            } else {
-                hiddenDiv.style.display = 'none';
-                btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
+    // Media preview
+    const fileInput = document.getElementById('media-upload');
+    const preview = document.getElementById('media-preview');
+    if (fileInput && preview) {
+        fileInput.addEventListener('change', (e) => {
+            preview.innerHTML = '';
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    if (file.type.startsWith('image/')) {
+                        preview.innerHTML = `<img src="${ev.target.result}" class="max-w-full h-auto rounded">`;
+                    } else if (file.type.startsWith('video/')) {
+                        preview.innerHTML = `<video src="${ev.target.result}" controls class="max-w-full h-auto rounded"></video>`;
+                    }
+                };
+                reader.readAsDataURL(file);
             }
-        }
-
-        function sharePost(postId) {
-            const url = `${window.location.origin}/home#post-${postId}`;
-            navigator.clipboard.writeText(url).then(() => {
-                const btn = event.target;
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>';
-                btn.style.color = '#a78bfa';
-                setTimeout(() => {
-                    btn.innerHTML = originalHTML;
-                    btn.style.color = '';
-                }, 2000);
-            }).catch(() => {
-                alert('Failed to copy link. Please copy manually: ' + url);
-            });
-        }
-
-        // Lesson check functions
-        function checkMath(lessonId) {
-            const inputValue = document.getElementById('math-input-' + lessonId).value.trim();
-            if (!inputValue) { alert('Please enter an answer.'); return; }
-            const answer = parseFloat(inputValue) || 0;
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'math_fill',
-                    response: answer
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Correct! +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Try again!');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function submitMatch(lessonId) {
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'match_game',
-                    response: 'demo_match'
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Great match! +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Keep trying!');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function checkTrace(lessonId) {
-            const input = document.getElementById('trace-input-' + lessonId).value.trim().toLowerCase();
-            if (!input) { alert('Please enter the word.'); return; }
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'trace_complete',
-                    response: input
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Correct! Great job tracing the word. +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function checkSpelling(lessonId) {
-            const input = document.getElementById('spell-input-' + lessonId).value.trim().toLowerCase();
-            if (!input) { alert('Please enter your spelling.'); return; }
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'spelling_complete',
-                    response: input
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Correct! You spelled the word correctly. +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Try again! Check the spelling carefully.');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function checkMultipleChoice(lessonId) {
-            const selected = document.querySelector('input[name="mc-' + lessonId + '"]:checked');
-            if (!selected) {
-                alert('Please select an option.');
-                return;
-            }
-            const answer = selected.value.trim().toLowerCase();
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'mc_choice',
-                    response: answer
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Correct! +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Try again!');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function checkSentence(lessonId) {
-            const select = document.getElementById('sentence-select-' + lessonId);
-            if (!select.value) {
-                alert('Please select an option.');
-                return;
-            }
-            const answer = select.value.trim().toLowerCase();
-            fetch('/check_lesson', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    lesson_id: lessonId,
-                    activity_type: 'sentence_complete',
-                    response: answer
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.is_correct) {
-                    alert('Correct! +' + data.points + ' points');
-                } else {
-                    alert(data.message || 'Try again!');
-                }
-            }).catch(err => console.error('Error:', err));
-        }
-
-        function completeLesson(lessonId) {
-            window.location.href = `/complete_lesson/${lessonId}`;
-        }
-
-        function doAgain(lessonId) {
-            window.location.href = `/reset_lesson/${lessonId}`;
-        }
-    </script>
-
-    <style>
-        .new-post::before {
-            content: '';
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 12px;
-            height: 12px;
-            background-color: #22c55e; /* Green-500 */
-            border-radius: 50%;
-        }
-        @media (max-width: 640px) {
-            .container {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
-            .card {
-                width: 100%;
-                max-width: 100%;
-                /* margin-left: 0.5rem; */
-                /* margin-right: 0.5rem; */
-                /* padding: 0.5rem; */
-            }
-        }
-    </style>
-</div>
+        });
+    }
+</script>
 {% endblock %}
