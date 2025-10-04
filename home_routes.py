@@ -24,7 +24,8 @@ def home():
         conn = get_db()
         c = conn.cursor()
         user_id = session['user_id']
-        # UPDATED: Get friends' user_ids (approved friendships)
+        # FIXED: Removed friends filter to show all posts from all users
+        # Keep friends query only for friend_count
         c.execute('''
             SELECT u.id FROM users u
             WHERE u.id IN (
@@ -34,9 +35,9 @@ def home():
             )
         ''', (user_id, user_id))
         friend_ids = [row['id'] for row in c.fetchall()]
-        friend_ids.append(user_id)  # Include self
+        # No longer using friend_ids for posts filter
         
-        # Fetch posts with sort - UPDATED: Filter to friends and self
+        # Fetch posts with sort - FIXED: No filter to friends, show all posts
         sort = request.args.get('sort', 'latest')
         if sort == 'latest':
             order_by = 'p.created_at DESC'
@@ -48,7 +49,6 @@ def home():
             order_by = 'p.created_at DESC'
             sort = 'latest'  # fallback
 
-        placeholders = ','.join(['?' for _ in friend_ids])
         c.execute(f'''
             SELECT p.*, 
             (SELECT handle FROM posts o WHERE o.id = p.original_post_id) as original_handle,
@@ -56,10 +56,10 @@ def home():
             (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id) as reposts,
             (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
             (SELECT 1 FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
-            FROM posts p 
-            WHERE p.user_id IN ({placeholders})
+            FROM posts p
             ORDER BY {order_by}
-        ''', tuple(friend_ids + [user_id, user_id]))
+            LIMIT 50
+        ''', [user_id, user_id])
         raw_posts = c.fetchall()
         posts = [dict(row) for row in raw_posts]
         
@@ -96,7 +96,7 @@ def home():
                 comments[post_id] = []
             comments[post_id].append(comment)
         
-        # UPDATED: Fetch only assigned but NOT completed lessons (hide completed from feed)
+        # FIXED: Fetch only assigned but NOT completed lessons (active lessons for logged-in user)
         c.execute('''SELECT l.*, lu.assigned_at 
                    FROM lessons l 
                    INNER JOIN lessons_users lu ON l.id = lu.lesson_id AND lu.user_id = ? 
