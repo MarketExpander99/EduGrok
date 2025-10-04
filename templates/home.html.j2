@@ -1,11 +1,11 @@
-<!-- home.html.j2 (updated: Changed Create Post button to a floating action button (FAB) positioned fixed bottom-right for better UX, removed full-width button) -->
+<!-- home.html.j2 -->
 {% extends "base.html.j2" %}
 
 {% block title %}Home - EduGrok{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
-    <!-- Sorting Options (Dropdown for compactness) -->
+    {# Sorting Options (Dropdown for compactness) #}
     <div class="flex justify-center mb-8">
         <select id="sort-select" onchange="changeSort()" class="bg-grok-surface text-grok-text px-4 py-2 rounded-lg border border-grok-border focus:outline-none focus:ring-2 focus:ring-grok-accent">
             <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
@@ -14,11 +14,14 @@
         </select>
     </div>
 
-    <!-- Posts Feed -->
+    {# Posts Feed #}
     {% if posts %}
         {% for post in posts %}
+            {% set post_comments = comments[post.id] if post.id in comments else [] %}
             <div class="mb-8 {% if highlight_first and loop.first %}animate-pulse border-2 border-grok-accent rounded-lg p-2{% endif %}" id="post-{{ post.id }}">
-                {% include 'post_card.html.j2' %}
+                {% with post=post, comments=post_comments %}
+                    {% include 'post_card.html.j2' %}
+                {% endwith %}
             </div>
         {% endfor %}
     {% else %}
@@ -27,10 +30,10 @@
         </div>
     {% endif %}
 
-    <!-- Recent Test -->
+    {# Recent Test #}
     {% include 'recent_test.html.j2' %}
 
-    <!-- Progress Cards -->
+    {# Progress Cards #}
     <div class="grid md:grid-cols-2 gap-6 mb-8">
         <div class="card p-6">
             <h3 class="font-semibold text-grok-text mb-3 text-lg">Lessons Completed</h3>
@@ -42,7 +45,25 @@
         </div>
     </div>
 
-    <!-- Badges -->
+    {# Your Lessons Section #}
+    <section class="mb-8">
+        <h2 class="text-2xl font-bold mb-4 text-grok-text">Your Lessons</h2>
+        {% if feed_lessons %}
+            {% for lesson in feed_lessons %}
+                {% set lesson_completed = lesson.id in completed_lessons %}
+                {% with lesson=lesson, completed_lessons=completed_lessons, is_completed=lesson_completed %}
+                    {% include 'lesson_card.html.j2' %}
+                {% endwith %}
+            {% endfor %}
+        {% else %}
+            <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border max-w-lg mx-auto text-center">
+                <p class="text-grok-secondary">No lessons in your feed yet. Add some from the Lessons page!</p>
+                <a href="{{ url_for('lessons') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Go to Lessons</a>
+            </div>
+        {% endif %}
+    </section>
+
+    {# Badges #}
     {% if badges %}
         <div class="card p-6 mb-8">
             <h3 class="font-semibold text-grok-text mb-4 text-lg">Badges</h3>
@@ -57,7 +78,7 @@
     {% include 'post_form.html.j2' %}
 </div>
 
-<!-- Floating Action Button (FAB) for Create Post -->
+{# Floating Action Button (FAB) for Create Post #}
 <button onclick="openPostForm()" class="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 bg-grok-accent hover:bg-grok-accent-hover text-grok-text w-16 h-16 rounded-full text-2xl font-bold shadow-lg transition-all duration-200 flex items-center justify-center md:w-14 md:h-14 md:text-xl">+</button>
 
 <script>

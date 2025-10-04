@@ -13,35 +13,42 @@ def index():
     return redirect(url_for('landing'))
 
 def landing():
-    return render_template('landing.html.j2')
+    return render_template('landing.html.j2', theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
 
 def home():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
     conn = None
+    feed_lessons = []
+    completed_lessons = []
+    posts = []
+    comments = {}
     try:
         conn = get_db()
         c = conn.cursor()
         user_id = session['user_id']
-        # NEW: Update last_feed_view on home access
+        
+        # Update last_feed_view
         now = datetime.now().isoformat()
         c.execute("UPDATE users SET last_feed_view = ? WHERE id = ?", (now, user_id))
-        conn.commit()
-        # FIXED: Removed friends filter to show all posts from all users
-        # Keep friends query only for friend_count
-        c.execute('''
-            SELECT u.id FROM users u
-            WHERE u.id IN (
-                SELECT target_id FROM friendships WHERE requester_id = ? AND status = 'approved'
-                UNION
-                SELECT requester_id FROM friendships WHERE target_id = ? AND status = 'approved'
-            )
-        ''', (user_id, user_id))
-        friend_ids = [row['id'] for row in c.fetchall()]
-        # No longer using friend_ids for posts filter
         
-        # Fetch posts with sort - FIXED: No filter to friends, show all posts
+        # Fetch friend_count (safe, as friendships may not exist)
+        try:
+            c.execute('''
+                SELECT u.id FROM users u
+                WHERE u.id IN (
+                    SELECT target_id FROM friendships WHERE requester_id = ? AND status = 'approved'
+                    UNION
+                    SELECT requester_id FROM friendships WHERE target_id = ? AND status = 'approved'
+                )
+            ''', (user_id, user_id))
+            friend_ids = [row['id'] for row in c.fetchall()]
+        except Exception as f_err:
+            logger.warning(f"Friendships query failed: {f_err}")
+            friend_ids = []
+        
+        # Fetch posts with sort (core feed, prioritize this)
         sort = request.args.get('sort', 'latest')
         if sort == 'latest':
             order_by = 'p.created_at DESC'
@@ -51,67 +58,97 @@ def home():
             order_by = 'p.likes DESC'
         else:
             order_by = 'p.created_at DESC'
-            sort = 'latest'  # fallback
+            sort = 'latest'
 
-        c.execute(f'''
-            SELECT p.*, u.handle,
-            CASE WHEN pl.user_id = {user_id} THEN 1 ELSE 0 END as liked_by_user,
-            CASE WHEN pr.user_id = {user_id} THEN 1 ELSE 0 END as reposted_by_user
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            LEFT JOIN likes pl ON pl.post_id = p.id AND pl.user_id = {user_id}
-            LEFT JOIN reposts pr ON pr.post_id = p.id AND pr.user_id = {user_id}
-            ORDER BY {order_by}
+        # FIXED: Use parameterized query to avoid SQL injection in CASE
+        c.execute('''
+            SELECT p.*, u.handle as post_handle,
+                   (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
+                   (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
+            FROM posts p 
+            JOIN users u ON p.user_id = u.id 
+            ORDER BY {}
             LIMIT 20
-        ''')
+        '''.format(order_by), (user_id, user_id))
         posts = c.fetchall()
         
-        # Fetch comments for each post
+        # Fetch comments
         comments = {}
         for post in posts:
-            c.execute("SELECT c.*, u.handle FROM comments c JOIN users u ON c.user_id = u.id WHERE post_id = ? ORDER BY c.created_at ASC", (post['id'],))
-            comments[post['id']] = c.fetchall()
+            try:
+                c.execute("SELECT c.*, u.handle as comment_handle FROM comments c JOIN users u ON c.user_id = u.id WHERE post_id = ? ORDER BY c.created_at ASC", (post['id'],))
+                comments[post['id']] = c.fetchall()
+            except Exception as com_err:
+                logger.warning(f"Comments fetch failed for post {post['id']}: {com_err}")
+                comments[post['id']] = []
         
-        # Increment views for each post
+        # Increment views
         for post in posts:
             c.execute("UPDATE posts SET views = views + 1 WHERE id = ?", (post['id'],))
+        
         conn.commit()
         
-        # Fetch user data for profile
+        # User data
         c.execute("SELECT handle, grade, star_coins, points FROM users WHERE id = ?", (user_id,))
         user = c.fetchone()
-        session['handle'] = user['handle'] or session.get('email', 'User')
+        if user:
+            session['handle'] = user['handle'] or session.get('email', 'User')
         
-        # Fetch recent test
-        c.execute("SELECT grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (user_id,))
-        recent_test = c.fetchone()
+        # Recent test (safe fallback)
+        try:
+            c.execute("SELECT grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (user_id,))
+            recent_test = c.fetchone()
+        except:
+            recent_test = None
         
-        # Fetch lessons completed count
-        c.execute("SELECT COUNT(*) as count FROM completed_lessons WHERE user_id = ?", (user_id,))
-        lessons_completed = c.fetchone()['count']
+        # Lessons completed count
+        try:
+            c.execute("SELECT COUNT(*) as count FROM completed_lessons WHERE user_id = ?", (user_id,))
+            lessons_completed = c.fetchone()['count']
+        except:
+            lessons_completed = 0
         
-        # Fetch games played count
-        c.execute("SELECT COUNT(*) as count FROM games WHERE user_id = ?", (user_id,))
-        games_played = c.fetchone()['count']
+        # Games played
+        try:
+            c.execute("SELECT COUNT(*) as count FROM games WHERE user_id = ?", (user_id,))
+            games_played = c.fetchone()['count']
+        except:
+            games_played = 0
         
-        # Fetch average test score
-        c.execute("SELECT AVG(score) as avg FROM tests WHERE user_id = ?", (user_id,))
-        avg_result = c.fetchone()
-        avg_score = round(avg_result['avg'], 1) if avg_result['avg'] else 'N/A'
+        # Avg score
+        try:
+            c.execute("SELECT AVG(score) as avg FROM tests WHERE user_id = ?", (user_id,))
+            avg_result = c.fetchone()
+            avg_score = round(avg_result['avg'], 1) if avg_result and avg_result['avg'] else 'N/A'
+        except:
+            avg_score = 'N/A'
         
-        # Fetch badges
-        c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ? ORDER BY awarded_date DESC", (user_id,))
-        badges = c.fetchall()
+        # Badges
+        try:
+            c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ? ORDER BY awarded_date DESC", (user_id,))
+            badges = c.fetchall()
+        except:
+            badges = []
         
-        # Fetch feedbacks
-        c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (user_id,))
-        feedbacks = c.fetchall()
+        # Feedbacks
+        try:
+            c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (user_id,))
+            feedbacks = c.fetchall()
+        except:
+            feedbacks = []
         
-        # NEW: Fetch assigned lessons and completed_lessons for lesson cards in feed
-        c.execute("SELECT l.* FROM lessons l JOIN lessons_users lu ON l.id = lu.lesson_id WHERE lu.user_id = ? ORDER BY lu.assigned_at DESC", (user_id,))
-        assigned_lessons = c.fetchall()
-        c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (user_id,))
-        completed_lessons = [row['lesson_id'] for row in c.fetchall()]
+        # Lesson feed (isolated try for safety)
+        try:
+            c.execute("SELECT l.*, lu.assigned_at FROM lessons l JOIN lessons_users lu ON l.id = lu.lesson_id WHERE lu.user_id = ? ORDER BY lu.assigned_at DESC LIMIT 10", (user_id,))
+            feed_lessons = c.fetchall()
+            c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (user_id,))
+            completed_lessons = [row['lesson_id'] for row in c.fetchall()]
+        except Exception as lesson_err:
+            logger.error(f"Lesson feed failed: {lesson_err}")
+            feed_lessons = []
+            completed_lessons = []
+        
+        conn.commit()
         
         return render_template('home.html.j2', 
                                posts=posts, 
@@ -125,16 +162,22 @@ def home():
                                feedbacks=feedbacks,
                                friend_count=len(friend_ids),
                                sort=sort,
-                               assigned_lessons=assigned_lessons,
+                               feed_lessons=feed_lessons,
                                completed_lessons=completed_lessons,
                                theme=session.get('theme', 'astronaut'),
                                language=session.get('language', 'en'))
     except Exception as e:
-        logger.error(f"Home route error: {str(e)}")
+        logger.error(f"Critical home route error: {str(e)}")
         if conn:
             conn.rollback()
-        flash('Error loading feed', 'error')
-        return redirect(url_for('landing'))
+        flash('Error loading feed—try again soon!', 'error')
+        return render_template('home.html.j2',  # Fallback to empty home render
+                               posts=[], comments={}, user=None, recent_test=None,
+                               lessons_completed=0, games_played=0, avg_score='N/A',
+                               badges=[], feedbacks=[], friend_count=0, sort='latest',
+                               feed_lessons=[], completed_lessons=[],
+                               theme=session.get('theme', 'astronaut'),
+                               language=session.get('language', 'en'))
     finally:
         if conn:
             conn.close()

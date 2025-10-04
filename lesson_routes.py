@@ -1,8 +1,8 @@
 # lesson_routes.py
-# lesson_routes.py (updated: Changed add_to_feed to assign lesson via lessons_users; added assigned_lessons fetch in lessons() and pass as added_lessons)
 from flask import session, request, jsonify, render_template, redirect, url_for, flash
 import logging
 from datetime import datetime
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,16 @@ def check_lesson():
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute(f"SELECT {activity_type}_answer FROM lessons WHERE id = ?", (lesson_id,))
-        correct_answer = c.fetchone()[0]
+        # FIXED: Use dynamic column based on activity_type, with safe fallback
+        col = f"{activity_type}_answer"
+        c.execute(f"SELECT {col} FROM lessons WHERE id = ?", (lesson_id,))
+        row = c.fetchone()
+        if not row or row[0] is None:
+            return jsonify({'success': False, 'error': 'Invalid activity type'}), 400
+        correct_answer = row[0]
         is_correct = response == correct_answer
         points = 5 if is_correct else 0
-        c.execute("INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) VALUES (?, ?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points, responded_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
                   (lesson_id, session['user_id'], activity_type, response, int(is_correct), points))
         conn.commit()
         logger.info(f"User {session['user_id']} responded to {activity_type} in lesson {lesson_id}, correct: {is_correct}")
@@ -40,12 +45,14 @@ def complete_lesson(lesson_id):
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("INSERT INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, datetime('now'))", (session['user_id'], lesson_id))
-        c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, 10, datetime('now'))", (session['user_id'],))
+        now = datetime.now().isoformat()
+        # FIXED: Use isoformat for consistency
+        c.execute("INSERT INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)", (session['user_id'], lesson_id, now))
+        c.execute("INSERT INTO user_points (user_id, points, earned_at) VALUES (?, 10, ?)", (session['user_id'], now))
         conn.commit()
         flash('Lesson completed! +10 points', 'success')
         logger.info(f"User {session['user_id']} completed lesson {lesson_id}")
-        return redirect(url_for('lessons'))
+        return redirect(url_for('home'))  # FIXED: Redirect to home to see updated feed
     except Exception as e:
         logger.error(f"Complete lesson failed: {str(e)}")
         if conn:
@@ -119,15 +126,19 @@ def generate_lesson():
         c = conn.cursor()
         grade = session.get('grade', 1)
         now = datetime.now().isoformat()
-        # Simple generation for demo
-        title = f"Generated Lesson for Grade {grade}"
-        content = "Generated content"
-        description = "This is a generated lesson."
+        # FIXED: Query DB count instead of calling route function
+        c.execute("SELECT COUNT(*) FROM lessons WHERE grade = ?", (grade,))
+        count = c.fetchone()[0]
+        title = f"Generated Lesson {count + 1} for Grade {grade}"
+        content = "Generated content with interactive activities."
+        description = "This is a dynamically generated lesson based on your grade level."
+        subject = 'math'  # Or randomize: random.choice(['math', 'language', 'science'])
         c.execute('''INSERT INTO lessons (title, grade, subject, content, description, created_at) 
-                     VALUES (?, ?, 'generated', ?, ?, ?)''', (title, grade, content, description, now))
+                     VALUES (?, ?, ?, ?, ?, ?)''', (title, grade, subject, content, description, now))
+        lesson_id = c.lastrowid
         conn.commit()
-        logger.info(f"Generated lesson for user {session['user_id']}")
-        return jsonify({'success': True})
+        logger.info(f"Generated lesson {lesson_id} for user {session['user_id']}")
+        return jsonify({'success': True, 'lesson_id': lesson_id})
     except Exception as e:
         logger.error(f"Generate lesson failed: {str(e)}")
         return jsonify({'success': False, 'error': 'Server error'}), 500
