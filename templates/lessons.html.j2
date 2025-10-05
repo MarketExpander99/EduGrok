@@ -1,4 +1,4 @@
-<!-- lessons.html.j2 (Fixed: Use completed_ids list for per-lesson check (lesson.id in completed_ids). Updated start link to complete_lesson (GET). Ensured safe defaults. All prior styling/JS/back button preserved. Matches route data: lessons and completed_ids.) -->
+<!-- lessons.html.j2 (Fixed: Added support for added_ids list from backend to show "Added to Feed" state for buttons, preventing multiple adds. Updated JS to not reload on 'Already in feed' message, instead update button locally. Preserved all styling, back button, safe defaults. Matches route data: lessons, completed_ids, added_ids.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
@@ -38,9 +38,15 @@
                             <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="text-grok-text hover:text-grok-accent transition flex items-center">
                                 <i class="fas fa-play mr-1"></i> Start Lesson
                             </a>
-                            <a href="#" onclick="addToFeed({{ lesson.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center">
-                                <i class="fas fa-plus mr-1"></i> Add to Feed
-                            </a>
+                            {% if lesson.id in added_ids %}
+                                <span class="text-green-500 flex items-center opacity-75 cursor-not-allowed">
+                                    <i class="fas fa-check mr-1"></i> Added to Feed
+                                </span>
+                            {% else %}
+                                <a href="#" onclick="addToFeed({{ lesson.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center" id="add-btn-{{ lesson.id }}">
+                                    <i class="fas fa-plus mr-1"></i> Add to Feed
+                                </a>
+                            {% endif %}
                         {% else %}
                             <span class="text-green-500 flex items-center"><i class="fas fa-check mr-1"></i> Completed</span>
                             <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="text-grok-secondary hover:text-grok-accent transition flex items-center">
@@ -61,7 +67,7 @@
 </div>
 
 <script>
-    async function handleFetch(fetchPromise, successMsg, errorMsg) {
+    async function handleFetch(fetchPromise, successMsg, errorMsg, callback) {
         try {
             const response = await fetchPromise;
             if (!response.ok) {
@@ -73,7 +79,7 @@
             const data = await response.json();
             if (data.success) {
                 if (successMsg) alert(successMsg);
-                location.reload();
+                if (callback) callback(data);
             } else {
                 alert(data.error || errorMsg || 'Operation failed');
             }
@@ -84,6 +90,11 @@
     }
 
     function addToFeed(lessonId) {
+        const btn = document.getElementById('add-btn-' + lessonId);
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Adding...';
         handleFetch(
             fetch('/add_to_feed', {
                 method: 'POST',
@@ -91,7 +102,18 @@
                 body: JSON.stringify({lesson_id: lessonId})
             }),
             'Lesson added to feed!',
-            'Failed to add lesson'
+            'Failed to add lesson',
+            function(data) {
+                if (data.message === 'Already in feed') {
+                    btn.innerHTML = '<i class="fas fa-check mr-1"></i> Already Added';
+                    btn.classList.add('text-green-500', 'opacity-75', 'cursor-not-allowed');
+                } else {
+                    btn.innerHTML = '<i class="fas fa-check mr-1"></i> Added to Feed';
+                    btn.classList.add('text-green-500', 'opacity-75', 'cursor-not-allowed');
+                    // Optional: reload to update list if needed, but avoid to prevent flash
+                    // location.reload();
+                }
+            }
         );
     }
 
@@ -99,7 +121,10 @@
         handleFetch(
             fetch('/generate_lesson', {method: 'POST'}),
             'Lesson generated!',
-            'Failed to generate lesson'
+            'Failed to generate lesson',
+            function() {
+                location.reload();
+            }
         );
     }
 </script>

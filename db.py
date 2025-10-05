@@ -1,4 +1,6 @@
-﻿# db.py (Fixed: Added 'type' and 'lesson_id' columns to posts table in init_tables and check_db_schema. Ensured all lessons tuples are exactly 17 items. Added logging for schema changes.)
+﻿# db.py
+# Fixed: Added unique partial index on posts(lesson_id) WHERE type='lesson' in check_db_schema to prevent duplicate lesson posts.
+
 import sqlite3
 import os
 from flask import g
@@ -44,6 +46,7 @@ def init_tables():
                       points INTEGER DEFAULT 0,
                       parent_id INTEGER,
                       role TEXT DEFAULT 'kid',
+                      last_feed_view TEXT,
                       FOREIGN KEY (parent_id) REFERENCES users(id))''')
         # Lessons table
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
@@ -122,6 +125,7 @@ def init_tables():
                       user_id INTEGER, 
                       lesson_id INTEGER, 
                       assigned_at TEXT,
+                      completed INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (lesson_id) REFERENCES lessons(id))''')
         # Lesson responses table
@@ -247,14 +251,15 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
                 conn.commit()
                 logger.info(f"Added {col} column to lessons table")
-        # Check users table for required columns - UPDATED: Add parent_id, role
+        # Check users table for required columns - UPDATED: Add parent_id, role, last_feed_view
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col[2] for col in c.fetchall()}
-        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role']
+        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role', 'last_feed_view']
         for col in required_user_columns:
             if col not in columns:
-                default = "NULL" if col == 'parent_id' else "'kid'" if col == 'role' else 0 if col in ['subscribed', 'star_coins', 'points'] else "'en'" if col == 'language' else "'astronaut'" if col == 'theme' else "''"
-                c.execute(f"ALTER TABLE users ADD COLUMN {col} {'INTEGER' if col in ['parent_id'] else 'TEXT'} DEFAULT {default}")
+                default = "NULL" if col == 'parent_id' else "'kid'" if col == 'role' else "NULL" if col == 'last_feed_view' else 0 if col in ['subscribed', 'star_coins', 'points'] else "'en'" if col == 'language' else "'astronaut'" if col == 'theme' else "''"
+                col_type = 'TEXT' if col in ['last_feed_view'] else 'INTEGER' if col == 'parent_id' else 'TEXT'
+                c.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
         # Check posts table for views, type, lesson_id columns
@@ -272,6 +277,20 @@ def check_db_schema():
             c.execute("ALTER TABLE posts ADD COLUMN lesson_id INTEGER")
             conn.commit()
             logger.info("Added lesson_id column to posts table")
+        # FIXED: Add completed column to lessons_users if missing
+        c.execute("PRAGMA table_info(lessons_users)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'completed' not in columns:
+            c.execute("ALTER TABLE lessons_users ADD COLUMN completed INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added completed column to lessons_users table")
+        # FIXED: Add unique partial index to prevent duplicate lesson posts
+        try:
+            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_lesson_post ON posts (lesson_id) WHERE type = 'lesson'")
+            conn.commit()
+            logger.info("Created unique index for lesson posts")
+        except sqlite3.Error as e:
+            logger.warning(f"Could not create unique index for lesson posts: {e}")
         # UPDATED: Check friendships table
         c.execute("PRAGMA table_info(friendships)")
         columns = {col[1]: col[2] for col in c.fetchall()}
@@ -283,13 +302,7 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to friendships table")
-        # NEW: Add last_feed_view column to users
-        c.execute("PRAGMA table_info(users)")
-        columns = {col[1]: col[2] for col in c.fetchall()}
-        if 'last_feed_view' not in columns:
-            c.execute("ALTER TABLE users ADD COLUMN last_feed_view TEXT")
-            conn.commit()
-            logger.info("Added last_feed_view column to users table")
+        # NEW: Add last_feed_view column to users (already in required_user_columns)
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:

@@ -1,4 +1,4 @@
-# home_routes.py (Fixed: Query alias u.handle as handle (not post_handle). Added LEFT JOIN for original_handle. Log post types fetched. Full prior functionality.)
+# home_routes.py
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
 import logging
@@ -24,7 +24,6 @@ def home():
         last_view = row['last_feed_view'] if row else None
         now = datetime.now().isoformat()
         c.execute("UPDATE users SET last_feed_view = ? WHERE id = ?", (now, user_id))
-        # Friend count...
         try:
             c.execute('''SELECT u.id FROM users u WHERE u.id IN (SELECT target_id FROM friendships WHERE requester_id = ? AND status = 'approved' UNION SELECT requester_id FROM friendships WHERE target_id = ? AND status = 'approved')''', (user_id, user_id))
             friend_ids = [row['id'] for row in c.fetchall()]
@@ -40,14 +39,22 @@ def home():
         else:
             order_by = 'p.created_at DESC'
             sort = 'latest'
-        # FIXED: Alias handle correctly, add original_handle JOIN
-        c.execute(f'''SELECT p.*, u.handle, orig_u.handle as original_handle,
+        if friend_ids:
+            friends_placeholder = ','.join('?' * len(friend_ids))
+            where_clause = f"(p.user_id = ? OR p.user_id IN ({friends_placeholder}) OR p.type = 'lesson')"
+            params = [user_id] + friend_ids
+        else:
+            where_clause = "(p.user_id = ? OR p.type = 'lesson')"
+            params = [user_id]
+        c.execute(f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
                       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                       (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
-                      FROM posts p JOIN users u ON p.user_id = u.id
+                      FROM posts p 
+                      LEFT JOIN users u ON p.user_id = u.id
                       LEFT JOIN posts orig ON p.original_post_id = orig.id
                       LEFT JOIN users orig_u ON orig.user_id = orig_u.id
-                      ORDER BY {order_by} LIMIT 20''', (user_id, user_id))
+                      WHERE {where_clause}
+                      ORDER BY {order_by} LIMIT 20''', params + [user_id, user_id])
         posts_raw = c.fetchall()
         posts = [dict(post) for post in posts_raw]
         for post in posts:
@@ -57,7 +64,6 @@ def home():
                 if lesson:
                     post['lesson'] = dict(lesson)
             post['is_new'] = last_view is None or post['created_at'] > last_view
-        # Log for debug
         lesson_posts = [p for p in posts if p.get('type') == 'lesson']
         logger.info(f"Fetched {len(posts)} posts ({len(lesson_posts)} lessons) for user {user_id}")
         comments = {}
@@ -67,7 +73,6 @@ def home():
         for post in posts:
             c.execute("UPDATE posts SET views = views + 1 WHERE id = ?", (post['id'],))
         conn.commit()
-        # User data, recent_test, etc. (all your original code here - abbreviated for space)
         c.execute("SELECT handle, grade, star_coins, points FROM users WHERE id = ?", (user_id,))
         user = c.fetchone()
         if user:
@@ -104,7 +109,11 @@ def home():
         except:
             feedbacks = []
         try:
-            c.execute("SELECT l.*, lu.assigned_at FROM lessons l JOIN lessons_users lu ON l.id = lu.lesson_id WHERE lu.user_id = ? ORDER BY lu.assigned_at DESC LIMIT 10", (user_id,))
+            c.execute("""SELECT l.*, lu.assigned_at FROM lessons l 
+                         JOIN lessons_users lu ON l.id = lu.lesson_id 
+                         WHERE lu.user_id = ? 
+                         AND l.id NOT IN (SELECT lesson_id FROM posts WHERE type = 'lesson' AND lesson_id IS NOT NULL)
+                         ORDER BY lu.assigned_at DESC LIMIT 10""", (user_id,))
             feed_lessons = c.fetchall()
             c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (user_id,))
             completed_lessons = [row['lesson_id'] for row in c.fetchall()]
