@@ -1,4 +1,4 @@
-<!-- lesson_card.html.j2 (Fixed: If post.completed, add "Completed! 🎉" badge, disable inputs/buttons (readonly/disabled), gray out activities. Always show card but locked. All prior styling/JS preserved, but skip submit if completed.) -->
+<!-- lesson_card.html.j2 (updated: Confirmed removal of | fromjson filter. Added safe fallback for options as list. Ensured no template errors on missing/None options.) -->
 <div class="card bg-grok-surface border-2 border-orange-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}sparkly-border bg-orange-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
         <div class="flex justify-end mb-3">
@@ -32,7 +32,7 @@
         {% if post.lesson.mc_question %}
             <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}">
                 <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.mc_question }}</h4>
-                {% set options = post.lesson.mc_options | fromjson if post.lesson.mc_options else [] %}
+                {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
                 <div class="space-y-2">
                     {% for option in options %}
                         <label class="flex items-center space-x-2">
@@ -47,7 +47,7 @@
         {% if post.lesson.sentence_question %}
             <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}">
                 <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.sentence_question }}</h4>
-                {% set options = post.lesson.sentence_options | fromjson if post.lesson.sentence_options else [] %}
+                {% set options = (post.lesson.sentence_options if post.lesson.sentence_options is iterable and not post.lesson.sentence_options is string else []) %}
                 <div class="space-y-2">
                     {% for option in options %}
                         <label class="flex items-center space-x-2">

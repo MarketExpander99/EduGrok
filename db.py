@@ -1,4 +1,4 @@
-﻿# db.py (updated: Changed unique index to (user_id, lesson_id) for lesson posts to allow multiple lessons per user)
+﻿# db.py (updated: Added CREATE TABLE for missing tables: tests, games, badges, feedback to prevent potential issues with queries)
 # Fixed: Added unique partial index on posts(user_id, lesson_id) WHERE type='lesson' in check_db_schema to prevent duplicate lesson posts per user.
 
 import sqlite3
@@ -150,6 +150,35 @@ def init_tables():
                       approved_at TEXT,
                       FOREIGN KEY (requester_id) REFERENCES users(id),
                       FOREIGN KEY (target_id) REFERENCES users(id))''')
+        # NEW: Tests table
+        c.execute('''CREATE TABLE IF NOT EXISTS tests 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                      user_id INTEGER, 
+                      grade INTEGER, 
+                      score REAL, 
+                      date TEXT, 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        # NEW: Games table
+        c.execute('''CREATE TABLE IF NOT EXISTS games 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                      user_id INTEGER, 
+                      played_at TEXT DEFAULT (datetime('now')), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        # NEW: Badges table
+        c.execute('''CREATE TABLE IF NOT EXISTS badges 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                      user_id INTEGER, 
+                      badge_name TEXT, 
+                      awarded_date TEXT DEFAULT (datetime('now')), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+        # NEW: Feedback table
+        c.execute('''CREATE TABLE IF NOT EXISTS feedback 
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                      user_id INTEGER, 
+                      rating INTEGER, 
+                      comments TEXT, 
+                      submitted_date TEXT DEFAULT (datetime('now')), 
+                      FOREIGN KEY (user_id) REFERENCES users(id))''')
         conn.commit()
     except sqlite3.Error as e:
         logger.error(f"Error initializing tables: {str(e)}")

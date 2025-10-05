@@ -1,9 +1,20 @@
+<!-- home.html.j2 (updated: Added flash messages display at the top for better error visibility. Used Tailwind classes for alert styling consistent with grok- theme. Placed before the grid to ensure visibility.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Home - EduGrok{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-grok-bg">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="mb-4 p-4 rounded-lg border {% if category == 'error' %}border-red-400 bg-red-50 text-red-700{% elif category == 'success' %}border-green-400 bg-green-50 text-green-700{% else %}border-blue-400 bg-blue-50 text-blue-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
         <div class="flex items-center space-x-4">
