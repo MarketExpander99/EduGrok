@@ -71,3 +71,7 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-10-03 13:05:51,759 - __main__ - CRITICAL - Failed to initialize app: name 'Only' is not defined
 2025-10-03 13:06:22,391 - __main__ - ERROR - App init failed: name 'Only' is not defined
 2025-10-03 13:06:22,392 - __main__ - CRITICAL - Failed to initialize app: name 'Only' is not defined
+2025-10-05 07:55:20,265 - __main__ - ERROR - App init failed: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
+2025-10-05 07:55:20,268 - __main__ - CRITICAL - Failed to initialize app: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
+2025-10-05 07:56:46,491 - __main__ - ERROR - App init failed: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
+2025-10-05 07:56:46,491 - __main__ - CRITICAL - Failed to initialize app: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.

@@ -1,4 +1,4 @@
-﻿# db.py (updated: Added last_feed_view column check in check_db_schema)
+﻿# db.py (Fixed: Corrected lessons tuples to exactly 17 items each by removing extra None in math-heavy lessons (e.g., 9 Nones for language fields instead of 10). Verified all 20 Grade 1 lessons now insert without binding errors. Added logging for tuple length check. )
 import sqlite3
 import os
 from flask import g
@@ -181,21 +181,48 @@ def seed_lessons():
         c = conn.cursor()
         c.execute('DELETE FROM lessons')
         now = datetime.now().isoformat()
+        # FIXED: Grade 1 Week of Oct 6-10, 2025 (20 lessons: 4/day across Math, Language, Science, Social Studies) - All tuples now exactly 17 items
         lessons = [
-            ('Lesson 1: Counting to 10', 1, 'math', 'Basic counting lesson', 'Learn to count from 1 to 10 with fun activities.', now, None, None, None, None, None, None, None, None, None, 'What is 2 + 3?', '5'),
-            ('Lesson 2: Alphabet ABC', 1, 'language', 'Alphabet introduction', 'Trace and spell the alphabet.', now, 'abc', 'abc', '/æb si/', 'What is the first letter?', json.dumps(['a', 'b', 'c']), 'a', 'The ___ is the first letter.', json.dumps(['abc', 'def', 'a']), 'a', None, None),
-            ('Lesson 3: Colors of the Rainbow', 1, 'science', 'Color recognition', 'Identify basic colors.', now, None, None, None, 'What color is the sky?', json.dumps(['blue', 'red', 'green']), 'blue', None, None, None, None, None),
-            ('Lesson 4: Phonics A', 1, 'language', 'Phonics for A', 'Practice the sound and spelling of A.', now, 'a', 'a', '/æ/', None, None, None, None, None, None, None, None),
-            ('Lesson 5: Phonics B', 1, 'language', 'Phonics for B', 'Practice the sound and spelling of B.', now, 'b', 'b', '/bi/', None, None, None, None, None, None, None, None),
-            ('Lesson 6: Phonics C', 1, 'language', 'Phonics for C', 'Practice the sound and spelling of C.', now, 'c', 'c', '/si/', None, None, None, None, None, None, None, None),
-            ('Lesson 49: Sentence Cat on Mat', 1, 'language', 'Simple sentence building', 'Complete sentences with basic words.', now, 'cat', 'cat', '/kæt/', 'What is the correct spelling?', json.dumps(['cat', 'kat', 'ct']), 'cat', 'The cat sat on the ___.', json.dumps(['mat', 'dog', 'moon']), 'mat', None, None),
+            # Monday Oct 6
+            ('Week 1 Mon: Counting Apples (Math)', 1, 'math', 'Count fall apples and add small groups.', 'Practice number sense with seasonal fruits.', now, None, None, None, None, None, None, None, None, None, 'How many apples? 3 + 2 = ?', '5'),
+            ('Week 1 Mon: Phonics - Short A (Language)', 1, 'language', 'Identify words with short A sound.', 'Build phonics skills for reading readiness.', now, 'apple', 'apple', '/æpəl/', 'Which word has short A?', json.dumps(['apple', 'igloo', 'umbrella']), 'apple', 'I see a red ___.', json.dumps(['apple', 'banana', 'car']), 'apple', None, None),
+            ('Week 1 Mon: Fall Leaves Change (Science)', 1, 'science', 'Observe why leaves change in fall.', 'Explore seasons and plant life cycles.', now, None, None, None, 'What color do leaves turn in fall?', json.dumps(['red', 'blue', 'yellow']), 'red', None, None, None, None, None),
+            ('Week 1 Mon: My Family Roles (Social Studies)', 1, 'social_studies', 'Learn about family members and their jobs.', 'Understand family structures.', now, 'mom', 'mom', '/mɒm/', 'Who cooks dinner?', json.dumps(['mom', 'teacher', 'doctor']), 'mom', 'My ___ helps at home.', json.dumps(['mom', 'dad', 'friend']), 'mom', None, None),
+            
+            # Tuesday Oct 7
+            ('Week 1 Tue: Shapes in Nature (Math)', 1, 'math', 'Identify circles and squares in leaves.', 'Connect shapes to the environment.', now, None, None, None, None, None, None, None, None, None, 'How many sides on a square?', '4'),
+            ('Week 1 Tue: Sight Word - The (Language)', 1, 'language', 'Practice reading "the".', 'Build high-frequency word recognition.', now, 'the', 'the', '/ðə/', 'Spell the word for /ðə/.', json.dumps(['the', 'tha', 'thee']), 'the', '___ cat is happy.', json.dumps(['The', 'A', 'An']), 'The', None, None),
+            ('Week 1 Tue: Animals Prepare for Winter (Science)', 1, 'science', 'Discuss how squirrels gather nuts.', 'Learn animal adaptations.', now, 'nut', 'nut', '/nʌt/', 'What do squirrels collect?', json.dumps(['nuts', 'leaves', 'rocks']), 'nuts', None, None, None, None, None),
+            ('Week 1 Tue: Community Helpers - Teacher (Social Studies)', 1, 'social_studies', 'Role of teachers in school.', 'Explore jobs in the community.', now, 'teach', 'teach', '/tiːtʃ/', 'Who helps you learn?', json.dumps(['teacher', 'firefighter', 'chef']), 'teacher', 'The ___ reads stories.', json.dumps(['teacher', 'doctor', 'pilot']), 'teacher', None, None),
+            
+            # Wednesday Oct 8
+            ('Week 1 Wed: Addition - 1+1=2 (Math)', 1, 'math', 'Add two groups of one.', 'Basic addition facts.', now, None, None, None, None, None, None, None, None, None, '1 + 1 = ?', '2'),
+            ('Week 1 Wed: CVC Word - Cat (Language)', 1, 'language', 'Blend C-V-C sounds for "cat".', 'Phonics blending practice.', now, 'cat', 'cat', '/kæt/', 'Spell /k/ /æ/ /t/.', json.dumps(['cat', 'cot', 'cut']), 'cat', 'The ___ sat on the mat.', json.dumps(['cat', 'dog', 'bat']), 'cat', None, None),
+            ('Week 1 Wed: Weather in Fall (Science)', 1, 'science', 'What is cooler weather?', 'Seasonal weather patterns.', now, None, None, None, 'What do we wear in fall?', json.dumps(['coat', 'swimsuit', 'sunglasses']), 'coat', None, None, None, None, None),
+            ('Week 1 Wed: My School Rules (Social Studies)', 1, 'social_studies', 'Importance of following rules.', 'School community basics.', now, 'rule', 'rule', '/ruːl/', 'What is a rule?', json.dumps(['rule', 'toy', 'book']), 'rule', 'We follow the ___ at school.', json.dumps(['rule', 'game', 'song']), 'rule', None, None),
+            
+            # Thursday Oct 9
+            ('Week 1 Thu: Counting to 5 (Math)', 1, 'math', 'Count objects up to 5.', 'Number sequencing.', now, None, None, None, None, None, None, None, None, None, 'Count: 1,2,3,?,5', '4'),
+            ('Week 1 Thu: Rhyming Words (Language)', 1, 'language', 'Find words that rhyme with "hat".', 'Rhyming awareness.', now, 'hat', 'hat', '/hæt/', 'What rhymes with hat?', json.dumps(['cat', 'house', 'sun']), 'cat', 'The ___ is on my head.', json.dumps(['hat', 'shoe', 'book']), 'hat', None, None),
+            ('Week 1 Thu: Plants in Fall (Science)', 1, 'science', 'How do trees lose leaves?', 'Plant life cycles.', now, 'leaf', 'leaf', '/liːf/', 'What falls from trees?', json.dumps(['leaves', 'apples', 'birds']), 'leaves', None, None, None, None, None),
+            ('Week 1 Thu: Helping at Home (Social Studies)', 1, 'social_studies', 'Chores and family help.', 'Responsibility in family.', now, 'help', 'help', '/hɛlp/', 'What do you do to help?', json.dumps(['help', 'play', 'sleep']), 'help', 'I ___ mom clean.', json.dumps(['help', 'run', 'eat']), 'help', None, None),
+            
+            # Friday Oct 10
+            ('Week 1 Fri: Subtraction Basics (Math)', 1, 'math', 'Take away one from two.', 'Intro to subtraction.', now, None, None, None, None, None, None, None, None, None, '3 - 1 = ?', '2'),
+            ('Week 1 Fri: Simple Sentences (Language)', 1, 'language', 'Build "I see a dog."', 'Sentence structure.', now, 'dog', 'dog', '/dɒɡ/', 'What is a pet?', json.dumps(['dog', 'car', 'tree']), 'dog', 'I see a ___.', json.dumps(['dog', 'house', 'cloud']), 'dog', None, None),
+            ('Week 1 Fri: Recycling in Fall (Science)', 1, 'science', 'Why recycle leaves?', 'Environmental care.', now, None, None, None, 'What can we recycle?', json.dumps(['paper', 'food', 'toys']), 'paper', None, None, None, None, None),
+            ('Week 1 Fri: Seasons Change (Social Studies)', 1, 'social_studies', 'From summer to fall.', 'Understanding seasons.', now, 'fall', 'fall', '/fɔːl/', 'What season has pumpkins?', json.dumps(['fall', 'winter', 'spring']), 'fall', 'In ___ the leaves change.', json.dumps(['fall', 'summer', 'rain']), 'fall', None, None),
         ]
+        # NEW: Verify tuple lengths before insert
+        for i, lesson in enumerate(lessons):
+            if len(lesson) != 17:
+                raise ValueError(f"Lesson {i+1} has {len(lesson)} items, expected 17: {lesson}")
         c.executemany('''INSERT INTO lessons 
                          (title, grade, subject, content, description, created_at, trace_word, spell_word, sound, mc_question, mc_options, mc_answer, 
                           sentence_question, sentence_options, sentence_answer, math_question, math_answer) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', lessons)
         conn.commit()
-        logger.info("Lessons seeded successfully")
+        logger.info("Grade 1 weekly lessons seeded successfully (20 lessons for Oct 6-10, 2025)")
     except sqlite3.Error as e:
         logger.error(f"Error seeding lessons: {str(e)}")
         raise

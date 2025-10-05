@@ -1,9 +1,10 @@
-<!-- Filename: post_card.html.j2 -->
-<!-- Updates: Changed bg-grok-surface-light to #5b5b66 for darker gray background. Fixed sparkly border to ensure rounded corners using pseudo-element with rounded-xl (border-radius: 0.75rem). Maintained theme consistency with grok- classes. Ensured responsiveness and transitions. -->
-
+<!-- post_card.html.j2 (Updated: Added avatar icon in header for visual consistency with posts.html.j2 and lessons.html.j2. Ensured all grok- classes are applied uniformly. Retained conditional for new posts (sparkly-border). Fixed video controls class for theme hover. Minor polish to comment textarea placeholder and button transitions. ) -->
 <div class="card bg-grok-surface {% if post.is_new %}bg-grok-surface-light sparkly-border{% else %}border-grok-border{% endif %} p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6" id="post-{{ post.id }}">
     <!-- Post Header -->
     <div class="flex items-center mb-3">
+        <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
+            {{ post.handle[0] | upper if post.handle else 'U' }}
+        </div>
         <div class="flex-1">
             <p class="text-grok-text font-semibold">{{ post.handle }}{% if post.original_handle %} (reposted from {{ post.original_handle }}){% endif %}</p>
             <p class="text-grok-secondary text-sm">{{ post.created_at }}</p>
@@ -16,7 +17,10 @@
         {% if post.media_url.endswith(('.png', '.jpg', '.jpeg', '.gif')) %}
             <img src="{{ post.media_url }}" alt="Post media" class="max-w-full h-auto rounded-lg shadow-md mb-4">
         {% elif post.media_url.endswith('.mp4') %}
-            <video src="{{ post.media_url }}" controls class="max-w-full h-auto rounded-lg shadow-md mb-4"></video>
+            <video src="{{ post.media_url }}" controls class="max-w-full h-auto rounded-lg shadow-md mb-4 hover:shadow-lg transition-shadow duration-200">
+                <source src="{{ post.media_url }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
         {% endif %}
     {% endif %}
 
@@ -46,8 +50,8 @@
 
     <!-- Comment Form -->
     <form id="comment-form-{{ post.id }}" style="display: none;" method="POST" action="{{ url_for('add_comment', post_id=post.id) }}" class="mt-4">
-        <textarea name="content" class="w-full p-3 border border-grok-border rounded-lg bg-grok-bg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent" rows="3" placeholder="Add a comment..." required></textarea>
-        <button type="submit" class="mt-2 bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition">Post Comment</button>
+        <textarea name="content" class="w-full p-3 border border-grok-border rounded-lg bg-grok-bg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent placeholder-grok-secondary" rows="3" placeholder="Add a comment..." required></textarea>
+        <button type="submit" class="mt-2 bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Post Comment</button>
     </form>
 
     <!-- Comments -->
@@ -102,7 +106,7 @@
 
 /* Dark gray background for new posts */
 .bg-grok-surface-light {
-    background-color: #000000ff; /* Dark gray as specified */
+    background-color: #5b5b66; /* Dark gray as specified */
 }
 
 @keyframes sparkle {
