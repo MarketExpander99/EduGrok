@@ -1,33 +1,26 @@
-<!-- home.html.j2 (Fixed: Used {% set post = dummy_post %} for recommended lessons—no 'with' blocks, parser-tested clean. Single feed to end dups. Full sidebar, header, modal.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Home - EduGrok{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-grok-bg">
-    <!-- Header with + button and sort -->
     <div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
         <div class="flex items-center space-x-4">
-            <!-- Notifications badge (JS fetches count) -->
             <div id="notifications-badge" class="relative">
                 <button onclick="fetchNotifications()" class="text-grok-secondary hover:text-grok-accent">🔔</button>
                 <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1 min-w-[18px] hidden">{{ notifications_count or 0 }}</span>
             </div>
-            <!-- Sort dropdown -->
             <select onchange="window.location.href='?sort='+this.value" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1">
                 <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
                 <option value="most_views" {% if sort == 'most_views' %}selected{% endif %}>Most Views</option>
                 <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Likes</option>
             </select>
-            <!-- + Post button (triggers modal) -->
             <button onclick="openPostModal()" class="bg-grok-accent text-grok-text px-4 py-2 rounded-lg hover:bg-grok-accent-hover transition shadow-md">+</button>
         </div>
     </div>
 
-    <!-- Main content grid: Feed + Sidebar -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 max-w-7xl mx-auto">
-        <!-- Main Feed (SINGLE include - fixes dup rendering) -->
         <div class="lg:col-span-2">
             {% include 'posts.html.j2' %}
             {% if not posts %}
@@ -37,9 +30,7 @@
             {% endif %}
         </div>
 
-        <!-- Sidebar: Profile & Stats -->
         <div class="lg:col-span-1 space-y-4">
-            <!-- Profile Card -->
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
                 <div class="flex items-center mb-3">
@@ -55,10 +46,8 @@
                 <a href="{{ url_for('profile') }}" class="text-grok-accent hover:underline text-sm">View Full Profile →</a>
             </div>
 
-            <!-- Recent Test -->
             {% include 'recent_test.html.j2' %}
 
-            <!-- Progress Card -->
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Progress</h3>
                 <p class="text-grok-text mb-1">Lessons Completed: {{ lessons_completed }}</p>
@@ -66,7 +55,6 @@
                 <p class="text-grok-text">Avg Test Score: {{ avg_score }}</p>
             </div>
 
-            <!-- Badges Card -->
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Badges</h3>
                 {% if badges %}
@@ -80,7 +68,6 @@
                 {% endif %}
             </div>
 
-            <!-- Feedback History -->
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Recent Feedback</h3>
                 {% if feedbacks %}
@@ -96,14 +83,12 @@
                 {% endif %}
             </div>
 
-            <!-- Friends Count -->
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Friends</h3>
                 <p class="text-grok-text">{{ friend_count }} connected</p>
                 <a href="#" class="text-grok-accent hover:underline text-sm">Find more →</a>
             </div>
 
-            <!-- Recommended Lessons (Separate section - uses feed_lessons, excluded for added ones) -->
             {% if feed_lessons %}
                 <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                     <h3 class="text-lg font-semibold text-grok-text mb-3">Recommended Lessons</h3>
@@ -115,10 +100,19 @@
                             'handle': 'Recommended',
                             'created_at': lesson.created_at or getattr(lesson, 'assigned_at', '') or '',
                             'subject': lesson.subject or 'General',
-                            'grade': lesson.grade or (session.get('grade') if session else 1)
+                            'grade': lesson.grade or (session.get('grade') if session else 1),
+                            'completed': getattr(lesson, 'completed', false),
+                            'is_new': false,
+                            'liked_by_user': false,
+                            'reposted_by_user': false,
+                            'views': 0,
+                            'likes': 0,
+                            'reposts': 0
                         } %}
-                        {% set post = dummy_post %}
-                        {% include 'lesson_card.html.j2' %}
+                        <div id="post-{{ dummy_post.id }}" class="mb-4">
+                            {% set post = dummy_post %}
+                            {% include 'lesson_card.html.j2' %}
+                        </div>
                     {% endfor %}
                 </div>
             {% endif %}
@@ -126,27 +120,23 @@
     </div>
 </div>
 
-<!-- Post Modal (include from post_form) -->
 {% include 'post_form.html.j2' %}
 
 <script>
-    // Placeholder JS for notifications (fetch from API)
-    function fetchNotifications() {
-        fetch('/api/notifications_count')
-            .then(r => r.json())
-            .then(d => {
-                const count = document.getElementById('notif-count');
-                count.textContent = d.count;
-                count.classList.toggle('hidden', d.count === 0);
-            });
-    }
-    // Call on load
-    fetchNotifications();
+function fetchNotifications() {
+    fetch('/api/notifications_count')
+        .then(r => r.json())
+        .then(d => {
+            const count = document.getElementById('notif-count');
+            count.textContent = d.count;
+            count.classList.toggle('hidden', d.count === 0);
+        });
+}
+fetchNotifications();
 
-    // Post modal functions (assumed in base or separate)
-    function openPostModal() {
-        document.getElementById('post-form').classList.remove('hidden');
-        document.getElementById('post-form-backdrop').classList.remove('hidden');
-    }
+function openPostModal() {
+    document.getElementById('post-form').classList.remove('hidden');
+    document.getElementById('post-form-backdrop').classList.remove('hidden');
+}
 </script>
 {% endblock %}

@@ -1,7 +1,9 @@
-<!-- posts.html.j2 (Fixed: Always include lesson_card for lesson posts, but pass post.completed to template for locking/marking. Removed hide conditional. All post logic preserved.) -->
+<!-- posts.html.j2 (Fixed: Wrapped lesson include in consistent card div with unique ID to prevent rendering breaks for multiple lessons. Ensured all grok- classes and structure match regular posts.) -->
 {% for post in posts %}
     {% if post.get('type') == 'lesson' and post.get('lesson') %}
-        {% include 'lesson_card.html.j2' %}
+        <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+            {% include 'lesson_card.html.j2' %}
+        </div>
     {% else %}
         <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
             <div class="flex items-center mb-3">

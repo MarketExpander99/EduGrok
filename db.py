@@ -1,5 +1,5 @@
-﻿# db.py
-# Fixed: Added unique partial index on posts(lesson_id) WHERE type='lesson' in check_db_schema to prevent duplicate lesson posts.
+﻿# db.py (updated: Changed unique index to (user_id, lesson_id) for lesson posts to allow multiple lessons per user)
+# Fixed: Added unique partial index on posts(user_id, lesson_id) WHERE type='lesson' in check_db_schema to prevent duplicate lesson posts per user.
 
 import sqlite3
 import os
@@ -284,13 +284,14 @@ def check_db_schema():
             c.execute("ALTER TABLE lessons_users ADD COLUMN completed INTEGER DEFAULT 0")
             conn.commit()
             logger.info("Added completed column to lessons_users table")
-        # FIXED: Add unique partial index to prevent duplicate lesson posts
+        # FIXED: Add unique partial index to prevent duplicate lesson posts per user
         try:
-            c.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_lesson_post ON posts (lesson_id) WHERE type = 'lesson'")
-            conn.commit()
-            logger.info("Created unique index for lesson posts")
-        except sqlite3.Error as e:
-            logger.warning(f"Could not create unique index for lesson posts: {e}")
+            c.execute("DROP INDEX IF EXISTS unique_lesson_post")
+        except sqlite3.OperationalError:
+            pass
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_lesson_post ON posts (user_id, lesson_id) WHERE type = 'lesson'")
+        conn.commit()
+        logger.info("Created unique index for lesson posts per user")
         # UPDATED: Check friendships table
         c.execute("PRAGMA table_info(friendships)")
         columns = {col[1]: col[2] for col in c.fetchall()}

@@ -39,17 +39,14 @@ def home():
         else:
             order_by = 'p.created_at DESC'
             sort = 'latest'
-        # FIXED: Prevent potential duplicates by excluding lesson-type from friends clause (lessons are global via type='lesson').
-        # For no friends: Same as original (p.user_id = ? OR p.type = 'lesson').
+        # FIXED: Use per-user posts only (including lessons added by user/friends) to avoid global lesson conflicts and ensure personalized feed.
         if friend_ids:
             friends_placeholder = ','.join('?' * len(friend_ids))
-            where_clause = f"(p.user_id = ? OR (p.user_id IN ({friends_placeholder}) AND p.type != 'lesson') OR p.type = 'lesson')"
+            where_clause = f"(p.user_id = ? OR p.user_id IN ({friends_placeholder}))"
             params = [user_id] + friend_ids
         else:
-            where_clause = "(p.user_id = ? OR p.type = 'lesson')"
+            where_clause = "p.user_id = ?"
             params = [user_id]
-        # FIXED: Match original SELECT exactly—no extra subqueries for totals (use p.likes/p.reposts/p.views from posts table).
-        # Only user-specific subs for liked_by_user/reposted_by_user.
         c.execute(f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
                       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                       (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
@@ -120,8 +117,8 @@ def home():
             c.execute("""SELECT l.*, lu.assigned_at FROM lessons l 
                          JOIN lessons_users lu ON l.id = lu.lesson_id 
                          WHERE lu.user_id = ? 
-                         AND l.id NOT IN (SELECT lesson_id FROM posts WHERE type = 'lesson' AND lesson_id IS NOT NULL)
-                         ORDER BY lu.assigned_at DESC LIMIT 10""", (user_id,))
+                         AND l.id NOT IN (SELECT lesson_id FROM posts WHERE type = 'lesson' AND lesson_id IS NOT NULL AND user_id = ?)
+                         ORDER BY lu.assigned_at DESC LIMIT 10""", (user_id, user_id))
             feed_lessons = c.fetchall()
             # FIXED: Set completed for each recommended lesson to match template expectations
             for lesson in feed_lessons:
