@@ -1,159 +1,97 @@
-<!-- Filename: posts.html.j2 -->
-<!-- Updates: Updated post cards with grok- classes for theme consistency. Improved interaction buttons and comments section with shadows and transitions. Made consistent with post_card.html.j2 styling. -->
-
+<!-- posts.html.j2 (With debug line: "Post type=..." in else branch—remove once you see "lesson" for the added one. Conditional on post.get('type') == 'lesson' and post.get('lesson').) -->
 {% for post in posts %}
-    <div id="post-{{ post.id }}" class=""><!--card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">-->
-        <div class="flex items-center mb-3">
-            <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
-                {{ post.handle[0] | upper if post.handle else 'U' }}
-            </div>
-            <div>
-                <h3 class="text-sm font-semibold text-grok-text">{{ post.handle }} (Grade {{ post.grade }})</h3>
-                <p class="text-xs text-grok-secondary">{{ post.created_at }}</p>
-            </div>
-        </div>
-        {% if post.original_handle %}
-            <div class="text-grok-secondary text-xs mb-2 flex items-center">
-                <span class="text-lg mr-1">🔄</span>
-                <span>Reposted from {{ post.original_handle }}</span>
-            </div>
-        {% endif %}
-        <p class="text-grok-text leading-relaxed mb-3 text-base">{{ post.content | safe }}</p>
-        {% if post.media_url %}
-            {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
-                <img src="{{ post.media_url }}" alt="Post media" class="max-w-full h-auto rounded-lg shadow-md mb-4">
-            {% elif post.media_url.endswith('.mp4') %}
-                <video controls class="max-w-full h-auto rounded-lg shadow-md mb-4">
-                    <source src="{{ post.media_url }}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            {% endif %}
-        {% endif %}
-        <!-- View Count -->
-        <div class="flex items-center text-grok-secondary text-xs mb-3">
-            <span class="mr-1">👁️</span>
-            <span>{{ post.views or 0 }} views</span>
-        </div>
-        <div class="flex flex-wrap gap-2 mb-3">
-            <span class="bg-grok-accent/50 text-grok-text text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject }}</span>
-            <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Likes: {{ post.likes or 0 }}</span>
-            <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Reposts: {{ post.reposts or 0 }}</span>
-        </div>
-        <!-- Social Interactions Bar -->
-        <div class="flex justify-between items-center pt-3 border-t border-grok-border">
-            <div class="flex space-x-6">
-                <!-- Like Button with Icon -->
-                <button onclick="likePost({{ post.id }})" class="text-grok-secondary hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
-                    <span class="text-lg">❤️</span>
-                    <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
-                </button>
-                <!-- Repost Button -->
-                <button onclick="repostPost({{ post.id }})" class="text-grok-secondary hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
-                    <span class="text-lg">🔄</span>
-                    <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
-                </button>
-                <!-- Comment Button -->
-                <button onclick="toggleComments({{ post.id }})" class="text-grok-secondary hover:text-blue-400 transition flex items-center space-x-1">
-                    <span class="text-lg">💬</span>
-                    <span class="text-sm">Comment</span>
-                </button>
-            </div>
-            <!-- Share Button -->
-            <button onclick="sharePost({{ post.id }})" class="text-grok-secondary hover:text-indigo-400 transition flex items-center space-x-1">
-                <span class="text-lg">📤</span>
-                <span class="text-sm">Share</span>
-            </button>
-        </div>
-        {% if post.id in comments %}
-        {% set sorted_comments = comments[post.id] | sort(attribute='created_at', reverse=True) %}
-        {% set visible_comments = sorted_comments[:5] %}
-        {% set hidden_comments = sorted_comments[5:] %}
-        <div class="comments-section mt-4 p-3 bg-grok-bg rounded-lg shadow-inner border border-grok-border">
-            <h4 class="text-sm font-semibold text-grok-text mb-2">Comments:</h4>
-            {% for comment in visible_comments %}
-            <div class="comment mb-2 text-sm text-grok-secondary">
-                <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
-                {{ comment.content | safe }}
-            </div>
-            {% endfor %}
-            {% if hidden_comments %}
-            <div id="hidden-comments-{{ post.id }}" style="display: none;">
-                {% for comment in hidden_comments %}
-                <div class="comment mb-2 text-sm text-grok-secondary">
-                    <strong class="text-grok-text">{{ comment.handle }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
-                    {{ comment.content | safe }}
+    {% if post.get('type') == 'lesson' and post.get('lesson') %}
+        {% include 'lesson_card.html.j2' %}
+    {% else %}
+        <!-- DEBUG: Post type={{ post.get('type') | default('unknown') }} -- REMOVE AFTER CONFIRMING 'lesson' -->
+        <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
+            <div class="flex items-center mb-3">
+                <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
+                    {{ post.handle[0] | upper if post.handle else 'U' }}
                 </div>
-                {% endfor %}
+                <div>
+                    <h3 class="text-sm font-semibold text-grok-text">{{ post.handle | default('User') }} (Grade {{ post.grade | default(1) }})</h3>
+                    <p class="text-xs text-grok-secondary">{{ post.created_at | default('Now') }}</p>
+                </div>
             </div>
-            <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-grok-accent hover:text-grok-accent-hover text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
+            {% if post.original_handle %}
+                <div class="text-grok-secondary text-xs mb-2 flex items-center">
+                    <span class="text-lg mr-1">🔄</span> Reposted from {{ post.original_handle }}
+                </div>
             {% endif %}
+            <p class="text-grok-text leading-relaxed mb-3 text-base">{{ post.content | safe | default('No content') }}</p>
+            {% if post.media_url %}
+                {% if post.media_url.endswith(('.png', '.jpg', '.jpeg')) %}
+                    <img src="{{ post.media_url }}" alt="Media" class="max-w-full h-auto rounded-lg shadow-md mb-4">
+                {% elif post.media_url.endswith('.mp4') %}
+                    <video controls class="max-w-full h-auto rounded-lg shadow-md mb-4">
+                        <source src="{{ post.media_url }}" type="video/mp4">
+                    </video>
+                {% endif %}
+            {% endif %}
+            <div class="flex items-center text-grok-secondary text-xs mb-3">
+                <span class="mr-1">👁️</span> {{ post.views or 0 }} views
+            </div>
+            <div class="flex flex-wrap gap-2 mb-3">
+                <span class="bg-grok-accent/50 text-grok-text text-sm px-3 py-1 rounded-full font-medium">Subject: {{ post.subject | default('General') }}</span>
+                <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Likes: {{ post.likes or 0 }}</span>
+                <span class="bg-grok-surface text-grok-secondary text-sm px-3 py-1 rounded-full font-medium border border-grok-border">Reposts: {{ post.reposts or 0 }}</span>
+            </div>
+            <div class="flex justify-between items-center pt-3 border-t border-grok-border">
+                <div class="flex space-x-6">
+                    <button onclick="likePost({{ post.id }})" class="text-grok-secondary hover:text-red-400 transition flex items-center space-x-1" {% if post.liked_by_user %}style="color: #ef4444;"{% endif %}>
+                        <span class="text-lg">❤️</span> <span class="text-sm">{{ 'Unlike' if post.liked_by_user else 'Like' }}</span>
+                    </button>
+                    <button onclick="repostPost({{ post.id }})" class="text-grok-secondary hover:text-green-400 transition flex items-center space-x-1" {% if post.reposted_by_user %}style="color: #22c55e;"{% endif %}>
+                        <span class="text-lg">🔄</span> <span class="text-sm">{{ 'Unrepost' if post.reposted_by_user else 'Repost' }}</span>
+                    </button>
+                    <button onclick="toggleComments({{ post.id }})" class="text-grok-secondary hover:text-blue-400 transition flex items-center space-x-1">
+                        <span class="text-lg">💬</span> <span class="text-sm">Comment</span>
+                    </button>
+                </div>
+                <button onclick="sharePost({{ post.id }})" class="text-grok-secondary hover:text-indigo-400 transition flex items-center space-x-1">
+                    <span class="text-lg">📤</span> <span class="text-sm">Share</span>
+                </button>
+            </div>
+            {% if post.id in comments %}
+                {% set sorted_comments = comments[post.id] | sort(attribute='created_at', reverse=True) %}
+                {% set visible_comments = sorted_comments[:5] %}
+                {% set hidden_comments = sorted_comments[5:] %}
+                <div class="comments-section mt-4 p-3 bg-grok-bg rounded-lg shadow-inner border border-grok-border">
+                    <h4 class="text-sm font-semibold text-grok-text mb-2">Comments:</h4>
+                    {% for comment in visible_comments %}
+                        <div class="comment mb-2 text-sm text-grok-secondary">
+                            <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
+                            {{ comment.content | safe }}
+                        </div>
+                    {% endfor %}
+                    {% if hidden_comments %}
+                        <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                            {% for comment in hidden_comments %}
+                                <div class="comment mb-2 text-sm text-grok-secondary">
+                                    <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
+                                    {{ comment.content | safe }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-grok-accent hover:text-grok-accent-hover text-sm mt-2 underline">Show more ({{ hidden_comments | length }} more)</button>
+                    {% endif %}
+                </div>
+            {% endif %}
+            <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
+                <form method="POST" action="/comment/{{ post.id }}">
+                    <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-grok-border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text placeholder-grok-secondary" required rows="2"></textarea>
+                    <button type="submit" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Post Comment</button>
+                </form>
+            </div>
         </div>
-        {% endif %}
-        <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
-            <form method="POST" action="/comment/{{ post.id }}">
-                <textarea name="content" placeholder="Write a comment..." class="w-full p-3 border border-grok-border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text placeholder-grok-secondary" required rows="2"></textarea>
-                <button type="submit" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Post Comment</button>
-            </form>
-        </div>
-    </div>
+    {% endif %}
 {% endfor %}
 
 <script>
-// Post-specific JS (likes, reposts, comments toggle)
-function likePost(postId) {
-    fetch(`/like/${postId}`, {method: 'POST'})
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) {
-            location.reload();
-        } else {
-            alert(d.error);
-        }
-    });
-}
-
-function repostPost(postId) {
-    fetch(`/repost/${postId}`, {method: 'POST'})
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) {
-            location.reload();
-        } else {
-            alert(d.error);
-        }
-    });
-}
-
-function toggleComments(postId) {
-    const form = document.getElementById(`comment-form-${postId}`);
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleCommentsExtra(postId) {
-    const hiddenDiv = document.getElementById(`hidden-comments-${postId}`);
-    const btn = document.getElementById(`toggle-btn-${postId}`);
-    if (hiddenDiv.style.display === 'none') {
-        hiddenDiv.style.display = 'block';
-        btn.textContent = 'Show less';
-    } else {
-        hiddenDiv.style.display = 'none';
-        btn.textContent = `Show more (${hiddenDiv.children.length} more)`;
-    }
-}
-
-function sharePost(postId) {
-    const url = `${window.location.origin}/home#post-${postId}`;
-    navigator.clipboard.writeText(url).then(() => {
-        const btn = event.target;
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>';
-        btn.style.color = '#a78bfa';
-        setTimeout(() => {
-            btn.innerHTML = originalHTML;
-            btn.style.color = '';
-        }, 2000);
-    }).catch(() => {
-        alert('Failed to copy link. Please copy manually: ' + url);
-    });
-}
+function likePost(postId) { fetch(`/like/${postId}`, {method: 'POST'}).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); }); }
+function repostPost(postId) { fetch(`/repost/${postId}`, {method: 'POST'}).then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.error); }); }
+function toggleComments(postId) { const form = document.getElementById(`comment-form-${postId}`); form.style.display = form.style.display === 'none' ? 'block' : 'none'; }
+function toggleCommentsExtra(postId) { const hidden = document.getElementById(`hidden-comments-${postId}`); const btn = document.getElementById(`toggle-btn-${postId}`); if (hidden.style.display === 'none') { hidden.style.display = 'block'; btn.textContent = 'Show less'; } else { hidden.style.display = 'none'; btn.textContent = `Show more (${hidden.children.length} more)`; } }
+function sharePost(postId) { const url = `${window.location.origin}/home#post-${postId}`; navigator.clipboard.writeText(url).then(() => { const btn = event.target; const orig = btn.innerHTML; btn.innerHTML = '<span class="text-lg">📋</span><span class="text-sm">Copied!</span>'; btn.style.color = '#a78bfa'; setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 2000); }).catch(() => alert('Copy failed: ' + url)); }
 </script>

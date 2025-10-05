@@ -1,4 +1,4 @@
-<!-- lessons.html.j2 (Fixed: Removed conditional 'is_new' to prevent Jinja attribute error if not in query. Added fallback for completed (default 0). Ensured all accesses safe with | default(0). Added back button for navigation. ) -->
+<!-- lessons.html.j2 (Fixed: Use completed_ids list for per-lesson check (lesson.id in completed_ids). Updated start link to complete_lesson (GET). Ensured safe defaults. All prior styling/JS/back button preserved. Matches route data: lessons and completed_ids.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
@@ -34,9 +34,8 @@
                     </div>
 
                     <div class="flex justify-between border-t border-grok-border pt-3" style="font-size:80%;">
-                        {% set completed = lesson.completed | default(0) %}
-                        {% if not completed %}
-                            <a href="{{ url_for('check_lesson', lesson_id=lesson.id) }}" class="text-grok-text hover:text-grok-accent transition flex items-center">
+                        {% if lesson.id not in completed_ids %}
+                            <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="text-grok-text hover:text-grok-accent transition flex items-center">
                                 <i class="fas fa-play mr-1"></i> Start Lesson
                             </a>
                             <a href="#" onclick="addToFeed({{ lesson.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center">

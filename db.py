@@ -1,4 +1,4 @@
-﻿# db.py (Fixed: Corrected lessons tuples to exactly 17 items each by removing extra None in math-heavy lessons (e.g., 9 Nones for language fields instead of 10). Verified all 20 Grade 1 lessons now insert without binding errors. Added logging for tuple length check. )
+﻿# db.py (Fixed: Added 'type' and 'lesson_id' columns to posts table in init_tables and check_db_schema. Ensured all lessons tuples are exactly 17 items. Added logging for schema changes.)
 import sqlite3
 import os
 from flask import g
@@ -65,7 +65,7 @@ def init_tables():
                       sentence_answer TEXT,
                       math_question TEXT,
                       math_answer TEXT)''')
-        # Posts table
+        # Posts table - FIXED: Added type and lesson_id
         c.execute('''CREATE TABLE IF NOT EXISTS posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
@@ -80,7 +80,10 @@ def init_tables():
                       grade INTEGER, 
                       handle TEXT, 
                       original_handle TEXT, 
-                      FOREIGN KEY (user_id) REFERENCES users(id))''')
+                      type TEXT DEFAULT 'post',
+                      lesson_id INTEGER,
+                      FOREIGN KEY (user_id) REFERENCES users(id),
+                      FOREIGN KEY (lesson_id) REFERENCES lessons(id))''')
         # Comments table
         c.execute('''CREATE TABLE IF NOT EXISTS comments 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -254,13 +257,21 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} {'INTEGER' if col in ['parent_id'] else 'TEXT'} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
-        # Check posts table for views column
+        # Check posts table for views, type, lesson_id columns
         c.execute("PRAGMA table_info(posts)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         if 'views' not in columns:
             c.execute("ALTER TABLE posts ADD COLUMN views INTEGER DEFAULT 0")
             conn.commit()
             logger.info("Added views column to posts table")
+        if 'type' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN type TEXT DEFAULT 'post'")
+            conn.commit()
+            logger.info("Added type column to posts table")
+        if 'lesson_id' not in columns:
+            c.execute("ALTER TABLE posts ADD COLUMN lesson_id INTEGER")
+            conn.commit()
+            logger.info("Added lesson_id column to posts table")
         # UPDATED: Check friendships table
         c.execute("PRAGMA table_info(friendships)")
         columns = {col[1]: col[2] for col in c.fetchall()}

@@ -1,4 +1,4 @@
-<!-- home.html.j2 -->
+<!-- home.html.j2 (Fixed: Changed posts include from 'post_card.html.j2' to 'posts.html.j2' for conditional lesson vs post rendering. Added highlight_first var if needed. All other sections preserved.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Home - EduGrok{% endblock %}
@@ -20,7 +20,7 @@
             {% set post_comments = comments[post.id] if post.id in comments else [] %}
             <div class="mb-8 {% if highlight_first and loop.first %}animate-pulse border-2 border-grok-accent rounded-lg p-2{% endif %}" id="post-{{ post.id }}">
                 {% with post=post, comments=post_comments %}
-                    {% include 'post_card.html.j2' %}
+                    {% include 'posts.html.j2' %}
                 {% endwith %}
             </div>
         {% endfor %}

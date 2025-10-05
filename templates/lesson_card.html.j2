@@ -1,220 +1,136 @@
-<!-- lesson_card.html.j2 -->
-<div class="hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto">
-    <h2 class="text-xl font-bold text-white mb-2">{{ lesson.title or 'Untitled' }}</h2>
-    <h3 class="text-lg font-semibold text-orange-100 mb-3">{{ lesson.subject | capitalize }}</h3>
-    <p class="text-gray-300 mb-4">{{ lesson.description or 'No description available.' }}</p>
-    <div class="text-white leading-relaxed mb-4 prose prose-sm max-w-none">{{ lesson.content | safe }}</div>
-    {% if lesson.subject == 'math' %}
-        <!-- Math Fill-in -->
-        <div class="mb-4" id="math-activity-{{ lesson.id }}">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Math Fill-in</h4>
-            <p class="text-gray-300 mb-2">{{ lesson.math_question or 'Enter the answer to the math problem.' }}</p>
-            <input type="number" id="math-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Enter your answer">
-            <button onclick="checkMath({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
+<!-- lesson_card.html.j2 (Interactive with orange borders/check buttons: trace, spell input + Check, MC radio + Check, math input + Check. Alerts on submit, green success. Matches lessons page style.) -->
+<div class="card bg-grok-surface border-2 border-orange-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}sparkly-border bg-orange-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
+    <div class="flex items-center mb-3">
+        <div class="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
+            📚
         </div>
-        <!-- Match-3 Stub -->
-        <div class="mb-4" id="match-game-{{ lesson.id }}">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Match Three</h4>
-            <p class="text-gray-300 mb-2">Match numbers: Drag to pair (e.g., 2x3 to 6)</p>
-            <!-- Simple buttons for demo -->
-            <button onclick="submitMatch({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition mr-2">Match 1</button>
+        <div class="flex-1">
+            <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
+            <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
         </div>
-    {% elif lesson.subject == 'language' %}
-        <!-- Path Lesson: Word Tracing -->
-        <div class="mb-4">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Trace the Word</h4>
-            <p class="text-gray-300 mb-2">Type the word you see below to practice spelling:</p>
-            <p class="text-white font-bold mb-2">{{ lesson.trace_word or 'cat' }}</p>
-            <input type="text" id="trace-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Type the word here">
-            <button onclick="checkTrace({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
-        </div>
-        <!-- Spelling Lesson -->
-        <div class="mb-4">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Spelling Practice</h4>
-            <p class="text-gray-300 mb-2">Spell the word for the given sound: {{ lesson.sound or '/kæt/' }}</p>
-            <input type="text" id="spell-input-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white placeholder-gray-400" placeholder="Type your answer here">
-            <button onclick="checkSpelling({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
-        </div>
-        <!-- Multiple Choice Questions -->
-        <div class="mb-4">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Multiple Choice</h4>
-            <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is the correct spelling?' }}</p>
-            {% for option in lesson.mc_options or [] %}
-                <label class="block mb-2 text-white">
-                    <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
-                    {{ option }}
-                </label>
-            {% endfor %}
-            <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
-        </div>
-        <!-- Sentence Completion -->
-        <div class="mb-4">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Sentence Completion</h4>
-            <p class="text-gray-300 mb-2">{{ lesson.sentence_question or 'The cat sat on the ___.' }}</p>
-            <select id="sentence-select-{{ lesson.id }}" class="w-full p-3 border border-gray-600 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-800 text-white">
-                {% for option in lesson.sentence_options or ['mat', 'dog', 'moon'] %}
-                    <option value="{{ option }}">{{ option }}</option>
-                {% endfor %}
-            </select>
-            <button onclick="checkSentence({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
-        </div>
-    {% elif lesson.subject == 'science' %}
-        <!-- Science Multiple Choice -->
-        <div class="mb-4">
-            <h4 class="text-md font-semibold text-orange-200 mb-2">Science Quiz</h4>
-            <p class="text-gray-300 mb-2">{{ lesson.mc_question or 'What is this?' }}</p>
-            {% for option in lesson.mc_options or [] %}
-                <label class="block mb-2 text-white">
-                    <input type="radio" name="mc-{{ lesson.id }}" value="{{ option }}" class="mr-2">
-                    {{ option }}
-                </label>
-            {% endfor %}
-            <button onclick="checkMultipleChoice({{ lesson.id }})" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check</button>
-        </div>
-    {% endif %}
-    <div class="flex justify-end space-x-2">
-        <button onclick="completeLesson({{ lesson.id }})" class="bg-orange-500 text-white px-6 py-2 rounded-md hover:bg-orange-600 transition inline-flex items-center">
-            Complete Lesson
+    </div>
+    <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
+    <div class="space-y-4 mb-4">
+        {% if post.lesson.trace_word %}
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 class="text-orange-700 font-medium mb-2">✏️ Trace the word: {{ post.lesson.trace_word }}</h4>
+                <button onclick="submitActivity({{ post.lesson.id }}, 'trace', '{{ post.lesson.trace_word }}')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition">Check Trace</button>
+            </div>
+        {% endif %}
+        {% if post.lesson.spell_word %}
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 class="text-orange-700 font-medium mb-2">🔤 Spell the word: {{ post.lesson.spell_word }}</h4>
+                <input id="spell-{{ post.lesson.id }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type the word here">
+                <button onclick="submitActivity({{ post.lesson.id }}, 'spell', document.getElementById('spell-{{ post.lesson.id }}').value)" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition">Check</button>
+            </div>
+        {% endif %}
+        {% if post.lesson.mc_question %}
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.mc_question }}</h4>
+                {% set options = post.lesson.mc_options | fromjson if post.lesson.mc_options else [] %}
+                <div class="space-y-2">
+                    {% for option in options %}
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="mc{{ post.lesson.id }}" value="{{ option }}" class="text-orange-500 focus:ring-orange-500">
+                            <span class="text-grok-text">{{ option }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                <button onclick="submitActivity({{ post.lesson.id }}, 'mc', document.querySelector(`input[name='mc${post.lesson.id}']:checked`)?.value || '')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition">Check</button>
+            </div>
+        {% endif %}
+        {% if post.lesson.sentence_question %}
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.sentence_question }}</h4>
+                {% set options = post.lesson.sentence_options | fromjson if post.lesson.sentence_options else [] %}
+                <div class="space-y-2">
+                    {% for option in options %}
+                        <label class="flex items-center space-x-2">
+                            <input type="radio" name="sentence{{ post.lesson.id }}" value="{{ option }}" class="text-orange-500 focus:ring-orange-500">
+                            <span class="text-grok-text">{{ option }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                <button onclick="submitActivity({{ post.lesson.id }}, 'sentence', document.querySelector(`input[name='sentence${post.lesson.id}']:checked`)?.value || '')" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition">Check</button>
+            </div>
+        {% endif %}
+        {% if post.lesson.math_question %}
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.math_question }}</h4>
+                <input id="math-{{ post.lesson.id }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type your answer here">
+                <button onclick="submitActivity({{ post.lesson.id }}, 'math', document.getElementById('math-{{ post.lesson.id }}').value)" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition">Check</button>
+            </div>
+        {% endif %}
+    </div>
+    <div class="flex justify-between text-grok-secondary mb-4 text-xs">
+        <span>👁️ {{ post.views or 0 }} views</span> <span>❤️ {{ post.likes or 0 }} likes</span> <span>🔄 {{ post.reposts or 0 }} reposts</span> <span>💬 {{ (comments[post.id] | length) if post.id in comments else 0 }} comments</span>
+    </div>
+    <div class="flex justify-between border-t border-orange-300 pt-3 text-sm">
+        <button onclick="likePost({{ post.id }})" class="text-grok-text hover:text-orange-500 flex items-center {% if post.liked_by_user %}text-orange-500{% endif %}">
+            ❤️ {{ 'Unlike' if post.liked_by_user else 'Like' }}
         </button>
-        <button onclick="doAgain({{ lesson.id }})" class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition inline-flex items-center">
-            Do Again
+        <button onclick="repostPost({{ post.id }})" class="text-grok-text hover:text-orange-500 flex items-center {% if post.reposted_by_user %}text-orange-500{% endif %}">
+            🔄 {{ 'Unrepost' if post.reposted_by_user else 'Repost' }}
+        </button>
+        <button onclick="toggleComments({{ post.id }})" class="text-grok-text hover:text-orange-500 flex items-center">
+            💬 Comment
+        </button>
+        <button onclick="sharePost({{ post.id }})" class="text-grok-text hover:text-orange-500 flex items-center">
+            📤 Share
         </button>
     </div>
+    <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
+        <form method="POST" action="/comment/{{ post.id }}">
+            <textarea name="content" placeholder="Comment on this lesson..." class="w-full p-3 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-grok-bg text-grok-text" required rows="2"></textarea>
+            <button type="submit" class="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2">Post Comment</button>
+        </form>
+    </div>
+    {% if post.id in comments %}
+        <div class="mt-4">
+            {% for comment in (comments[post.id] | sort(attribute='created_at'))[:3] %}
+                <div class="border-l-2 border-orange-400 pl-4 mb-2 text-sm">
+                    <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
+                    {{ comment.content | safe }}
+                </div>
+            {% endfor %}
+            {% if (comments[post.id] | length) > 3 %}
+                <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                    {% for comment in comments[post.id] | slice(3) %}
+                        <div class="border-l-2 border-orange-400 pl-4 mb-2 text-sm">
+                            <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small><br>
+                            {{ comment.content | safe }}
+                        </div>
+                    {% endfor %}
+                </div>
+                <button id="toggle-btn-{{ post.id }}" onclick="toggleCommentsExtra({{ post.id }})" class="text-orange-500 underline text-sm">Show more ({{ (comments[post.id] | length) - 3 }} more)</button>
+            {% endif %}
+        </div>
+    {% endif %}
 </div>
 
-<script type="text/javascript">
-function checkMath(lessonId) {
-    const inputValue = document.getElementById('math-input-' + lessonId).value.trim();
-    if (!inputValue) { alert('Please enter an answer.'); return; }
-    const answer = parseFloat(inputValue) || 0;
+<script>
+function submitActivity(lessonId, type, response) {
+    if (!response.trim()) return alert('Enter your answer!');
     fetch('/check_lesson', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'math_fill',
-            response: answer
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Correct! +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function submitMatch(lessonId) {
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'match_game',
-            response: 'demo_match'
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Great match! +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Keep trying!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function checkTrace(lessonId) {
-    const input = document.getElementById('trace-input-' + lessonId).value.trim().toLowerCase();
-    if (!input) { alert('Please enter the word.'); return; }
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'trace_complete',
-            response: input
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Correct! Great job tracing the word. +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again! Make sure to type the word exactly as shown.');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function checkSpelling(lessonId) {
-    const input = document.getElementById('spell-input-' + lessonId).value.trim().toLowerCase();
-    if (!input) { alert('Please enter your spelling.'); return; }
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'spelling_complete',
-            response: input
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Correct! You spelled the word correctly. +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again! Check the spelling carefully.');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function checkMultipleChoice(lessonId) {
-    const selected = document.querySelector('input[name="mc-' + lessonId + '"]:checked');
-    if (!selected) {
-        alert('Please select an option.');
-        return;
-    }
-    const answer = selected.value.trim().toLowerCase();
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'mc_choice',
-            response: answer
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Correct! +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function checkSentence(lessonId) {
-    const select = document.getElementById('sentence-select-' + lessonId);
-    if (!select.value) {
-        alert('Please select an option.');
-        return;
-    }
-    const answer = select.value.trim().toLowerCase();
-    fetch('/check_lesson', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            lesson_id: lessonId,
-            activity_type: 'sentence_complete',
-            response: answer
-        })
-    }).then(res => res.json()).then(data => {
-        if (data.is_correct) {
-            alert('Correct! +' + data.points + ' points');
-        } else {
-            alert(data.message || 'Try again!');
-        }
-    }).catch(err => console.error('Error:', err));
-}
-
-function completeLesson(lessonId) {
-    window.location.href = `/complete_lesson/${lessonId}`;
-}
-
-function doAgain(lessonId) {
-    window.location.href = `/reset_lesson/${lessonId}`;
+        body: JSON.stringify({lesson_id: lessonId, activity_type: type, response})
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            const msg = d.is_correct ? `Correct! +${d.points} points 🎉` : 'Try again! 💪';
+            alert(msg);
+            if (d.is_correct) {
+                event.target.closest('.activity-section').style.backgroundColor = '#d1fae5';  // Green success
+                event.target.textContent = 'Done! ✅';
+                event.target.disabled = true;
+            }
+        } else alert(d.error || 'Check failed');
+    }).catch(() => alert('Network issue—reload and try again'));
 }
 </script>
+
+<style>
+.sparkly-border { position: relative; border: 2px solid transparent; border-radius: 0.75rem; }
+.sparkly-border::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border-radius: 0.75rem; background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706, #b45309); background-size: 400%; animation: sparkle 2s linear infinite; z-index: -1; }
+@keyframes sparkle { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+</style>
