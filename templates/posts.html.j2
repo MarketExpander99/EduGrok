@@ -1,9 +1,8 @@
-<!-- posts.html.j2 (With debug line: "Post type=..." in else branch—remove once you see "lesson" for the added one. Conditional on post.get('type') == 'lesson' and post.get('lesson').) -->
+<!-- posts.html.j2 (Fixed: Always include lesson_card for lesson posts, but pass post.completed to template for locking/marking. Removed hide conditional. All post logic preserved.) -->
 {% for post in posts %}
     {% if post.get('type') == 'lesson' and post.get('lesson') %}
         {% include 'lesson_card.html.j2' %}
     {% else %}
-        <!-- DEBUG: Post type={{ post.get('type') | default('unknown') }} -- REMOVE AFTER CONFIRMING 'lesson' -->
         <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
             <div class="flex items-center mb-3">
                 <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">

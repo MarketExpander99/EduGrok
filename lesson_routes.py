@@ -1,4 +1,4 @@
-# lesson_routes.py (Replace this ENTIRE file—old version has "Added lesson X" content; new one uses title + desc for interactive card. Added flash/alert for confirmation.)
+# lesson_routes.py (Fixed: In add_to_feed, check if lesson already in user's feed; if yes, return success without duplicate insert. All prior logic preserved.)
 from flask import session, request, jsonify, redirect, url_for, render_template, flash
 import logging
 from datetime import datetime, timedelta
@@ -16,41 +16,46 @@ def check_lesson():
     response = data.get('response')
     if not all([lesson_id, activity_type, response]):
         return jsonify({'success': False, 'error': 'Missing data'}), 400
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,))
-    lesson = c.fetchone()
-    if not lesson:
-        return jsonify({'success': False, 'error': 'Lesson not found'}), 404
-    is_correct = 0
-    points = 0
-    if activity_type == 'trace':
-        is_correct = 1
-        points = 5
-    elif activity_type == 'spell':
-        is_correct = response.lower() == lesson['spell_word'].lower() if lesson['spell_word'] else 0
-        points = 10 if is_correct else 0
-    elif activity_type == 'sound':
-        is_correct = response.lower() == lesson['sound'].lower() if lesson['sound'] else 0
-        points = 10 if is_correct else 0
-    elif activity_type == 'mc':
-        is_correct = response == lesson['mc_answer'] if lesson['mc_answer'] else 0
-        points = 15 if is_correct else 0
-    elif activity_type == 'sentence':
-        is_correct = response == lesson['sentence_answer'] if lesson['sentence_answer'] else 0
-        points = 15 if is_correct else 0
-    elif activity_type == 'math':
-        is_correct = response == lesson['math_answer'] if lesson['math_answer'] else 0
-        points = 15 if is_correct else 0
-    c.execute("INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) VALUES (?, ?, ?, ?, ?, ?)",
-              (lesson_id, session['user_id'], activity_type, response, is_correct, points))
-    conn.commit()
-    c.execute("SELECT COUNT(DISTINCT activity_type) FROM lesson_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", (lesson_id, session['user_id']))
-    completed_activities = c.fetchone()[0]
-    total_activities = sum(1 for field in ['trace_word', 'spell_word', 'sound', 'mc_question', 'sentence_question', 'math_question'] if lesson[field])
-    if completed_activities >= total_activities:
-        complete_lesson(lesson_id)
-    return jsonify({'success': True, 'is_correct': is_correct, 'points': points})
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,))
+        lesson = c.fetchone()
+        if not lesson:
+            return jsonify({'success': False, 'error': 'Lesson not found'}), 404
+        is_correct = 0
+        points = 0
+        if activity_type == 'trace':
+            is_correct = 1
+            points = 5
+        elif activity_type == 'spell':
+            is_correct = response.lower() == lesson['spell_word'].lower() if lesson['spell_word'] else 0
+            points = 10 if is_correct else 0
+        elif activity_type == 'sound':
+            is_correct = response.lower() == lesson['sound'].lower() if lesson['sound'] else 0
+            points = 10 if is_correct else 0
+        elif activity_type == 'mc':
+            is_correct = response == lesson['mc_answer'] if lesson['mc_answer'] else 0
+            points = 15 if is_correct else 0
+        elif activity_type == 'sentence':
+            is_correct = response == lesson['sentence_answer'] if lesson['sentence_answer'] else 0
+            points = 15 if is_correct else 0
+        elif activity_type == 'math':
+            is_correct = response == lesson['math_answer'] if lesson['math_answer'] else 0
+            points = 15 if is_correct else 0
+        c.execute("INSERT INTO lesson_responses (lesson_id, user_id, activity_type, response, is_correct, points) VALUES (?, ?, ?, ?, ?, ?)",
+                  (lesson_id, session['user_id'], activity_type, response, is_correct, points))
+        conn.commit()
+        c.execute("SELECT COUNT(DISTINCT activity_type) FROM lesson_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", (lesson_id, session['user_id']))
+        completed_activities = c.fetchone()[0]
+        total_activities = sum(1 for field in ['trace_word', 'spell_word', 'sound', 'mc_question', 'sentence_question', 'math_question'] if lesson[field])
+        if completed_activities >= total_activities:
+            complete_lesson(lesson_id)
+        logger.info(f"Lesson check success: user={session['user_id']}, lesson={lesson_id}, type={activity_type}, correct={is_correct}, points={points}")
+        return jsonify({'success': True, 'is_correct': is_correct, 'points': points})
+    except Exception as e:
+        logger.error(f"Lesson check error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def complete_lesson(lesson_id):
     if 'user_id' not in session:
@@ -129,7 +134,13 @@ def add_to_feed():
     lesson = c.fetchone()
     if not lesson:
         return jsonify({'success': False, 'error': 'Lesson not found'}), 404
-    # FIXED: This is the key line—uses lesson title + description for content, so feed shows interactive card, not notification
+    # FIXED: Check if already added for this user
+    c.execute("SELECT id FROM posts WHERE user_id = ? AND lesson_id = ? AND type = 'lesson'", (session['user_id'], lesson_id))
+    existing = c.fetchone()
+    if existing:
+        logger.info(f"Lesson {lesson_id} already in feed for user {session['user_id']}")
+        flash('Lesson already in your feed!')
+        return jsonify({'success': True, 'post_id': existing['id'], 'already_exists': True})
     content = f"Lesson: {lesson['title']}\n{lesson['description']}"
     handle = session.get('handle', session.get('email', 'User'))
     logger.info(f"Adding lesson post: type='lesson', id={lesson_id}, title={lesson['title'][:30]} for user {session['user_id']}")
@@ -139,5 +150,5 @@ def add_to_feed():
     post_id = c.lastrowid
     conn.commit()
     logger.info(f"Lesson post inserted: ID={post_id}, type=lesson")
-    flash('Interactive lesson added to feed!')  # Confirmation
+    flash('Interactive lesson added to feed!')
     return jsonify({'success': True, 'post_id': post_id})
