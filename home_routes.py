@@ -1,4 +1,4 @@
-# home_routes.py (updated: Added cleanup query before fetching posts to remove invalid lesson posts where lesson_id doesn't exist in lessons table. This prevents accumulation of broken posts from previous runs. Also ensured JSON parsing handles None gracefully.)
+# home_routes.py (updated: Applied fix for global visibility of 'post' types while keeping 'lesson' types user-specific. Fetched global posts from all users (type='post'), user's own lessons (type='lesson'). Included friends for posts if desired, but per request, posts are global. Retained cleanup, JSON parsing, and other features.)
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
 import logging
@@ -22,7 +22,7 @@ def home():
         c = conn.cursor()
         user_id = session['user_id']
         logger.info(f"Home for user_id: {user_id}")
-        # NEW: Cleanup invalid lesson posts before fetching
+        # Cleanup invalid lesson posts before fetching
         try:
             c.execute("""
                 DELETE FROM posts 
@@ -58,31 +58,43 @@ def home():
         else:
             order_by = 'p.created_at DESC'
             sort = 'latest'
-        # FIXED: Use per-user posts only (including lessons added by user/friends) to avoid global lesson conflicts and ensure personalized feed.
-        if friend_ids:
-            friends_placeholder = ','.join('?' * len(friend_ids))
-            where_clause = f"(p.user_id = ? OR p.user_id IN ({friends_placeholder}))"
-            params = [user_id] + friend_ids
-        else:
-            where_clause = "p.user_id = ?"
-            params = [user_id]
-        full_params = params + [user_id, user_id]
-        query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
-                      (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
-                      (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
-                      FROM posts p 
-                      LEFT JOIN users u ON p.user_id = u.id
-                      LEFT JOIN posts orig ON p.original_post_id = orig.id
-                      LEFT JOIN users orig_u ON orig.user_id = orig_u.id
-                      WHERE {where_clause}
-                      ORDER BY {order_by} LIMIT 20'''
-        logger.info(f"Executing query: {query}")
-        logger.info(f"With params: {full_params}")
-        c.execute(query, full_params)
-        posts_raw = c.fetchall()
-        logger.info(f"Raw posts fetched: {len(posts_raw)}")
-        posts = [dict(post) for post in posts_raw]
-        logger.info(f"Posts after dict conversion: {len(posts)}")
+
+        # FIXED: Separate queries for global posts (type='post') and user-specific lessons (type='lesson')
+        # Global posts: from all users
+        global_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
+                          (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
+                          (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
+                          FROM posts p 
+                          LEFT JOIN users u ON p.user_id = u.id
+                          LEFT JOIN posts orig ON p.original_post_id = orig.id
+                          LEFT JOIN users orig_u ON orig.user_id = orig_u.id
+                          WHERE p.type = 'post'
+                          ORDER BY {order_by} LIMIT 20'''
+        c.execute(global_query, [user_id, user_id])
+        global_posts_raw = c.fetchall()
+        global_posts = [dict(post) for post in global_posts_raw]
+
+        # User lessons: only from current user
+        lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
+                          (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
+                          (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
+                          FROM posts p 
+                          LEFT JOIN users u ON p.user_id = u.id
+                          LEFT JOIN posts orig ON p.original_post_id = orig.id
+                          LEFT JOIN users orig_u ON orig.user_id = orig_u.id
+                          WHERE p.type = 'lesson' AND p.user_id = ?
+                          ORDER BY {order_by}'''
+        c.execute(lesson_query, [user_id, user_id, user_id])
+        lesson_posts_raw = c.fetchall()
+        lesson_posts = [dict(post) for post in lesson_posts_raw]
+
+        # Combine and sort all posts
+        posts = global_posts + lesson_posts
+        posts.sort(key=lambda x: x['created_at'] or '', reverse=True)
+        posts = posts[:20]  # Limit total
+
+        logger.info(f"Raw posts fetched: {len(global_posts)} global, {len(lesson_posts)} lessons; Total: {len(posts)}")
+
         for post in posts:
             try:
                 if post.get('type') == 'lesson' and post.get('lesson_id'):
@@ -90,7 +102,7 @@ def home():
                     lesson = c.fetchone()
                     if lesson:
                         lesson_dict = dict(lesson)
-                        # NEW: Parse JSON fields to lists
+                        # Parse JSON fields to lists
                         if lesson_dict.get('mc_options'):
                             try:
                                 lesson_dict['mc_options'] = json.loads(lesson_dict['mc_options']) if lesson_dict['mc_options'] else []
@@ -104,7 +116,7 @@ def home():
                                 logger.warning(f"Invalid JSON in sentence_options for lesson {post['lesson_id']}: {e}")
                                 lesson_dict['sentence_options'] = []
                         post['lesson'] = lesson_dict
-                        # FIXED: Set completed status for lesson posts (global or user) to prevent template hiding/locking issues
+                        # Set completed status for lesson posts
                         c.execute("SELECT 1 FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (user_id, post['lesson_id']))
                         completed_row = c.fetchone()
                         post['completed'] = bool(completed_row)
@@ -113,8 +125,8 @@ def home():
             except Exception as e:
                 logger.error(f"Error processing lesson for post {post.get('id', 'unknown')}: {e}\n{traceback.format_exc()}")
             post['is_new'] = last_view is None or post['created_at'] > last_view
-        logger.info("Post processing loop complete")
-        # NEW: Filter out invalid lesson posts (type='lesson' but no 'lesson' data)
+
+        # Filter out invalid lesson posts
         original_count = len(posts)
         posts = [p for p in posts if not (p.get('type') == 'lesson' and not p.get('lesson'))]
         removed_count = original_count - len(posts)
@@ -122,6 +134,7 @@ def home():
             logger.warning(f"Removed {removed_count} invalid lesson posts from feed for user {user_id}")
         lesson_posts = [p for p in posts if p.get('type') == 'lesson']
         logger.info(f"Total posts after filter: {len(posts)} ({len(lesson_posts)} lessons) for user {user_id}")
+
         comments = {}
         for post in posts:
             try:
@@ -130,16 +143,16 @@ def home():
             except Exception as e:
                 logger.error(f"Error fetching comments for post {post['id']}: {e}\n{traceback.format_exc()}")
                 comments[post['id']] = []
-        logger.info("Comments fetch complete")
+
         for post in posts:
             try:
                 c.execute("UPDATE posts SET views = views + 1 WHERE id = ?", (post['id'],))
             except Exception as e:
                 logger.error(f"Error updating views for post {post['id']}: {e}\n{traceback.format_exc()}")
-        logger.info("Views update complete")
+
         conn.commit()
-        logger.info(f"Committed, rendering with {len(posts)} posts")
-        # NEW: Wrap user fetch in try to catch schema issues
+
+        # User fetch
         try:
             c.execute("SELECT handle, grade, star_coins, points FROM users WHERE id = ?", (user_id,))
             user = c.fetchone()
@@ -150,24 +163,32 @@ def home():
             session['handle'] = user['handle'] or session.get('email', 'User')
         else:
             session['handle'] = session.get('email', 'User')
+
+        # Recent test
         try:
             c.execute("SELECT grade, score, date FROM tests WHERE user_id = ? ORDER BY date DESC LIMIT 1", (user_id,))
             recent_test = c.fetchone()
         except Exception as e:
             logger.warning(f"Error fetching recent test: {e}")
             recent_test = None
+
+        # Lessons completed
         try:
             c.execute("SELECT COUNT(*) as count FROM completed_lessons WHERE user_id = ?", (user_id,))
             lessons_completed = c.fetchone()['count']
         except Exception as e:
             logger.warning(f"Error fetching lessons completed: {e}")
             lessons_completed = 0
+
+        # Games played
         try:
             c.execute("SELECT COUNT(*) as count FROM games WHERE user_id = ?", (user_id,))
             games_played = c.fetchone()['count']
         except Exception as e:
             logger.warning(f"Error fetching games played: {e}")
             games_played = 0
+
+        # Avg score
         try:
             c.execute("SELECT AVG(score) as avg FROM tests WHERE user_id = ?", (user_id,))
             avg_result = c.fetchone()
@@ -175,18 +196,24 @@ def home():
         except Exception as e:
             logger.warning(f"Error fetching avg score: {e}")
             avg_score = 'N/A'
+
+        # Badges
         try:
             c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ? ORDER BY awarded_date DESC", (user_id,))
             badges = c.fetchall()
         except Exception as e:
             logger.warning(f"Error fetching badges: {e}")
             badges = []
+
+        # Feedbacks
         try:
             c.execute("SELECT rating, comments, submitted_date FROM feedback WHERE user_id = ? ORDER BY submitted_date DESC", (user_id,))
             feedbacks = c.fetchall()
         except Exception as e:
             logger.warning(f"Error fetching feedbacks: {e}")
             feedbacks = []
+
+        # Feed lessons (recommended)
         try:
             logger.info("Fetching feed_lessons")
             c.execute("""SELECT l.*, lu.assigned_at FROM lessons l 
@@ -198,7 +225,7 @@ def home():
             feed_lessons = []
             for l in feed_rows:
                 lesson_dict = dict(l)
-                # NEW: Parse JSON fields to lists for recommended lessons
+                # Parse JSON fields to lists for recommended lessons
                 if lesson_dict.get('mc_options'):
                     try:
                         lesson_dict['mc_options'] = json.loads(lesson_dict['mc_options']) if lesson_dict['mc_options'] else []
@@ -212,7 +239,7 @@ def home():
                         logger.warning(f"Invalid JSON in sentence_options for recommended lesson {lesson_dict['id']}: {e}")
                         lesson_dict['sentence_options'] = []
                 feed_lessons.append(lesson_dict)
-            # FIXED: Set completed for each recommended lesson to match template expectations (now possible since dict)
+            # Set completed for each recommended lesson
             for lesson in feed_lessons:
                 c.execute("SELECT 1 FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (user_id, lesson['id']))
                 completed_row = c.fetchone()
@@ -224,6 +251,7 @@ def home():
             logger.error(f"Error fetching feed_lessons: {e}\n{traceback.format_exc()}")
             feed_lessons = []
             completed_lessons = []
+
         return render_template('home.html.j2', posts=posts, comments=comments, user=user, recent_test=recent_test, lessons_completed=lessons_completed, games_played=games_played, avg_score=avg_score, badges=badges, feedbacks=feedbacks, friend_count=len(friend_ids), sort=sort, feed_lessons=feed_lessons, completed_lessons=completed_lessons, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Home error for user {user_id}: {str(e)}\n{traceback.format_exc()}")
