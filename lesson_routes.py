@@ -1,4 +1,4 @@
-# lesson_routes.py (Fixed: In add_to_feed, removed SELECT check and used INSERT directly; catch IntegrityError for unique violation to return 'Already in feed'. This prevents duplicates even on multiple rapid clicks. Preserved all other logic.)
+# lesson_routes.py (Fixed: In add_to_feed, ensured IntegrityError handling with flash; in lessons(), added added_ids filter for UI button disable. Preserved all original logic, tables, and activity checks.)
 from flask import session, request, jsonify, redirect, url_for, render_template, flash
 import logging
 from datetime import datetime
@@ -32,7 +32,7 @@ def lessons():
     # Also fetch completed_ids for template compatibility
     c.execute("SELECT lesson_id FROM completed_lessons WHERE user_id = ?", (session['user_id'],))
     completed_ids = [row['lesson_id'] for row in c.fetchall()]
-    # NEW: Fetch added lesson IDs (global lesson posts)
+    # FIXED: Fetch added lesson IDs (global lesson posts) to disable "Add to Feed" buttons in UI
     c.execute("SELECT DISTINCT lesson_id FROM posts WHERE type = 'lesson' AND lesson_id IS NOT NULL")
     added_ids = [row['lesson_id'] for row in c.fetchall()]
     conn.close()
@@ -42,7 +42,7 @@ def lessons():
                            completed_lessons=completed_lessons,
                            lessons=all_lessons,  # For original template
                            completed_ids=completed_ids,
-                           added_ids=added_ids,  # For button state
+                           added_ids=added_ids,  # For button state (disable if in added_ids)
                            theme=session.get('theme', 'astronaut'),
                            language=session.get('language', 'en'))
 
@@ -104,7 +104,7 @@ def add_to_feed():
             lesson = c.fetchone()
             if not lesson:
                 return jsonify({'success': False, 'error': 'Lesson not found'}), 404
-            # FIXED: Attempt insert; catch IntegrityError from unique index to detect duplicate
+            # FIXED: Attempt insert; catch IntegrityError from unique index to detect duplicate (with flash for UI)
             now = datetime.now().isoformat()
             content = f"Lesson: {lesson['title']}\n{lesson['description']}"
             c.execute("""INSERT INTO posts (user_id, content, created_at, subject, grade, handle, type, lesson_id)
@@ -117,12 +117,15 @@ def add_to_feed():
             post_id = c.lastrowid
             conn.commit()
             logger.info(f"Added global lesson post {post_id} for lesson {lesson_id}")
+            flash('Lesson added to feed!', 'success')  # FIXED: Add flash for non-JSON fallback
             return jsonify({'success': True, 'post_id': post_id})
         except sqlite3.IntegrityError:
             logger.info(f"Lesson {lesson_id} already in global feed (unique constraint)")
+            flash('Already in feed!', 'info')  # FIXED: Consistent flash on dup
             return jsonify({'success': True, 'message': 'Already in feed'})
         except Exception as e:
             logger.error(f"Error adding lesson to feed: {str(e)}")
+            flash('Failed to add lesson.', 'error')
             return jsonify({'success': False, 'error': 'Server error'}), 500
         finally:
             if conn:
