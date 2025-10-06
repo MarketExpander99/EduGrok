@@ -1,4 +1,5 @@
-<!-- lessons.html.j2 (Updated: Added conditional 'sparkly-border' class for incomplete lessons to highlight as "new". For completed lessons, added 'completed' class with reduced opacity and cursor-not-allowed to visually disable. Preserved all existing logic, styling, and functionality. Ensured completed lessons do not show sparkly-border.) -->
+# [lessons.html.j2]
+<!-- lessons.html.j2 (Updated: Added conditional child selector dropdown at the top for parents with multiple kids, similar to parent_dashboard.html.j2. Uses passed 'kids' and 'selected_kid_id' variables. On change, redirects to /lessons?kid_id=<id>. Integrated into the header flex layout for clean UX. Updated addToFeed onclick and JS to pass selected_user_id as target_user_id for parent assignments. Preserved all existing logic, styling, and functionality. Ensured completed lessons do not show sparkly-border.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
@@ -7,6 +8,16 @@
 <div class="container mx-auto p-6 max-w-4xl">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold text-grok-text">Your Lessons</h1>
+        {% if kids %}
+        <div class="flex-1 max-w-xs mx-4">
+            <label for="kid-selector" class="block text-grok-secondary font-medium mb-2 text-sm">Select Child:</label>
+            <select id="kid-selector" class="w-full p-3 border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" onchange="changeKid(this.value)">
+                {% for kid in kids %}
+                    <option value="{{ kid.id }}" {% if kid.id == selected_kid_id %}selected{% endif %}>{{ kid.handle }} (Grade {{ kid.grade }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
         <a href="{{ url_for('home') }}" class="text-grok-secondary hover:text-grok-accent">&larr; Back to Home</a>
     </div>
     {% if lessons %}
@@ -43,12 +54,12 @@
                             <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="text-grok-text hover:text-grok-accent transition flex items-center">
                                 <i class="fas fa-play mr-1"></i> Start Lesson
                             </a>
-                            {% if lesson.id in added_ids %}
+                            {% if lesson.in_feed %}
                                 <span class="text-green-500 flex items-center opacity-75 cursor-not-allowed">
                                     <i class="fas fa-check mr-1"></i> Added to Feed
                                 </span>
                             {% else %}
-                                <a href="#" onclick="addToFeed({{ lesson.id }})" class="text-grok-text hover:text-grok-accent transition flex items-center" id="add-btn-{{ lesson.id }}">
+                                <a href="#" onclick="addToFeed({{ lesson.id }}, {{ selected_user_id }})" class="text-grok-text hover:text-grok-accent transition flex items-center" id="add-btn-{{ lesson.id }}">
                                     <i class="fas fa-plus mr-1"></i> Add to Feed
                                 </a>
                             {% endif %}
@@ -67,6 +78,12 @@
 </div>
 
 <script>
+    function changeKid(kidId) {
+        if (kidId) {
+            window.location.href = `/lessons?kid_id=${kidId}`;
+        }
+    }
+
     async function handleFetch(fetchPromise, successMsg, errorMsg, callback) {
         try {
             const response = await fetchPromise;
@@ -89,7 +106,7 @@
         }
     }
 
-    function addToFeed(lessonId) {
+    function addToFeed(lessonId, targetUserId) {
         const btn = document.getElementById('add-btn-' + lessonId);
         if (!btn || btn.disabled) return;
         btn.disabled = true;
@@ -99,7 +116,7 @@
             fetch('/add_to_feed', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({lesson_id: lessonId})
+                body: JSON.stringify({lesson_id: lessonId, target_user_id: targetUserId})
             }),
             'Lesson added to feed!',
             'Failed to add lesson',

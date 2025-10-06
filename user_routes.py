@@ -1,4 +1,5 @@
 # [user_routes.py]
+import sqlite3
 from flask import jsonify, session, request, flash, redirect, url_for, render_template
 import logging
 from datetime import datetime
@@ -114,8 +115,15 @@ def register_child():
             hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
             c.execute("INSERT INTO users (email, password, grade, handle, theme, subscribed, language, star_coins, points, parent_id, role) VALUES (?, ?, ?, ?, 'astronaut', 0, 'en', 0, 0, ?, 'kid')", 
                       (email, hashed_password, int(grade), handle, session['user_id']))
+            child_id = c.lastrowid
+            # Create approved friendship between parent and child
+            now = datetime.now().isoformat()
+            c.execute("""
+                INSERT INTO friendships (requester_id, target_id, status, requested_at, approved_at)
+                VALUES (?, ?, 'approved', ?, ?)
+            """, (session['user_id'], child_id, now, now))
             conn.commit()
-            logger.info(f"Child registered by parent {session['user_id']}: {email}")
+            logger.info(f"Child registered by parent {session['user_id']}: {email}, friendship created")
             flash("Child registered successfully!", "success")
             return redirect(url_for('profile'))
         except sqlite3.IntegrityError:
