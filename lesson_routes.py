@@ -1,3 +1,4 @@
+# [lesson_routes.py]
 import logging
 import sqlite3
 import json
@@ -160,7 +161,7 @@ def check_lesson():
         logger.info(f"Lesson {lesson_id}, user {session['user_id']}: required_activities={required_activities}, completed_activities={completed_activities}")
         lesson_completed = required_activities.issubset(completed_activities)
         if lesson_completed:
-            c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)", 
+            c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at, parent_confirmed) VALUES (?, ?, ?, 0)", 
                       (session['user_id'], lesson_id, now))
             c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
                       (session['user_id'], lesson_id))
@@ -188,7 +189,7 @@ def complete_lesson(lesson_id):
     c = conn.cursor()
     try:
         now = datetime.now().isoformat()
-        c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)", 
+        c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at, parent_confirmed) VALUES (?, ?, ?, 0)", 
                   (session['user_id'], lesson_id, now))
         c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
                   (session['user_id'], lesson_id))

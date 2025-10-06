@@ -1,10 +1,11 @@
+<!-- [profile.html.j2] -->
 {% extends "base.html.j2" %}
 
 {% block title %}Profile - EduGrok{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto p-6">
-    <h2 class="text-2xl font-semibold mb-6 text-center text-grok-text">Your Profile, Dino Cowboy!</h2>
+    <h2 class="text-2xl font-semibold mb-6 text-center text-grok-text">Your Profile, {{ user.handle | default('Dino Cowboy') }}!</h2>
     
     {% if error %}
         <div class="text-center py-4">
@@ -24,6 +25,7 @@
                     <p class="text-grok-text text-base"><strong>Grade:</strong> {{ grade | default('1') }}</p>
                     <p class="text-grok-text text-base"><strong>Star Coins:</strong> {{ star_coins | default(0) }}</p>
                     <p class="text-grok-text text-base"><strong>Points:</strong> {{ points | default(0) }}</p>
+                    <p class="text-grok-text text-base"><strong>Role:</strong> {{ user.role | default('parent') | title }}</p>
                 </div>
             </div>
         </div>
@@ -34,6 +36,30 @@
             <p class="text-grok-text text-base mb-2"><strong>Games Played:</strong> {{ games_played | default(0) }}</p>
             <p class="text-grok-text text-base"><strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
         </div>
+
+        {% if user.role == 'parent' %}
+        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+            <h3 class="text-lg font-semibold text-grok-text mb-4">Linked Children ({{ kids | length }})</h3>
+            {% if kids %}
+                <div class="space-y-2 mb-4">
+                    {% for kid in kids %}
+                        <div class="flex justify-between items-center p-3 bg-grok-bg rounded-lg">
+                            <div>
+                                <p class="text-grok-text font-medium">{{ kid.handle }} (Grade {{ kid.grade }})</p>
+                                <p class="text-grok-secondary text-sm">ID: {{ kid.id }}</p>
+                            </div>
+                            <a href="{{ url_for('parent_dashboard', kid_id=kid.id) }}" class="bg-grok-accent text-grok-text px-3 py-1 rounded-md text-sm hover:bg-grok-accent-hover transition">View Dashboard</a>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-grok-secondary text-base">No children linked yet.</p>
+            {% endif %}
+            <a href="{{ url_for('register_child') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md inline-flex items-center">
+                <i class="fas fa-plus mr-2"></i>Add Child
+            </a>
+        </div>
+        {% endif %}
 
         <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
             <h3 class="text-lg font-semibold text-grok-text mb-4">Badges</h3>

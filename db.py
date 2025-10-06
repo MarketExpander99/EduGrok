@@ -1,4 +1,5 @@
-﻿import sqlite3
+﻿# [db.py]
+import sqlite3
 import os
 from flask import g
 import logging
@@ -114,6 +115,7 @@ def init_tables():
                       user_id INTEGER, 
                       lesson_id INTEGER, 
                       completed_at TEXT, 
+                      parent_confirmed INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (lesson_id) REFERENCES lessons(id))''')
         # Assigned lessons table
@@ -361,6 +363,13 @@ def check_db_schema():
             c.execute("ALTER TABLE lessons_users ADD COLUMN completed INTEGER DEFAULT 0")
             conn.commit()
             logger.info("Added completed column to lessons_users table")
+        # Check completed_lessons for parent_confirmed column
+        c.execute("PRAGMA table_info(completed_lessons)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'parent_confirmed' not in columns:
+            c.execute("ALTER TABLE completed_lessons ADD COLUMN parent_confirmed INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added parent_confirmed column to completed_lessons table")
         # Add unique partial index for lesson posts
         try:
             c.execute("DROP INDEX IF EXISTS unique_lesson_post")

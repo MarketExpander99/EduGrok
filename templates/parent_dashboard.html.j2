@@ -1,77 +1,144 @@
-{% extends "base.html.j2" %}
-
-{% block title %}Parent Dashboard - EduGrok{% endblock %}
-
-{% block content %}
-<div class="max-w-4xl mx-auto p-6">
+<!-- [parent_dashboard.html.j2] -->
+{% extends "base.html.j2" %}{% block title %}Parent Dashboard - EduGrok{% endblock %}{% block content %}<div class="max-w-4xl mx-auto p-6">
     <h1 class="text-3xl font-bold mb-6 text-center text-grok-text">Parent Dashboard</h1>
     
-    {% if error %}
-        <div class="text-center py-4">
-            <p class="text-red-400 text-lg">{{ error }}</p>
-            <a href="{{ url_for('login') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition inline-flex items-center shadow-md mt-4">Log In Again</a>
-        </div>
-    {% else %}
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h2 class="text-xl font-semibold text-grok-text mb-4">Welcome, Parent!</h2>
-            <p class="text-grok-secondary text-base mb-4">Monitor your child's progress, view their achievements, and manage their learning activities.</p>
-        </div>
-
-        <!-- Child Progress Section -->
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h3 class="text-lg font-semibold text-grok-text mb-4">Child Progress</h3>
-            <p class="text-grok-text text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed | default(0) }}</p>
-            <p class="text-grok-text text-base mb-2"><strong>Games Played:</strong> {{ games_played | default(0) }}</p>
-            <p class="text-grok-text text-base"><strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
-        </div>
-
-        <!-- Badges Section -->
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h3 class="text-lg font-semibold text-grok-text mb-4">Badges Earned</h3>
-            {% if badges %}
-                <div class="flex flex-wrap gap-2">
-                    {% for badge in badges %}
-                        <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date }})</span>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-grok-secondary text-base">No badges earned yet. Encourage your child to keep learning!</p>
-            {% endif %}
-        </div>
-
-        <!-- Recent Tests Section -->
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h3 class="text-lg font-semibold text-grok-text mb-4">Recent Tests</h3>
-            {% if tests %}
-                {% for test in tests %}
-                    <p class="text-grok-text text-base mb-2"><strong>Grade:</strong> {{ test.grade | default('N/A') }} - <strong>Score:</strong> {{ test.score | default('N/A') }}/10 - <strong>Date:</strong> {{ test.date | default('Unknown') }}</p>
+{% if error %}
+    <div class="text-center py-4">
+        <p class="text-red-400 text-lg">{{ error }}</p>
+        <a href="{{ url_for('login') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition inline-flex items-center shadow-md mt-4">Log In Again</a>
+    </div>
+{% else %}
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h2 class="text-xl font-semibold text-grok-text mb-4">Welcome, Parent!</h2>
+        <div class="mb-4">
+            <label for="kid-selector" class="block text-grok-secondary font-medium mb-2">Select Child:</label>
+            <select id="kid-selector" class="w-full p-3 border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" onchange="changeKid(this.value)">
+                {% for kid in kids %}
+                    <option value="{{ kid.id }}" {% if kid.id == selected_kid_id %}selected{% endif %}>{{ kid.handle }} (Grade {{ kid.grade }})</option>
                 {% endfor %}
-            {% else %}
-                <p class="text-grok-secondary text-base">No tests taken yet.</p>
-            {% endif %}
+            </select>
         </div>
+        <p class="text-grok-secondary text-base mb-4">Monitor {{ kid_handle }}'s progress, view their achievements, and manage their learning activities.</p>
+    </div>
 
-        <!-- Feedback Section -->
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h3 class="text-lg font-semibold text-grok-text mb-4">Feedback History</h3>
-            {% if feedbacks %}
-                {% for feedback in feedbacks %}
-                    <p class="text-grok-text text-base mb-2"><strong>Rating:</strong> {{ feedback.rating | default('N/A') }} - <strong>Comments:</strong> {{ feedback.comments | default('None') }} - <strong>Date:</strong> {{ feedback.submitted_date | default('Unknown') }}</p>
+    <!-- Child Progress Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Child Progress</h3>
+        <p class="text-grok-text text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed | default(0) }}</p>
+        <p class="text-grok-text text-base mb-2"><strong>Games Played:</strong> {{ games_played | default(0) }}</p>
+        <p class="text-grok-text text-base"><strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
+    </div>
+
+    <!-- Pending Lesson Confirmations Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Pending Lesson Confirmations</h3>
+        {% if pending_lessons %}
+            <div class="space-y-4">
+                {% for lesson in pending_lessons %}
+                    <div class="border border-grok-border p-4 rounded-lg bg-grok-bg">
+                        <h4 class="text-grok-text font-medium mb-2">{{ lesson.title }} ({{ lesson.subject | title }})</h4>
+                        <p class="text-grok-secondary text-sm mb-3">Completed: {{ lesson.completed_at[:10] }}</p>
+                        <p class="text-grok-text mb-4"><strong>Stats:</strong> {{ lesson.correct_answers }}/{{ lesson.total_activities }} correct</p>
+                        <div class="flex gap-2">
+                            <button onclick="confirmLesson({{ lesson.id }})" class="bg-green-600 text-grok-text px-4 py-2 rounded-md hover:bg-green-700 transition shadow-md text-sm">
+                                <i class="fas fa-check mr-1"></i>Confirm Complete
+                            </button>
+                            <button onclick="restoreLesson({{ lesson.id }})" class="bg-yellow-600 text-grok-text px-4 py-2 rounded-md hover:bg-yellow-700 transition shadow-md text-sm">
+                                <i class="fas fa-undo mr-1"></i>Restore Lesson
+                            </button>
+                        </div>
+                    </div>
                 {% endfor %}
-            {% else %}
-                <p class="text-grok-secondary text-base">No feedback submitted yet. <a href="{{ url_for('feedback') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition inline-flex items-center shadow-md">Submit Feedback</a></p>
-            {% endif %}
-        </div>
-
-        <!-- Actions Section -->
-        <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
-            <h3 class="text-lg font-semibold text-grok-text mb-4">Actions</h3>
-            <div class="flex flex-wrap gap-4">
-                <a href="{{ url_for('lessons') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Assign Lessons</a>
-                <a href="{{ url_for('assess') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">View Assessments</a>
-                <a href="{{ url_for('games') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">View Games</a>
             </div>
+        {% else %}
+            <p class="text-grok-secondary text-base">No pending lessons to confirm.</p>
+        {% endif %}
+    </div>
+
+    <!-- Badges Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Badges Earned</h3>
+        {% if badges %}
+            <div class="flex flex-wrap gap-2">
+                {% for badge in badges %}
+                    <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date }})</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-grok-secondary text-base">No badges earned yet. Encourage your child to keep learning!</p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Tests Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Recent Tests</h3>
+        {% if tests %}
+            {% for test in tests %}
+                <p class="text-grok-text text-base mb-2"><strong>Grade:</strong> {{ test.grade | default('N/A') }} - <strong>Score:</strong> {{ test.score | default('N/A') }}/10 - <strong>Date:</strong> {{ test.date | default('Unknown') }}</p>
+            {% endfor %}
+        {% else %}
+            <p class="text-grok-secondary text-base">No tests taken yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Feedback Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Feedback History</h3>
+        {% if feedbacks %}
+            {% for feedback in feedbacks %}
+                <p class="text-grok-text text-base mb-2"><strong>Rating:</strong> {{ feedback.rating | default('N/A') }} - <strong>Comments:</strong> {{ feedback.comments | default('None') }} - <strong>Date:</strong> {{ feedback.submitted_date | default('Unknown') }}</p>
+            {% endfor %}
+        {% else %}
+            <p class="text-grok-secondary text-base">No feedback submitted yet. <a href="{{ url_for('feedback') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition inline-flex items-center shadow-md">Submit Feedback</a></p>
+        {% endif %}
+    </div>
+
+    <!-- Actions Section -->
+    <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
+        <h3 class="text-lg font-semibold text-grok-text mb-4">Actions</h3>
+        <div class="flex flex-wrap gap-4">
+            <a href="{{ url_for('lessons') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Assign Lessons</a>
+            <a href="{{ url_for('assess') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">View Assessments</a>
+            <a href="{{ url_for('games') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">View Games</a>
         </div>
-    {% endif %}
-</div>
+    </div>
+{% endif %}</div>
+
+<script>
+function confirmLesson(id) {
+    if (confirm('Confirm this lesson as complete? It will be removed from the feed.')) {
+        fetch(`/api/confirm_lesson/${id}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (d.error || 'Unknown error'));
+                }
+            })
+            .catch(err => alert('Request failed: ' + err));
+    }
+}
+
+function restoreLesson(id) {
+    if (confirm('Restore this lesson? It will reappear in the feed for review.')) {
+        fetch(`/api/restore_lesson/${id}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (d.error || 'Unknown error'));
+                }
+            })
+            .catch(err => alert('Request failed: ' + err));
+    }
+}
+
+function changeKid(kidId) {
+    if (kidId) {
+        window.location.href = `{{ url_for('parent_dashboard') }}?kid_id=${kidId}`;
+    }
+}
+</script>
 {% endblock %}

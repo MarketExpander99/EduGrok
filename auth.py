@@ -1,3 +1,4 @@
+# [auth.py]
 from flask import jsonify, request, render_template, redirect, url_for, session, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import get_db
@@ -28,10 +29,10 @@ def register():
             logger.debug(f"Generated hash for {email}: {hashed_password}")
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password, grade, theme, subscribed, handle, language, star_coins) VALUES (?, ?, ?, 'astronaut', 0, ?, 'en', 0)", 
+            c.execute("INSERT INTO users (email, password, grade, theme, subscribed, handle, language, star_coins, points, parent_id, role) VALUES (?, ?, ?, 'astronaut', 0, ?, 'en', 0, 0, NULL, 'parent')", 
                       (email, hashed_password, int(grade), handle))
             conn.commit()
-            logger.info(f"User registered: {email}")
+            logger.info(f"Parent user registered: {email}")
             flash("Registration successful! Please log in.", "success")
             return redirect(url_for('login'))
         except sqlite3.IntegrityError as e:
@@ -58,7 +59,7 @@ def login():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("SELECT id, password, grade, theme, language, handle FROM users WHERE email = ?", (email,))
+            c.execute("SELECT id, password, grade, theme, language, handle, role FROM users WHERE email = ?", (email,))
             user = c.fetchone()
             if user:
                 logger.debug(f"Found user {email}, stored hash: {user['password']}")
@@ -69,7 +70,8 @@ def login():
                     session['theme'] = user['theme'] or 'astronaut'
                     session['language'] = user['language'] or 'en'
                     session['handle'] = user['handle'] or email
-                    logger.info(f"User logged in: {email}")
+                    session['role'] = user['role'] or 'parent'
+                    logger.info(f"User logged in: {email}, role: {session['role']}")
                     flash("Login successful!", "success")
                     return redirect(url_for('home'))
                 else:

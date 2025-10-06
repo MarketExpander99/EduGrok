@@ -1,3 +1,4 @@
+# [app.py]
 # app.py (updated: Added /api/notifications_count and /api/mark_notifications_read routes)
 import os
 import secrets
@@ -18,7 +19,7 @@ from home_routes import index, home, landing
 from post_routes import create_post, like_post, repost_post, add_comment
 from lesson_routes import check_lesson, complete_lesson, reset_lesson, lessons, generate_lesson, schedule_lessons, add_to_feed
 from assess_routes import assess, take_test, game
-from user_routes import profile, parent_dashboard, update_points, update_coins, beta, feedback
+from user_routes import profile, parent_dashboard, update_points, update_coins, beta, feedback, confirm_lesson, restore_lesson, register_child
 from game_routes import phonics_game, games, number_game
 
 load_dotenv()
@@ -175,6 +176,9 @@ app.add_url_rule('/feedback', 'feedback', feedback, methods=['GET', 'POST'])
 app.add_url_rule('/games', 'games', games)
 app.add_url_rule('/phonics_game', 'phonics_game', phonics_game, methods=['GET', 'POST'])
 app.add_url_rule('/number_game', 'number_game', number_game, methods=['GET', 'POST'])
+app.add_url_rule('/api/confirm_lesson/<int:lesson_id>', 'confirm_lesson', confirm_lesson, methods=['POST'])
+app.add_url_rule('/api/restore_lesson/<int:lesson_id>', 'restore_lesson', restore_lesson, methods=['POST'])
+app.add_url_rule('/register_child', 'register_child', register_child, methods=['GET', 'POST'])
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

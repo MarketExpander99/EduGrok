@@ -1,4 +1,5 @@
-# home_routes.py (updated: Applied fix for global visibility of 'post' types while keeping 'lesson' types user-specific. Fetched global posts from all users (type='post'), user's own lessons (type='lesson'). Included friends for posts if desired, but per request, posts are global. Retained cleanup, JSON parsing, and other features.)
+# [home_routes.py]
+# home_routes.py (updated: Applied fix for global visibility of 'post' types while keeping 'lesson' types user-specific. Fetched global posts from all users (type='post'), user's own lessons (type='lesson'). Included friends for posts if desired, but per request, posts are global. Retained cleanup, JSON parsing, and other features. Added filter to exclude confirmed lesson posts (parent_confirmed=1).)
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
 import logging
@@ -74,7 +75,7 @@ def home():
         global_posts_raw = c.fetchall()
         global_posts = [dict(post) for post in global_posts_raw]
 
-        # User lessons: only from current user
+        # User lessons: only from current user, exclude confirmed (parent_confirmed=1)
         lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
                           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                           (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
@@ -82,7 +83,8 @@ def home():
                           LEFT JOIN users u ON p.user_id = u.id
                           LEFT JOIN posts orig ON p.original_post_id = orig.id
                           LEFT JOIN users orig_u ON orig.user_id = orig_u.id
-                          WHERE p.type = 'lesson' AND p.user_id = ?
+                          LEFT JOIN completed_lessons cl ON cl.lesson_id = p.lesson_id AND cl.user_id = p.user_id
+                          WHERE p.type = 'lesson' AND p.user_id = ? AND (cl.parent_confirmed IS NULL OR cl.parent_confirmed = 0)
                           ORDER BY {order_by}'''
         c.execute(lesson_query, [user_id, user_id, user_id])
         lesson_posts_raw = c.fetchall()
