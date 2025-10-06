@@ -1,4 +1,4 @@
-<!-- lesson_card.html.j2 (Updated: Enhanced submitActivity validation, ensured answer is string, added detailed logging for missing data.) -->
+<!-- lesson_card.html.j2 (Updated: Implemented sequential activity unlocking—starts with first activity enabled, unlocks next only on correct submission via AJAX to /check_lesson. Added initAllActivities() to disable all but first per card on load. Defined activityOrder for top-down progression. Added .disabled-activity CSS for visual disable. Preserved all existing logic, styling, and completed lesson handling. Allows any-order optional but defaults to progressive top-down UX.) -->
 <div class="card bg-grok-surface border-2 border-orange-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}sparkly-border bg-orange-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
         <div class="flex justify-end mb-3">
@@ -17,20 +17,20 @@
     <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
     <div class="space-y-4 mb-4">
         {% if post.lesson.trace_word %}
-            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}" data-type="trace">
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="trace">
                 <h4 class="text-orange-700 font-medium mb-2">✏️ Trace the word: {{ post.lesson.trace_word }}</h4>
                 <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="{{ post.lesson.trace_word }}" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check Trace</button>
             </div>
         {% endif %}
         {% if post.lesson.spell_word %}
-            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}" data-type="spell">
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="spell">
                 <h4 class="text-orange-700 font-medium mb-2">🔤 Spell the word: {{ post.lesson.spell_word }}</h4>
-                <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type the word here" {% if post.completed %}readonly{% endif %}>
+                <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type the word here" {% if post.completed %}readonly disabled{% endif %}>
                 <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
             </div>
         {% endif %}
         {% if post.lesson.mc_question %}
-            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}" data-type="mc">
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="mc">
                 <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.mc_question }}</h4>
                 {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
                 <div class="space-y-2">
@@ -45,7 +45,7 @@
             </div>
         {% endif %}
         {% if post.lesson.sentence_question %}
-            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}" data-type="sentence">
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="sentence">
                 <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.sentence_question }}</h4>
                 {% set options = (post.lesson.sentence_options if post.lesson.sentence_options is iterable and not post.lesson.sentence_options is string else []) %}
                 <div class="space-y-2">
@@ -60,9 +60,9 @@
             </div>
         {% endif %}
         {% if post.lesson.math_question %}
-            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50{% endif %}" data-type="math">
+            <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="math">
                 <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.math_question }}</h4>
-                <input id="math-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type your answer here" {% if post.completed %}readonly{% endif %}>
+                <input id="math-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type your answer here" {% if post.completed %}readonly disabled{% endif %}>
                 <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'math')" data-type="math" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
             </div>
         {% endif %}
@@ -114,6 +114,35 @@
 </div>
 
 <script>
+const activityOrder = ['trace', 'spell', 'mc', 'sentence', 'math'];
+
+function initAllActivities() {
+    document.querySelectorAll('.card[id^="lesson-"]').forEach(card => {
+        const lessonId = card.id.split('-')[1];
+        if (document.getElementById(`lesson-${lessonId}`).classList.contains('opacity-70')) return; // Skip completed lessons
+        const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => activityOrder.includes(s.dataset.type));
+        sections.slice(1).forEach(section => {
+            section.classList.add('disabled-activity');
+            section.querySelectorAll('input, button').forEach(el => el.disabled = true);
+        });
+        if (sections.length > 0) {
+            sections[0].classList.remove('disabled-activity');
+            sections[0].querySelectorAll('input, button').forEach(el => el.disabled = false);
+        }
+    });
+}
+
+function enableNextActivity(lessonId, currentType) {
+    const card = document.getElementById(`lesson-${lessonId}`);
+    if (card.classList.contains('opacity-70')) return; // Already completed
+    const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => activityOrder.includes(s.dataset.type));
+    const currentIndex = sections.findIndex(s => s.dataset.type === currentType);
+    if (currentIndex < 0 || currentIndex >= sections.length - 1) return; // No next or last
+    const nextSection = sections[currentIndex + 1];
+    nextSection.classList.remove('disabled-activity');
+    nextSection.querySelectorAll('input, button').forEach(el => el.disabled = false);
+}
+
 function submitActivity(event, lessonId, activityType) {
     console.log(`submitActivity called for lesson ${lessonId}, activity ${activityType}`);
     if (!lessonId) {
@@ -134,6 +163,10 @@ function submitActivity(event, lessonId, activityType) {
     if (!section) {
         console.error(`No section found for activity ${activityType}`);
         alert('Error: Activity not found!');
+        return;
+    }
+    if (section.classList.contains('disabled-activity')) {
+        console.log(`Activity ${activityType} is disabled, skipping`);
         return;
     }
     const btn = section.querySelector('.check-btn');
@@ -173,6 +206,7 @@ function submitActivity(event, lessonId, activityType) {
                 section.style.backgroundColor = '#d1fae5';
                 btn.textContent = 'Done! ✅';
                 btn.disabled = true;
+                enableNextActivity(lessonId, activityType);
                 if (d.lesson_completed) {
                     document.getElementById(`lesson-${lessonId}`).classList.add('opacity-70');
                     document.getElementById(`lesson-${lessonId}`).querySelectorAll('.check-btn, input').forEach(el => el.disabled = true);
@@ -217,10 +251,17 @@ function toggleCommentsExtra(postId) {
         btn.textContent = `Show more (${hidden.children.length} more)`;
     }
 }
+
+document.addEventListener('DOMContentLoaded', initAllActivities);
 </script>
 
 <style>
 .sparkly-border { position: relative; border: 2px solid transparent; border-radius: 0.75rem; }
 .sparkly-border::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border-radius: 0.75rem; background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706, #b45309); background-size: 400%; animation: sparkle 2s linear infinite; z-index: -1; }
 @keyframes sparkle { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+.disabled-activity {
+    opacity: 0.5;
+    pointer-events: none;
+}
 </style>

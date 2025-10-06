@@ -137,20 +137,29 @@ def check_lesson():
         is_correct = user_answer in correct_answer
         points = 10 if is_correct else 0
         now = datetime.now().isoformat()
-        c.execute("""INSERT INTO activity_responses 
-                     (lesson_id, user_id, activity_type, response, is_correct, points, responded_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)""", 
-                  (lesson_id, session['user_id'], activity_type, user_answer, is_correct, points, now))
-        # Check if all activities are completed correctly
-        c.execute("SELECT trace_word, spell_word, mc_answer, sentence_answer, math_answer FROM lessons WHERE id = ?", (lesson_id,))
-        lesson_data = c.fetchone()
-        activities = [k for k, v in dict(lesson_data).items() if v is not None]
-        required_activities = set(answer_map.keys()) & set(activities)
+        # FIXED: Use UPSERT to update if already exists for this activity
+        c.execute("""INSERT OR REPLACE INTO activity_responses 
+                     (id, lesson_id, user_id, activity_type, response, is_correct, points, responded_at) 
+                     VALUES (
+                         (SELECT id FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND activity_type = ?),
+                         ?, ?, ?, ?, ?, ?, ?
+                     )""", 
+                  (lesson_id, session['user_id'], activity_type, lesson_id, session['user_id'], activity_type, user_answer, is_correct, points, now))
+        # FIXED: Properly determine required_activities based on non-null answer fields
+        activity_types = {
+            'trace': lesson['trace_word'] is not None,
+            'spell': lesson['spell_word'] is not None,
+            'mc': lesson['mc_answer'] is not None,
+            'sentence': lesson['sentence_answer'] is not None,
+            'math': lesson['math_answer'] is not None
+        }
+        required_activities = {k for k, v in activity_types.items() if v}
         c.execute("SELECT activity_type FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", 
                   (lesson_id, session['user_id']))
         completed_activities = {row['activity_type'] for row in c.fetchall()}
         logger.info(f"Lesson {lesson_id}, user {session['user_id']}: required_activities={required_activities}, completed_activities={completed_activities}")
-        if required_activities.issubset(completed_activities):
+        lesson_completed = required_activities.issubset(completed_activities)
+        if lesson_completed:
             c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)", 
                       (session['user_id'], lesson_id, now))
             c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
@@ -161,12 +170,16 @@ def check_lesson():
             'correct': bool(is_correct), 
             'points': points, 
             'message': 'Correct!' if is_correct else 'Incorrect, try again.',
-            'lesson_completed': required_activities.issubset(completed_activities)
+            'lesson_completed': lesson_completed
         })
     except Exception as e:
         logger.error(f"Check lesson error: {e}")
-        conn.rollback()
+        if conn:
+            conn.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 def complete_lesson(lesson_id):
     if 'user_id' not in session:

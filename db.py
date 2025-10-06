@@ -295,6 +295,28 @@ def check_db_schema():
                           FOREIGN KEY (user_id) REFERENCES users(id))''')
             conn.commit()
             logger.info("Created activity_responses table")
+        # FIXED: Remove duplicates before adding unique index to prevent constraint failure
+        c.execute("""
+            DELETE FROM activity_responses 
+            WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (PARTITION BY user_id, lesson_id, activity_type ORDER BY responded_at DESC, id DESC) as rn
+                    FROM activity_responses
+                ) t
+                WHERE rn = 1
+            )
+        """)
+        conn.commit()
+        logger.info("Removed duplicate activity_responses, keeping latest per user/lesson/activity_type")
+        # FIXED: Add unique index to prevent duplicate submissions per user/lesson/activity_type
+        try:
+            c.execute("DROP INDEX IF EXISTS unique_activity_response")
+        except sqlite3.OperationalError:
+            pass
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_activity_response ON activity_responses (user_id, lesson_id, activity_type)")
+        conn.commit()
+        logger.info("Created unique index for activity_responses per user/lesson/activity_type")
         # Check lessons table for required columns
         c.execute("PRAGMA table_info(lessons)")
         columns = {col[1]: col[2] for col in c.fetchall()}

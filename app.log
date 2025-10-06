@@ -79,3 +79,5 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-10-06 08:40:04,355 - __main__ - CRITICAL - Failed to initialize app: there is already another table or index with this name: activity_responses
 2025-10-06 08:46:58,767 - __main__ - ERROR - App init failed: there is already another table or index with this name: activity_responses
 2025-10-06 08:46:58,768 - __main__ - CRITICAL - Failed to initialize app: there is already another table or index with this name: activity_responses
+2025-10-06 10:47:38,503 - __main__ - ERROR - App init failed: UNIQUE constraint failed: activity_responses.user_id, activity_responses.lesson_id, activity_responses.activity_type
+2025-10-06 10:47:38,504 - __main__ - CRITICAL - Failed to initialize app: UNIQUE constraint failed: activity_responses.user_id, activity_responses.lesson_id, activity_responses.activity_type

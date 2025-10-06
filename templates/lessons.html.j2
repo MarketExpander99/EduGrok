@@ -1,4 +1,4 @@
-<!-- lessons.html.j2 (Fixed: Added support for added_ids list from backend to show "Added to Feed" state for buttons, preventing multiple adds. Updated JS to not reload on 'Already in feed' message, instead update button locally. Preserved all styling, back button, safe defaults. Matches route data: lessons, completed_ids, added_ids.) -->
+<!-- lessons.html.j2 (Updated: Added conditional 'sparkly-border' class for incomplete lessons to highlight as "new". For completed lessons, added 'completed' class with reduced opacity and cursor-not-allowed to visually disable. Preserved all existing logic, styling, and functionality. Ensured completed lessons do not show sparkly-border.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
@@ -12,7 +12,7 @@
     {% if lessons %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for lesson in lessons %}
-                <div class="card bg-grok-surface border-grok-border p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6" id="lesson-{{ lesson.id }}">
+                <div class="card bg-grok-surface border-grok-border p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if not lesson.completed %}sparkly-border{% else %}completed opacity-75 cursor-not-allowed{% endif %}" id="lesson-{{ lesson.id }}">
                     <!-- Lesson Header (mirrors post header) -->
                     <div class="flex items-center mb-3">
                         <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
@@ -34,7 +34,12 @@
                     </div>
 
                     <div class="flex justify-between border-t border-grok-border pt-3" style="font-size:80%;">
-                        {% if lesson.id not in completed_ids %}
+                        {% if lesson.completed %}
+                            <span class="text-green-500 flex items-center"><i class="fas fa-check mr-1"></i> Completed</span>
+                            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="text-grok-secondary hover:text-grok-accent transition flex items-center">
+                                <i class="fas fa-redo mr-1"></i> Reset
+                            </a>
+                        {% else %}
                             <a href="{{ url_for('complete_lesson', lesson_id=lesson.id) }}" class="text-grok-text hover:text-grok-accent transition flex items-center">
                                 <i class="fas fa-play mr-1"></i> Start Lesson
                             </a>
@@ -47,11 +52,6 @@
                                     <i class="fas fa-plus mr-1"></i> Add to Feed
                                 </a>
                             {% endif %}
-                        {% else %}
-                            <span class="text-green-500 flex items-center"><i class="fas fa-check mr-1"></i> Completed</span>
-                            <a href="{{ url_for('reset_lesson', lesson_id=lesson.id) }}" class="text-grok-secondary hover:text-grok-accent transition flex items-center">
-                                <i class="fas fa-redo mr-1"></i> Reset
-                            </a>
                         {% endif %}
                     </div>
                 </div>
@@ -152,6 +152,12 @@
 @keyframes sparkle {
     0% { background-position: 0% 50%; }
     100% { background-position: 400% 50%; }
+}
+
+/* Visual disable for completed lessons */
+.completed {
+    opacity: 0.75;
+    cursor: not-allowed;
 }
 </style>
 {% endblock %}
