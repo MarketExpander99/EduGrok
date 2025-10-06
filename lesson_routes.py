@@ -1,4 +1,3 @@
-# [lesson_routes.py]
 import logging
 import sqlite3
 import json
@@ -22,6 +21,11 @@ def lessons():
             return redirect(url_for('login'))
         user_role = user_row['role']
         user_grade = user_row['grade']
+
+        # NEW: Check user role - redirect kids to home
+        if user_role == 'kid':
+            flash("Child accounts have access to the feed and games only. Check your feed for lessons!", "info")
+            return redirect(url_for('home'))
 
         # Determine selected user and grade
         selected_user_id = session['user_id']
@@ -50,8 +54,11 @@ def lessons():
                     selected_user_id = kids[0]['id']
                     selected_grade = kids[0]['grade']
             else:
-                logger.warning(f"No kids found for parent {session['user_id']}")
-                flash("No children linked to your account. Please register a child first.", "error")
+                logger.info(f"No kids found for parent {session['user_id']}; using self for lessons")
+                flash("No children linked to your account. Lessons will be added to your own feed. Register a child to assign to them.", "info")
+                # Default to parent's own account
+                selected_user_id = session['user_id']
+                selected_grade = user_grade
 
         # Fetch lessons for selected grade
         c.execute("SELECT * FROM lessons WHERE grade = ? ORDER BY created_at DESC", (selected_grade,))
@@ -114,10 +121,10 @@ def add_to_feed():
     conn = get_db()
     c = conn.cursor()
     try:
-        # Determine the user_id for the post
+        # Determine the user_id for the post - default to session user if no target
         post_user_id = target_user_id if target_user_id else session_user_id
-        # If target_user_id provided, validate (parent assigning to kid)
-        if target_user_id:
+        # If target_user_id provided and not self, validate (parent assigning to kid)
+        if target_user_id and target_user_id != session_user_id:
             c.execute("SELECT role, parent_id, grade, handle FROM users WHERE id = ?", (target_user_id,))
             target_user = c.fetchone()
             if not target_user:
@@ -127,11 +134,13 @@ def add_to_feed():
             target_grade = target_user['grade']
             target_handle = target_user['handle']
         else:
-            # Use session user
-            c.execute("SELECT grade, handle FROM users WHERE id = ?", (session_user_id,))
+            # Use session user - FIXED: No error if no child, just add to own feed
+            c.execute("SELECT role, grade, handle FROM users WHERE id = ?", (session_user_id,))
             user_row = c.fetchone()
             if not user_row:
                 return jsonify({'success': False, 'error': 'User not found'}), 404
+            if user_row['role'] == 'kid':
+                return jsonify({'success': False, 'error': 'Kids cannot add lessons'}), 403
             target_grade = user_row['grade']
             target_handle = session.get('handle', session.get('email', 'User'))
 
@@ -300,9 +309,53 @@ def reset_lesson(lesson_id):
     return redirect(url_for('lessons'))
 
 def generate_lesson():
-    # Stub: In a real app, this could generate a new lesson using AI or logic
-    flash('Lesson generated! (Stub implementation)', 'success')
-    return redirect(url_for('lessons'))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        # Fetch user role and kids
+        c.execute("SELECT role, grade, handle FROM users WHERE id = ?", (session['user_id'],))
+        user_row = c.fetchone()
+        if not user_row or user_row['role'] == 'kid':
+            flash("Only parents can generate lessons.", "error")
+            return redirect(url_for('home'))
+        user_grade = user_row['grade']
+        user_handle = user_row['handle']
+        c.execute("SELECT COUNT(*) as count FROM users WHERE parent_id = ? AND role = 'kid'", (session['user_id'],))
+        kid_count = c.fetchone()['count']
+
+        # NEW: If no kids, add to own feed; else, assume assigning to self or redirect to lessons for selection
+        if kid_count == 0:
+            # Generate a sample lesson and add to own feed
+            now = datetime.now().isoformat()
+            sample_title = "Generated Lesson: Basic Addition"
+            sample_content = "Practice adding numbers 1-5."
+            c.execute("""INSERT INTO lessons (title, grade, subject, content, description, created_at) 
+                         VALUES (?, ?, 'math', ?, ?, ?)""", 
+                      (sample_title, user_grade, sample_content, sample_content, now))
+            new_lesson_id = c.lastrowid
+            # Add to own feed
+            c.execute("""INSERT INTO posts 
+                         (user_id, content, subject, grade, handle, type, lesson_id, created_at, views, likes, reposts) 
+                         VALUES (?, ?, 'math', ?, ?, 'lesson', ?, ?, 0, 0, 0)""", 
+                      (session['user_id'], sample_title, user_grade, user_handle, new_lesson_id, now))
+            conn.commit()
+            flash(f"Generated and added '{sample_title}' to your feed! Register a child to assign lessons to them.", "success")
+            return redirect(url_for('profile'))  # Or home to see feed
+        else:
+            # Redirect to lessons page for selection
+            flash("Use the lessons page to generate and assign.", "info")
+            return redirect(url_for('lessons'))
+    except Exception as e:
+        logger.error(f"Generate lesson error: {e}")
+        if conn:
+            conn.rollback()
+        flash("Failed to generate lesson.", "error")
+        return redirect(url_for('lessons'))
+    finally:
+        if conn:
+            conn.close()
 
 def schedule_lessons():
     # Stub: POST to assign lessons to user
@@ -317,7 +370,7 @@ def schedule_lessons():
     conn = get_db()
     c = conn.cursor()
     try:
-        # Determine the user_id for assignment
+        # Determine the user_id for assignment - default to session user if no target
         assign_user_id = target_user_id if target_user_id else session_user_id
         # If target_user_id provided, validate (parent assigning to kid)
         if target_user_id:
@@ -327,6 +380,12 @@ def schedule_lessons():
                 return jsonify({'success': False, 'error': 'Target user not found'}), 404
             if target_user['role'] != 'kid' or target_user['parent_id'] != session_user_id:
                 return jsonify({'success': False, 'error': 'Invalid target user'}), 403
+        else:
+            # FIXED: Use session user if no child specified - no error
+            c.execute("SELECT role FROM users WHERE id = ?", (session_user_id,))
+            user_row = c.fetchone()
+            if not user_row or user_row['role'] == 'kid':
+                return jsonify({'success': False, 'error': 'Kids cannot schedule lessons'}), 403
         now = datetime.now().isoformat()
         for lid in lesson_ids:
             c.execute("INSERT OR IGNORE INTO lessons_users (user_id, lesson_id, assigned_at) VALUES (?, ?, ?)", 

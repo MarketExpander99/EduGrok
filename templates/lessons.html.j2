@@ -1,5 +1,4 @@
-# [lessons.html.j2]
-<!-- lessons.html.j2 (Updated: Added conditional child selector dropdown at the top for parents with multiple kids, similar to parent_dashboard.html.j2. Uses passed 'kids' and 'selected_kid_id' variables. On change, redirects to /lessons?kid_id=<id>. Integrated into the header flex layout for clean UX. Updated addToFeed onclick and JS to pass selected_user_id as target_user_id for parent assignments. Preserved all existing logic, styling, and functionality. Ensured completed lessons do not show sparkly-border.) -->
+<!-- lessons.html.j2 (Updated: Always show child selector dropdown for parents, even with no kids—prepends "My Feed" option using selected_user_id for solo parent use. When kids exist, "My Feed" is first option, followed by kids. Updated label to include grade from first lesson (or default 1). JS unchanged, as it already uses selected_user_id correctly. This prevents flow breakage and makes adding to own feed explicit. Preserved all styling, logic, and sparkly-border for incomplete lessons.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
@@ -8,16 +7,21 @@
 <div class="container mx-auto p-6 max-w-4xl">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold text-grok-text">Your Lessons</h1>
-        {% if kids %}
+        <!-- Always show selector for parents (inferred by presence of selected_user_id/kids); if no kids, only "My Feed" -->
         <div class="flex-1 max-w-xs mx-4">
-            <label for="kid-selector" class="block text-grok-secondary font-medium mb-2 text-sm">Select Child:</label>
+            <label for="kid-selector" class="block text-grok-secondary font-medium mb-2 text-sm">Add to:</label>
             <select id="kid-selector" class="w-full p-3 border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" onchange="changeKid(this.value)">
-                {% for kid in kids %}
-                    <option value="{{ kid.id }}" {% if kid.id == selected_kid_id %}selected{% endif %}>{{ kid.handle }} (Grade {{ kid.grade }})</option>
-                {% endfor %}
+                <!-- Always prepend "My Feed" option -->
+                <option value="{{ selected_user_id }}" {% if selected_user_id == session.user_id or not kids %}selected{% endif %}>
+                    {% if lessons %}{{ lessons[0].grade }}{% else %}1{% endif %} - My Feed
+                </option>
+                {% if kids %}
+                    {% for kid in kids %}
+                        <option value="{{ kid.id }}" {% if kid.id == selected_kid_id %}selected{% endif %}>{{ kid.handle }} (Grade {{ kid.grade }})</option>
+                    {% endfor %}
+                {% endif %}
             </select>
         </div>
-        {% endif %}
         <a href="{{ url_for('home') }}" class="text-grok-secondary hover:text-grok-accent">&larr; Back to Home</a>
     </div>
     {% if lessons %}

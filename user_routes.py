@@ -1,4 +1,5 @@
-# [user_routes.py]
+# [user_routes.py updated: Added role-based access control to parent_dashboard - redirects kids to home with a message, allowing only parents to access. Preserved all existing functionality for parents.]
+
 import sqlite3
 from flask import jsonify, session, request, flash, redirect, url_for, render_template
 import logging
@@ -145,6 +146,13 @@ def parent_dashboard():
     try:
         conn = get_db()
         c = conn.cursor()
+
+        # NEW: Check user role - redirect kids to home
+        c.execute("SELECT role FROM users WHERE id = ?", (session['user_id'],))
+        user_row = c.fetchone()
+        if not user_row or user_row['role'] == 'kid':
+            flash("Child accounts have access to the feed and games only. Ask your parent for dashboard access!", "info")
+            return redirect(url_for('home'))
 
         # Fetch kids
         c.execute("SELECT id, handle, grade FROM users WHERE parent_id = ? AND role = 'kid'", (session['user_id'],))

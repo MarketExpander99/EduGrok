@@ -1,5 +1,5 @@
-# [home_routes.py]
-# home_routes.py (updated: Applied fix for global visibility of 'post' types while keeping 'lesson' types user-specific. Fetched global posts from all users (type='post'), user's own lessons (type='lesson'). Included friends for posts if desired, but per request, posts are global. Retained cleanup, JSON parsing, and other features. Added filter to exclude confirmed lesson posts (parent_confirmed=1).)
+# [home_routes.py updated: Added subtle kid-friendly note by fetching user role and passing 'is_kid' flag to template for conditional display (e.g., "Explore the feed and play games!"). Preserved all existing feed logic, cleanup, and features.]
+
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
 import logging
@@ -23,6 +23,10 @@ def home():
         c = conn.cursor()
         user_id = session['user_id']
         logger.info(f"Home for user_id: {user_id}")
+        # Fetch user role for kid-mode note
+        c.execute("SELECT role FROM users WHERE id=?", (user_id,))
+        user_row = c.fetchone()
+        is_kid = user_row and user_row['role'] == 'kid' if user_row else False
         # Cleanup invalid lesson posts before fetching
         try:
             c.execute("""
@@ -254,13 +258,13 @@ def home():
             feed_lessons = []
             completed_lessons = []
 
-        return render_template('home.html.j2', posts=posts, comments=comments, user=user, recent_test=recent_test, lessons_completed=lessons_completed, games_played=games_played, avg_score=avg_score, badges=badges, feedbacks=feedbacks, friend_count=len(friend_ids), sort=sort, feed_lessons=feed_lessons, completed_lessons=completed_lessons, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return render_template('home.html.j2', posts=posts, comments=comments, user=user, recent_test=recent_test, lessons_completed=lessons_completed, games_played=games_played, avg_score=avg_score, badges=badges, feedbacks=feedbacks, friend_count=len(friend_ids), sort=sort, feed_lessons=feed_lessons, completed_lessons=completed_lessons, is_kid=is_kid, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     except Exception as e:
         logger.error(f"Home error for user {user_id}: {str(e)}\n{traceback.format_exc()}")
         if conn:
             conn.rollback()
         flash('Error loading feed! Check server logs for details.', 'error')
-        return render_template('home.html.j2', posts=[], comments={}, user=None, recent_test=None, lessons_completed=0, games_played=0, avg_score='N/A', badges=[], feedbacks=[], friend_count=0, sort='latest', feed_lessons=[], completed_lessons=[], theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
+        return render_template('home.html.j2', posts=[], comments={}, user=None, recent_test=None, lessons_completed=0, games_played=0, avg_score='N/A', badges=[], feedbacks=[], friend_count=0, sort='latest', feed_lessons=[], completed_lessons=[], is_kid=False, theme=session.get('theme', 'astronaut'), language=session.get('language', 'en'))
     finally:
         if conn:
             conn.close()
