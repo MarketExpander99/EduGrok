@@ -1,4 +1,3 @@
-# post_routes.py
 import os
 from flask import session, request, jsonify, redirect, url_for, flash, current_app
 from db import get_db
@@ -92,10 +91,13 @@ def repost_post(post_id):
     try:
         conn = get_db()
         c = conn.cursor()
-        # Check if post exists
-        c.execute("SELECT id FROM posts WHERE id = ?", (post_id,))
-        if not c.fetchone():
+        # Check if post exists and is not a lesson
+        c.execute("SELECT id, type FROM posts WHERE id = ?", (post_id,))
+        post = c.fetchone()
+        if not post:
             return jsonify({'success': False, 'error': 'Post not found'}), 404
+        if post['type'] == 'lesson':
+            return jsonify({'success': False, 'error': 'Lessons cannot be reposted'}), 403
         # Check if already reposted
         c.execute("SELECT id FROM reposts WHERE post_id = ? AND user_id = ?", (post_id, session['user_id']))
         existing = c.fetchone()
@@ -136,12 +138,12 @@ def repost_post(post_id):
 
 def add_comment(post_id):
     if 'user_id' not in session:
-        flash('Please log in to comment', 'error')
+        flash('Please log in to add a note', 'error')
         return redirect(url_for('login'))
     if request.method == 'POST':
         content = request.form.get('content', '').strip()
         if not content:
-            flash('Comment cannot be empty', 'error')
+            flash('Note cannot be empty', 'error')
             return redirect(url_for('home'))
         conn = None
         try:
@@ -155,13 +157,13 @@ def add_comment(post_id):
             c.execute("INSERT INTO comments (post_id, user_id, content, created_at, handle) VALUES (?, ?, ?, datetime('now'), ?)", 
                       (post_id, session['user_id'], content, session['handle']))
             conn.commit()
-            flash('Comment added successfully!', 'success')
-            logger.info(f"Comment added by user {session['user_id']} to post {post_id}: {content[:50]}...")
+            flash('Note added successfully!', 'success')
+            logger.info(f"Note added by user {session['user_id']} to post {post_id}: {content[:50]}...")
         except Exception as e:
-            logger.error(f"Add comment failed for post {post_id}: {str(e)}")
+            logger.error(f"Add note failed for post {post_id}: {str(e)}")
             if conn:
                 conn.rollback()
-            flash('Server error adding comment', 'error')
+            flash('Server error adding note', 'error')
         finally:
             if conn:
                 conn.close()

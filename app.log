@@ -75,3 +75,7 @@ Internal Server Error: 500 Internal Server Error: The server encountered an inte
 2025-10-05 07:55:20,268 - __main__ - CRITICAL - Failed to initialize app: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
 2025-10-05 07:56:46,491 - __main__ - ERROR - App init failed: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
 2025-10-05 07:56:46,491 - __main__ - CRITICAL - Failed to initialize app: Incorrect number of bindings supplied. The current statement uses 17, and there are 18 supplied.
+2025-10-06 08:40:04,354 - __main__ - ERROR - App init failed: there is already another table or index with this name: activity_responses
+2025-10-06 08:40:04,355 - __main__ - CRITICAL - Failed to initialize app: there is already another table or index with this name: activity_responses
+2025-10-06 08:46:58,767 - __main__ - ERROR - App init failed: there is already another table or index with this name: activity_responses
+2025-10-06 08:46:58,768 - __main__ - CRITICAL - Failed to initialize app: there is already another table or index with this name: activity_responses

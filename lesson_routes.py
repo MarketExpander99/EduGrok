@@ -1,4 +1,3 @@
-# lesson_routes.py (updated: Added json import and parsing for mc_options, sentence_options in lessons_list dicts. This ensures lessons page templates work without 'fromjson' filter.)
 import logging
 import sqlite3
 import json
@@ -19,7 +18,7 @@ def lessons():
     lessons_list = []
     for row in lessons_raw:
         lesson_dict = dict(row)
-        # NEW: Parse JSON fields to lists
+        # Parse JSON fields to lists
         if lesson_dict.get('mc_options'):
             try:
                 lesson_dict['mc_options'] = json.loads(lesson_dict['mc_options'])
@@ -102,43 +101,72 @@ def check_lesson():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     data = request.get_json()
-    if not data or 'lesson_id' not in data or 'activity_type' not in data or 'response' not in data:
+    lesson_id = data.get('lesson_id')
+    activity_type = data.get('activity_type')
+    user_answer = data.get('answer')
+    if not lesson_id or not activity_type or not user_answer:
         return jsonify({'success': False, 'error': 'Missing data'}), 400
-    lesson_id = data['lesson_id']
-    activity_type = data['activity_type']
-    response = data['response']
-    conn = get_db()
-    c = conn.cursor()
     try:
-        if activity_type == 'mc':
-            c.execute("SELECT mc_answer FROM lessons WHERE id = ?", (lesson_id,))
-            correct = c.fetchone()
-            correct = correct['mc_answer'] if correct else None
-        elif activity_type == 'sentence':
-            c.execute("SELECT sentence_answer FROM lessons WHERE id = ?", (lesson_id,))
-            correct = c.fetchone()
-            correct = correct['sentence_answer'] if correct else None
-        elif activity_type == 'math':
-            c.execute("SELECT math_answer FROM lessons WHERE id = ?", (lesson_id,))
-            correct = c.fetchone()
-            correct = correct['math_answer'] if correct else None
-        else:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT trace_word, spell_word, mc_answer, sentence_answer, math_answer FROM lessons WHERE id = ?", (lesson_id,))
+        lesson = c.fetchone()
+        if not lesson:
+            return jsonify({'success': False, 'error': 'Lesson not found'}), 404
+        # Select correct answer based on activity_type
+        answer_map = {
+            'trace': 'trace_word',
+            'spell': 'spell_word',
+            'mc': 'mc_answer',
+            'sentence': 'sentence_answer',
+            'math': 'math_answer'
+        }
+        if activity_type not in answer_map:
             return jsonify({'success': False, 'error': 'Invalid activity type'}), 400
-        if not correct:
-            return jsonify({'success': False, 'error': 'Lesson activity not found'}), 404
-        is_correct = 1 if str(response).strip() == str(correct).strip() else 0
+        correct_answer = lesson[answer_map[activity_type]]
+        if not correct_answer:
+            return jsonify({'success': False, 'error': f'No answer defined for {activity_type}'}), 404
+        # Normalize answers
+        try:
+            correct_answer = json.loads(correct_answer) if isinstance(correct_answer, str) else correct_answer
+        except json.JSONDecodeError:
+            correct_answer = correct_answer
+        user_answer = str(user_answer).strip().lower()
+        correct_answer = [str(c).strip().lower() for c in (correct_answer if isinstance(correct_answer, list) else [correct_answer])]
+        # Compare answers
+        is_correct = user_answer in correct_answer
         points = 10 if is_correct else 0
         now = datetime.now().isoformat()
-        c.execute("""INSERT INTO lesson_responses 
+        c.execute("""INSERT INTO activity_responses 
                      (lesson_id, user_id, activity_type, response, is_correct, points, responded_at) 
                      VALUES (?, ?, ?, ?, ?, ?, ?)""", 
-                  (lesson_id, session['user_id'], activity_type, response, is_correct, points, now))
+                  (lesson_id, session['user_id'], activity_type, user_answer, is_correct, points, now))
+        # Check if all activities are completed correctly
+        c.execute("SELECT trace_word, spell_word, mc_answer, sentence_answer, math_answer FROM lessons WHERE id = ?", (lesson_id,))
+        lesson_data = c.fetchone()
+        activities = [k for k, v in dict(lesson_data).items() if v is not None]
+        required_activities = set(answer_map.keys()) & set(activities)
+        c.execute("SELECT activity_type FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", 
+                  (lesson_id, session['user_id']))
+        completed_activities = {row['activity_type'] for row in c.fetchall()}
+        logger.info(f"Lesson {lesson_id}, user {session['user_id']}: required_activities={required_activities}, completed_activities={completed_activities}")
+        if required_activities.issubset(completed_activities):
+            c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at) VALUES (?, ?, ?)", 
+                      (session['user_id'], lesson_id, now))
+            c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
+                      (session['user_id'], lesson_id))
         conn.commit()
-        return jsonify({'success': True, 'correct': bool(is_correct), 'points': points})
+        return jsonify({
+            'success': True, 
+            'correct': bool(is_correct), 
+            'points': points, 
+            'message': 'Correct!' if is_correct else 'Incorrect, try again.',
+            'lesson_completed': required_activities.issubset(completed_activities)
+        })
     except Exception as e:
         logger.error(f"Check lesson error: {e}")
         conn.rollback()
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def complete_lesson(lesson_id):
     if 'user_id' not in session:
@@ -171,7 +199,7 @@ def reset_lesson(lesson_id):
                   (session['user_id'], lesson_id))
         c.execute("UPDATE lessons_users SET completed = 0 WHERE user_id = ? AND lesson_id = ?", 
                   (session['user_id'], lesson_id))
-        c.execute("DELETE FROM lesson_responses WHERE user_id = ? AND lesson_id = ?", 
+        c.execute("DELETE FROM activity_responses WHERE user_id = ? AND lesson_id = ?", 
                   (session['user_id'], lesson_id))
         conn.commit()
         flash('Lesson reset successfully!', 'success')

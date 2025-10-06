@@ -1,7 +1,4 @@
-﻿# db.py (updated: Added CREATE TABLE for missing tables: tests, games, badges, feedback to prevent potential issues with queries)
-# Fixed: Added unique partial index on posts(user_id, lesson_id) WHERE type='lesson' in check_db_schema to prevent duplicate lesson posts per user.
-
-import sqlite3
+﻿import sqlite3
 import os
 from flask import g
 import logging
@@ -32,7 +29,7 @@ def init_tables():
     try:
         conn = sqlite3.connect('database.db')
         c = conn.cursor()
-        # Users table - UPDATED: Added parent_id, role
+        # Users table
         c.execute('''CREATE TABLE IF NOT EXISTS users 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       email TEXT UNIQUE, 
@@ -68,7 +65,7 @@ def init_tables():
                       sentence_answer TEXT,
                       math_question TEXT,
                       math_answer TEXT)''')
-        # Posts table - FIXED: Added type and lesson_id
+        # Posts table
         c.execute('''CREATE TABLE IF NOT EXISTS posts 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
@@ -128,8 +125,8 @@ def init_tables():
                       completed INTEGER DEFAULT 0,
                       FOREIGN KEY (user_id) REFERENCES users(id), 
                       FOREIGN KEY (lesson_id) REFERENCES lessons(id))''')
-        # Lesson responses table
-        c.execute('''CREATE TABLE IF NOT EXISTS lesson_responses 
+        # Activity responses table
+        c.execute('''CREATE TABLE IF NOT EXISTS activity_responses 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       lesson_id INTEGER, 
                       user_id INTEGER, 
@@ -137,20 +134,20 @@ def init_tables():
                       response TEXT, 
                       is_correct INTEGER, 
                       points INTEGER,
-                      responded_at TEXT DEFAULT (datetime('now')),
+                      responded_at TEXT,
                       FOREIGN KEY (lesson_id) REFERENCES lessons(id),
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        # UPDATED: Added friendships table
+        # Friendships table
         c.execute('''CREATE TABLE IF NOT EXISTS friendships 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
                       requester_id INTEGER,
                       target_id INTEGER,
-                      status TEXT DEFAULT 'requested',  -- requested, approved, rejected
+                      status TEXT DEFAULT 'requested',
                       requested_at TEXT DEFAULT (datetime('now')),
                       approved_at TEXT,
                       FOREIGN KEY (requester_id) REFERENCES users(id),
                       FOREIGN KEY (target_id) REFERENCES users(id))''')
-        # NEW: Tests table
+        # Tests table
         c.execute('''CREATE TABLE IF NOT EXISTS tests 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
@@ -158,20 +155,20 @@ def init_tables():
                       score REAL, 
                       date TEXT, 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        # NEW: Games table
+        # Games table
         c.execute('''CREATE TABLE IF NOT EXISTS games 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
                       played_at TEXT DEFAULT (datetime('now')), 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        # NEW: Badges table
+        # Badges table
         c.execute('''CREATE TABLE IF NOT EXISTS badges 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
                       badge_name TEXT, 
                       awarded_date TEXT DEFAULT (datetime('now')), 
                       FOREIGN KEY (user_id) REFERENCES users(id))''')
-        # NEW: Feedback table
+        # Feedback table
         c.execute('''CREATE TABLE IF NOT EXISTS feedback 
                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                       user_id INTEGER, 
@@ -217,39 +214,33 @@ def seed_lessons():
         c = conn.cursor()
         c.execute('DELETE FROM lessons')
         now = datetime.now().isoformat()
-        # FIXED: Grade 1 Week of Oct 6-10, 2025 (20 lessons: 4/day across Math, Language, Science, Social Studies) - All tuples now exactly 17 items
         lessons = [
             # Monday Oct 6
             ('Week 1 Mon: Counting Apples (Math)', 1, 'math', 'Count fall apples and add small groups.', 'Practice number sense with seasonal fruits.', now, None, None, None, None, None, None, None, None, None, 'How many apples? 3 + 2 = ?', '5'),
             ('Week 1 Mon: Phonics - Short A (Language)', 1, 'language', 'Identify words with short A sound.', 'Build phonics skills for reading readiness.', now, 'apple', 'apple', '/æpəl/', 'Which word has short A?', json.dumps(['apple', 'igloo', 'umbrella']), 'apple', 'I see a red ___.', json.dumps(['apple', 'banana', 'car']), 'apple', None, None),
             ('Week 1 Mon: Fall Leaves Change (Science)', 1, 'science', 'Observe why leaves change in fall.', 'Explore seasons and plant life cycles.', now, None, None, None, 'What color do leaves turn in fall?', json.dumps(['red', 'blue', 'yellow']), 'red', None, None, None, None, None),
             ('Week 1 Mon: My Family Roles (Social Studies)', 1, 'social_studies', 'Learn about family members and their jobs.', 'Understand family structures.', now, 'mom', 'mom', '/mɒm/', 'Who cooks dinner?', json.dumps(['mom', 'teacher', 'doctor']), 'mom', 'My ___ helps at home.', json.dumps(['mom', 'dad', 'friend']), 'mom', None, None),
-            
             # Tuesday Oct 7
             ('Week 1 Tue: Shapes in Nature (Math)', 1, 'math', 'Identify circles and squares in leaves.', 'Connect shapes to the environment.', now, None, None, None, None, None, None, None, None, None, 'How many sides on a square?', '4'),
             ('Week 1 Tue: Sight Word - The (Language)', 1, 'language', 'Practice reading "the".', 'Build high-frequency word recognition.', now, 'the', 'the', '/ðə/', 'Spell the word for /ðə/.', json.dumps(['the', 'tha', 'thee']), 'the', '___ cat is happy.', json.dumps(['The', 'A', 'An']), 'The', None, None),
             ('Week 1 Tue: Animals Prepare for Winter (Science)', 1, 'science', 'Discuss how squirrels gather nuts.', 'Learn animal adaptations.', now, 'nut', 'nut', '/nʌt/', 'What do squirrels collect?', json.dumps(['nuts', 'leaves', 'rocks']), 'nuts', None, None, None, None, None),
             ('Week 1 Tue: Community Helpers - Teacher (Social Studies)', 1, 'social_studies', 'Role of teachers in school.', 'Explore jobs in the community.', now, 'teach', 'teach', '/tiːtʃ/', 'Who helps you learn?', json.dumps(['teacher', 'firefighter', 'chef']), 'teacher', 'The ___ reads stories.', json.dumps(['teacher', 'doctor', 'pilot']), 'teacher', None, None),
-            
             # Wednesday Oct 8
             ('Week 1 Wed: Addition - 1+1=2 (Math)', 1, 'math', 'Add two groups of one.', 'Basic addition facts.', now, None, None, None, None, None, None, None, None, None, '1 + 1 = ?', '2'),
             ('Week 1 Wed: CVC Word - Cat (Language)', 1, 'language', 'Blend C-V-C sounds for "cat".', 'Phonics blending practice.', now, 'cat', 'cat', '/kæt/', 'Spell /k/ /æ/ /t/.', json.dumps(['cat', 'cot', 'cut']), 'cat', 'The ___ sat on the mat.', json.dumps(['cat', 'dog', 'bat']), 'cat', None, None),
             ('Week 1 Wed: Weather in Fall (Science)', 1, 'science', 'What is cooler weather?', 'Seasonal weather patterns.', now, None, None, None, 'What do we wear in fall?', json.dumps(['coat', 'swimsuit', 'sunglasses']), 'coat', None, None, None, None, None),
             ('Week 1 Wed: My School Rules (Social Studies)', 1, 'social_studies', 'Importance of following rules.', 'School community basics.', now, 'rule', 'rule', '/ruːl/', 'What is a rule?', json.dumps(['rule', 'toy', 'book']), 'rule', 'We follow the ___ at school.', json.dumps(['rule', 'game', 'song']), 'rule', None, None),
-            
             # Thursday Oct 9
             ('Week 1 Thu: Counting to 5 (Math)', 1, 'math', 'Count objects up to 5.', 'Number sequencing.', now, None, None, None, None, None, None, None, None, None, 'Count: 1,2,3,?,5', '4'),
             ('Week 1 Thu: Rhyming Words (Language)', 1, 'language', 'Find words that rhyme with "hat".', 'Rhyming awareness.', now, 'hat', 'hat', '/hæt/', 'What rhymes with hat?', json.dumps(['cat', 'house', 'sun']), 'cat', 'The ___ is on my head.', json.dumps(['hat', 'shoe', 'book']), 'hat', None, None),
             ('Week 1 Thu: Plants in Fall (Science)', 1, 'science', 'How do trees lose leaves?', 'Plant life cycles.', now, 'leaf', 'leaf', '/liːf/', 'What falls from trees?', json.dumps(['leaves', 'apples', 'birds']), 'leaves', None, None, None, None, None),
             ('Week 1 Thu: Helping at Home (Social Studies)', 1, 'social_studies', 'Chores and family help.', 'Responsibility in family.', now, 'help', 'help', '/hɛlp/', 'What do you do to help?', json.dumps(['help', 'play', 'sleep']), 'help', 'I ___ mom clean.', json.dumps(['help', 'run', 'eat']), 'help', None, None),
-            
             # Friday Oct 10
             ('Week 1 Fri: Subtraction Basics (Math)', 1, 'math', 'Take away one from two.', 'Intro to subtraction.', now, None, None, None, None, None, None, None, None, None, '3 - 1 = ?', '2'),
             ('Week 1 Fri: Simple Sentences (Language)', 1, 'language', 'Build "I see a dog."', 'Sentence structure.', now, 'dog', 'dog', '/dɒɡ/', 'What is a pet?', json.dumps(['dog', 'car', 'tree']), 'dog', 'I see a ___.', json.dumps(['dog', 'house', 'cloud']), 'dog', None, None),
             ('Week 1 Fri: Recycling in Fall (Science)', 1, 'science', 'Why recycle leaves?', 'Environmental care.', now, None, None, None, 'What can we recycle?', json.dumps(['paper', 'food', 'toys']), 'paper', None, None, None, None, None),
             ('Week 1 Fri: Seasons Change (Social Studies)', 1, 'social_studies', 'From summer to fall.', 'Understanding seasons.', now, 'fall', 'fall', '/fɔːl/', 'What season has pumpkins?', json.dumps(['fall', 'winter', 'spring']), 'fall', 'In ___ the leaves change.', json.dumps(['fall', 'summer', 'rain']), 'fall', None, None),
         ]
-        # NEW: Verify tuple lengths before insert
         for i, lesson in enumerate(lessons):
             if len(lesson) != 17:
                 raise ValueError(f"Lesson {i+1} has {len(lesson)} items, expected 17: {lesson}")
@@ -269,6 +260,41 @@ def check_db_schema():
     try:
         conn = sqlite3.connect('database.db')
         c = conn.cursor()
+        # Check for activity_responses
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='activity_responses'")
+        activity_exists = c.fetchone()
+        # Check for lesson_responses
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lesson_responses'")
+        lesson_exists = c.fetchone()
+        if lesson_exists and not activity_exists:
+            # Rename lesson_responses to activity_responses
+            c.execute("ALTER TABLE lesson_responses RENAME TO activity_responses")
+            conn.commit()
+            logger.info("Renamed lesson_responses to activity_responses")
+        elif lesson_exists and activity_exists:
+            # Migrate data from lesson_responses to activity_responses
+            c.execute('''INSERT OR IGNORE INTO activity_responses 
+                         (lesson_id, user_id, activity_type, response, is_correct, points, responded_at)
+                         SELECT lesson_id, user_id, activity_type, response, is_correct, points, responded_at 
+                         FROM lesson_responses''')
+            c.execute("DROP TABLE lesson_responses")
+            conn.commit()
+            logger.info("Migrated data from lesson_responses to activity_responses and dropped lesson_responses")
+        elif not activity_exists:
+            # Create activity_responses if it doesn't exist
+            c.execute('''CREATE TABLE activity_responses 
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                          lesson_id INTEGER, 
+                          user_id INTEGER, 
+                          activity_type TEXT, 
+                          response TEXT, 
+                          is_correct INTEGER, 
+                          points INTEGER,
+                          responded_at TEXT,
+                          FOREIGN KEY (lesson_id) REFERENCES lessons(id),
+                          FOREIGN KEY (user_id) REFERENCES users(id))''')
+            conn.commit()
+            logger.info("Created activity_responses table")
         # Check lessons table for required columns
         c.execute("PRAGMA table_info(lessons)")
         columns = {col[1]: col[2] for col in c.fetchall()}
@@ -280,7 +306,7 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
                 conn.commit()
                 logger.info(f"Added {col} column to lessons table")
-        # Check users table for required columns - UPDATED: Add parent_id, role, last_feed_view
+        # Check users table for required columns
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role', 'last_feed_view']
@@ -306,14 +332,14 @@ def check_db_schema():
             c.execute("ALTER TABLE posts ADD COLUMN lesson_id INTEGER")
             conn.commit()
             logger.info("Added lesson_id column to posts table")
-        # FIXED: Add completed column to lessons_users if missing
+        # Check lessons_users for completed column
         c.execute("PRAGMA table_info(lessons_users)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         if 'completed' not in columns:
             c.execute("ALTER TABLE lessons_users ADD COLUMN completed INTEGER DEFAULT 0")
             conn.commit()
             logger.info("Added completed column to lessons_users table")
-        # FIXED: Add unique partial index to prevent duplicate lesson posts per user
+        # Add unique partial index for lesson posts
         try:
             c.execute("DROP INDEX IF EXISTS unique_lesson_post")
         except sqlite3.OperationalError:
@@ -321,7 +347,7 @@ def check_db_schema():
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_lesson_post ON posts (user_id, lesson_id) WHERE type = 'lesson'")
         conn.commit()
         logger.info("Created unique index for lesson posts per user")
-        # UPDATED: Check friendships table
+        # Check friendships table
         c.execute("PRAGMA table_info(friendships)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         required_friend_columns = ['requester_id', 'target_id', 'status', 'requested_at', 'approved_at']
@@ -332,7 +358,6 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to friendships table")
-        # NEW: Add last_feed_view column to users (already in required_user_columns)
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:
