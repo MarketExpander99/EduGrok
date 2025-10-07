@@ -1,4 +1,4 @@
-<!-- home.html.j2 (updated: FAB button scroll behavior already matches header/bottom nav—hides on scroll down (translateY(100%)) and shows on scroll up (translateY(0)) for all views, including mobile. Confirmed mobile compatibility via JS scroll event (works on touch devices). Adjusted bottom positioning to bottom-16 on mobile via media query for better spacing if bottom nav is taller on small screens. Added z-index to FAB for overlap safety.) -->
+<!-- home.html.j2 (updated: Modified FAB scroll behavior to only hide/show on mobile (window.innerWidth < 768px); on desktop/tablet (≥768px), FAB remains always visible with translateY(0). Retained responsive bottom positioning via Tailwind classes.) -->
 {% extends "base.html.j2" %}{% block title %}Home - EduGrok{% endblock %}{% block content %}<div class="min-h-screen bg-grok-bg">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -158,6 +158,7 @@ let lastScrollTop = 0;
 const header = document.getElementById('sticky-header');
 const bottomNav = document.getElementById('bottom-nav');
 const fab = document.getElementById('fab');
+const isMobile = () => window.innerWidth < 768;
 window.addEventListener('scroll', function() {
     let st = window.pageYOffset || document.documentElement.scrollTop;
     if (st > lastScrollTop) {
@@ -166,7 +167,7 @@ window.addEventListener('scroll', function() {
         if (bottomNav) {
             bottomNav.style.transform = 'translateY(100%)';
         }
-        if (fab) {
+        if (isMobile() && fab) {
             fab.style.transform = 'translateY(100%)';
         }
     } else {
