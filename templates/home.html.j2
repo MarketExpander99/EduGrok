@@ -1,4 +1,4 @@
-<!-- home.html.j2 (updated: Added scroll-based hide/show functionality to the sticky header—slides out on scroll down (after 100px threshold) and slides back on scroll up. Added 'transition-transform duration-300 ease-in-out' class to header for smooth animation. Restored  icon to notifications button. Compatible with desktop and mobile via vanilla JS scroll listener.) -->
+<!-- home.html.j2 (updated: Changed template literal in displayedKey to string concatenation ('flash-displayed-' + messageId + '-' + index) to avoid potential parsing issues with backticks in older browsers or malformed rendering. This should resolve the Unexpected token '{' SyntaxError around line 690 in the rendered script.) -->
 {% extends "base.html.j2" %}{% block title %}Home - EduGrok{% endblock %}{% block content %}<div class="min-h-screen bg-grok-bg">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -8,9 +8,7 @@
                 </div>
             {% endfor %}
         {% endif %}
-    {% endwith %}
-
-<div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center sticky top-0 z-50 transition-transform duration-300 ease-in-out" id="sticky-header">
+    {% endwith %}<div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center sticky top-0 z-50 transition-transform duration-300 ease-in-out w-full left-0" id="sticky-header">
     <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
     <div class="flex items-center space-x-4">
         <div id="notifications-badge" class="relative">
@@ -36,94 +34,94 @@
         {% endif %}
     </div>
 
-    <div class="lg:col-span-1 space-y-4">
-        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-            <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
-            <div class="flex items-center mb-3">
-                <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
-                    {{ user.handle[0] | upper if user and user.handle else 'U' }}
-                </div>
-                <div>
-                    <p class="text-grok-text font-medium">{{ user.handle or session.email or 'User' }} (Grade {{ user.grade or 1 }})</p>
-                    <p class="text-grok-secondary text-sm">Star Coins: {{ user.star_coins or 0 }}</p>
-                    <p class="text-grok-secondary text-sm">Points: {{ user.points or 0 }}</p>
-                </div>
+<div class="lg:col-span-1 space-y-4">
+    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+        <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
+        <div class="flex items-center mb-3">
+            <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
+                {{ user.handle[0] | upper if user and user.handle else 'U' }}
             </div>
-            <a href="{{ url_for('profile') }}" class="text-grok-accent hover:underline text-sm">View Full Profile →</a>
+            <div>
+                <p class="text-grok-text font-medium">{{ user.handle or session.email or 'User' }} (Grade {{ user.grade or 1 }})</p>
+                <p class="text-grok-secondary text-sm">Star Coins: {{ user.star_coins or 0 }}</p>
+                <p class="text-grok-secondary text-sm">Points: {{ user.points or 0 }}</p>
+            </div>
         </div>
+        <a href="{{ url_for('profile') }}" class="text-grok-accent hover:underline text-sm">View Full Profile →</a>
+    </div>
 
-        {% include 'recent_test.html.j2' %}
+    {% include 'recent_test.html.j2' %}
 
-        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-            <h3 class="text-lg font-semibold text-grok-text mb-3">Progress</h3>
-            <p class="text-grok-text mb-1">Lessons Completed: {{ lessons_completed }}</p>
-            <p class="text-grok-text mb-1">Games Played: {{ games_played }}</p>
-            <p class="text-grok-text">Avg Test Score: {{ avg_score }}</p>
-        </div>
+    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+        <h3 class="text-lg font-semibold text-grok-text mb-3">Progress</h3>
+        <p class="text-grok-text mb-1">Lessons Completed: {{ lessons_completed }}</p>
+        <p class="text-grok-text mb-1">Games Played: {{ games_played }}</p>
+        <p class="text-grok-text">Avg Test Score: {{ avg_score }}</p>
+    </div>
 
-        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-            <h3 class="text-lg font-semibold text-grok-text mb-3">Badges</h3>
-            {% if badges %}
-                <div class="flex flex-wrap gap-2">
-                    {% for badge in badges %}
-                        <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-grok-secondary text-sm">No badges yet. Keep going!</p>
-            {% endif %}
-        </div>
-
-        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-            <h3 class="text-lg font-semibold text-grok-text mb-3">Recent Feedback</h3>
-            {% if feedbacks %}
-                {% for feedback in feedbacks %}
-                    <div class="mb-2 text-sm">
-                        <p class="text-grok-text"><strong>Rating:</strong> {{ feedback.rating }}/5</p>
-                        <p class="text-grok-secondary">{{ feedback.comments[:50] }}...</p>
-                        <p class="text-xs text-grok-secondary">{{ feedback.submitted_date[:10] }}</p>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p class="text-grok-secondary text-sm">No feedback yet. <a href="{{ url_for('feedback') }}" class="text-grok-accent hover:underline">Share yours</a></p>
-            {% endif %}
-        </div>
-
-        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-            <h3 class="text-lg font-semibold text-grok-text mb-3">Friends</h3>
-            <p class="text-grok-text">{{ friend_count }} connected</p>
-            <a href="#" class="text-grok-accent hover:underline text-sm">Find more →</a>
-        </div>
-
-        {% if feed_lessons %}
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Recommended Lessons</h3>
-                {% for lesson in feed_lessons %}
-                    {% set dummy_post = {
-                        'id': lesson.id,
-                        'type': 'lesson',
-                        'lesson': lesson,
-                        'handle': 'Recommended',
-                        'created_at': lesson.created_at or getattr(lesson, 'assigned_at', '') or '',
-                        'subject': lesson.subject or 'General',
-                        'grade': lesson.grade or (session.get('grade') if session else 1),
-                        'completed': getattr(lesson, 'completed', false),
-                        'is_new': false,
-                        'liked_by_user': false,
-                        'reposted_by_user': false,
-                        'views': 0,
-                        'likes': 0,
-                        'reposts': 0
-                    } %}
-                    <div id="post-{{ dummy_post.id }}" class="mb-4">
-                        {% set post = dummy_post %}
-                        {% include 'lesson_card.html.j2' %}
-                    </div>
+    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+        <h3 class="text-lg font-semibold text-grok-text mb-3">Badges</h3>
+        {% if badges %}
+            <div class="flex flex-wrap gap-2">
+                {% for badge in badges %}
+                    <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
                 {% endfor %}
             </div>
+        {% else %}
+            <p class="text-grok-secondary text-sm">No badges yet. Keep going!</p>
         {% endif %}
     </div>
+
+    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+        <h3 class="text-lg font-semibold text-grok-text mb-3">Recent Feedback</h3>
+        {% if feedbacks %}
+            {% for feedback in feedbacks %}
+                <div class="mb-2 text-sm">
+                    <p class="text-grok-text"><strong>Rating:</strong> {{ feedback.rating }}/5</p>
+                    <p class="text-grok-secondary">{{ feedback.comments[:50] }}...</p>
+                    <p class="text-xs text-grok-secondary">{{ feedback.submitted_date[:10] }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-grok-secondary text-sm">No feedback yet. <a href="{{ url_for('feedback') }}" class="text-grok-accent hover:underline">Share yours</a></p>
+        {% endif %}
+    </div>
+
+    <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+        <h3 class="text-lg font-semibold text-grok-text mb-3">Friends</h3>
+        <p class="text-grok-text">{{ friend_count }} connected</p>
+        <a href="#" class="text-grok-accent hover:underline text-sm">Find more →</a>
+    </div>
+
+    {% if feed_lessons %}
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Recommended Lessons</h3>
+            {% for lesson in feed_lessons %}
+                {% set dummy_post = {
+                    'id': lesson.id,
+                    'type': 'lesson',
+                    'lesson': lesson,
+                    'handle': 'Recommended',
+                    'created_at': lesson.created_at or getattr(lesson, 'assigned_at', '') or '',
+                    'subject': lesson.subject or 'General',
+                    'grade': lesson.grade or (session.get('grade') if session else 1),
+                    'completed': getattr(lesson, 'completed', false),
+                    'is_new': false,
+                    'liked_by_user': false,
+                    'reposted_by_user': false,
+                    'views': 0,
+                    'likes': 0,
+                    'reposts': 0
+                } %}
+                <div id="post-{{ dummy_post.id }}" class="mb-4">
+                    {% set post = dummy_post %}
+                    {% include 'lesson_card.html.j2' %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 </div></div>
+</div>
 
 {% include 'post_form.html.j2' %}<script>
 function fetchNotifications() {
@@ -147,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const flashMessages = document.querySelectorAll('[id^="flash-"]');
     flashMessages.forEach(function(msg, index) {
         const messageId = msg.getAttribute('data-message-id');
-        const displayedKey = `flash-displayed-${messageId}-${index}`;
+        const displayedKey = 'flash-displayed-' + messageId + '-' + index;
         if (localStorage.getItem(displayedKey)) {
             msg.style.display = 'none';
             return;
@@ -162,17 +160,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 
-    // Sticky header scroll hide/show
+    // Sticky header and bottom nav scroll hide/show (immediate on any scroll direction change)
     let lastScrollTop = 0;
     const header = document.getElementById('sticky-header');
-    window.addEventListener('scroll', () => {
+    const bottomNav = document.getElementById('bottom-nav');
+    window.addEventListener('scroll', function() {
         let st = window.pageYOffset || document.documentElement.scrollTop;
-        if (st > lastScrollTop && st > 100) {
-            // Scrolling down past threshold
+        if (st > lastScrollTop) {
+            // Scrolling down (mouse wheel down / touch down)
             header.style.transform = 'translateY(-100%)';
+            if (bottomNav) {
+                bottomNav.style.transform = 'translateY(100%)';
+            }
         } else {
-            // Scrolling up or at top
+            // Scrolling up (mouse wheel up / touch up)
             header.style.transform = 'translateY(0)';
+            if (bottomNav) {
+                bottomNav.style.transform = 'translateY(0)';
+            }
         }
         lastScrollTop = st <= 0 ? 0 : st;
     });

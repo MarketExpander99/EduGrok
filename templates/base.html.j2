@@ -1,4 +1,4 @@
-<!-- base.html.j2 (updated: Replaced desktop top nav with fixed left sidebar like X/Twitter; Sidebar hidden on mobile; Main content shifted right on desktop; Bottom nav only on mobile with scroll behavior; Notifications in both with shared badge logic) -->
+<!-- base.html.j2 (updated: Changed mobile bottom nav ID to 'bottom-nav' to match home.html.j2 script for consistent scroll hide/show behavior. Added badge span to mobile notifications with id='mobile-notif-count' and updated fetch script to set count on both sidebar and mobile badges for shared logic. Ensured initial show on load by explicitly removing 'translate-y-full' class in DOMContentLoaded.) -->
 <!DOCTYPE html>
 <html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% else %}astronaut-theme{% endif %}">
 <head>
@@ -71,100 +71,117 @@
         </div>
     </aside>
 
-    <!-- Main Content: Shifted right on desktop -->
-    <main class="ml-0 md:ml-64 pt-4 pb-20 md:pb-0 px-4 md:px-6">
-        {% block content %}{% endblock %}
-    </main>
+<!-- Main Content: Shifted right on desktop -->
+<main class="ml-0 md:ml-64 pt-4 pb-20 md:pb-0 px-4 md:px-6">
+    {% block content %}{% endblock %}
+</main>
 
-    <!-- Mobile Bottom Nav: Hides on scroll down, shows on scroll up (desktop hidden) -->
-    <nav id="mobile-bottom-nav" class="fixed bottom-0 left-0 right-0 bg-grok-surface border-t border-grok-border z-40 md:hidden transition-transform duration-300 ease-in-out translate-y-0">
-        <div class="flex justify-around p-3">
-            <a href="/home" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-home text-xl"></i>
-                <span class="text-xs">Feed</span>
-            </a>
-            <a href="/lessons" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-book text-xl"></i>
-                <span class="text-xs">Lessons</span>
-            </a>
-            <a href="/games" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-gamepad text-xl"></i>
-                <span class="text-xs">Games</span>
-            </a>
-            <a href="/parent_dashboard" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-tachometer-alt text-xl"></i>
-                <span class="text-xs">Dashboard</span>
-            </a>
-            <a href="#" onclick="markReadAndGoHome(); return false;" class="flex flex-col items-center relative p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-bell text-xl"></i>
-                <span class="text-xs">Notifications</span>
-            </a>
-            <a href="/profile" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-                <i class="fas fa-user text-xl"></i>
-                <span class="text-xs">Profile</span>
-            </a>
-        </div>
-    </nav>
+<!-- Mobile Bottom Nav: Hides on scroll down, shows on scroll up (desktop hidden) -->
+<nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-grok-surface border-t border-grok-border z-40 md:hidden transition-transform duration-300 ease-in-out translate-y-0">
+    <div class="flex justify-around p-3">
+        <a href="/home" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-home text-xl"></i>
+            <span class="text-xs">Feed</span>
+        </a>
+        <a href="/lessons" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-book text-xl"></i>
+            <span class="text-xs">Lessons</span>
+        </a>
+        <a href="/games" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-gamepad text-xl"></i>
+            <span class="text-xs">Games</span>
+        </a>
+        <a href="/parent_dashboard" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-tachometer-alt text-xl"></i>
+            <span class="text-xs">Dashboard</span>
+        </a>
+        <a href="#" onclick="markReadAndGoHome(); return false;" class="flex flex-col items-center relative p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-bell text-xl"></i>
+            <span class="text-xs">Notifications</span>
+            <span id="mobile-notif-count" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs px-1 py-0 min-w-[18px] hidden">0</span>
+        </a>
+        <a href="/profile" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
+            <i class="fas fa-user text-xl"></i>
+            <span class="text-xs">Profile</span>
+        </a>
+    </div>
+</nav>
 
-    <script>
-        // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
-        let lastScrollTop = 0;
-        let ticking = false;
-        const mobileBottomNav = document.getElementById('mobile-bottom-nav');
+<script>
+    // Ensure bottom nav shows initially
+    document.addEventListener('DOMContentLoaded', function() {
+        const bottomNav = document.getElementById('bottom-nav');
+        if (bottomNav) {
+            bottomNav.classList.remove('translate-y-full');
+        }
+    });
 
-        function updateNavPosition() {
-            let st = window.pageYOffset || document.documentElement.scrollTop;
-            const isScrollingDown = st > lastScrollTop;
+    // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
+    let lastScrollTop = 0;
+    let ticking = false;
+    const bottomNav = document.getElementById('bottom-nav');
 
-            // Mobile bottom nav: hide on down, show on up
-            if (mobileBottomNav) {
-                if (isScrollingDown) {
-                    mobileBottomNav.classList.add('translate-y-full');
-                } else {
-                    mobileBottomNav.classList.remove('translate-y-full');
-                }
+    function updateNavPosition() {
+        let st = window.pageYOffset || document.documentElement.scrollTop;
+        const isScrollingDown = st > lastScrollTop;
+
+        // Mobile bottom nav: hide on down, show on up
+        if (bottomNav) {
+            if (isScrollingDown) {
+                bottomNav.classList.add('translate-y-full');
+            } else {
+                bottomNav.classList.remove('translate-y-full');
             }
-
-            lastScrollTop = st <= 0 ? 0 : st;
-            ticking = false;
         }
 
-        window.addEventListener('scroll', () => {
-            if (!ticking) {
-                requestAnimationFrame(updateNavPosition);
-                ticking = true;
-            }
-        });
+        lastScrollTop = st <= 0 ? 0 : st;
+        ticking = false;
+    }
 
-        // Initial check on load
-        updateNavPosition();
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            requestAnimationFrame(updateNavPosition);
+            ticking = true;
+        }
+    });
 
-        // Fetch and display notifications count (shared for sidebar and bottom nav)
-        if ('{{ 'user_id' in session }}' === 'True') {
-            fetch('/api/notifications_count')
-                .then(response => response.json())
-                .then(data => {
-                    const countEl = document.getElementById('notif-count');
-                    if (data.count > 0) {
-                        countEl.textContent = data.count;
+    // Initial check on load
+    updateNavPosition();
+
+    // Fetch and display notifications count (shared for sidebar and bottom nav)
+    if ('{{ 'user_id' in session }}' === 'True') {
+        fetch('/api/notifications_count')
+            .then(response => response.json())
+            .then(data => {
+                const countEl = document.getElementById('notif-count');
+                const mobileCountEl = document.getElementById('mobile-notif-count');
+                const count = data.count;
+                if (count > 0) {
+                    if (countEl) {
+                        countEl.textContent = count;
                         countEl.classList.remove('hidden');
                     }
-                })
-                .catch(error => console.error('Error fetching notifications count:', error));
-        }
+                    if (mobileCountEl) {
+                        mobileCountEl.textContent = count;
+                        mobileCountEl.classList.remove('hidden');
+                    }
+                }
+            })
+            .catch(error => console.error('Error fetching notifications count:', error));
+    }
 
-        // Mark notifications as read and go to home
-        function markReadAndGoHome() {
-            fetch('/api/mark_notifications_read', { method: 'POST' })
-                .then(() => {
-                    window.location.href = '/home?highlight_first=true';
-                })
-                .catch(error => {
-                    console.error('Error marking notifications read:', error);
-                    window.location.href = '/home?highlight_first=true'; // Proceed anyway
-                });
-        }
-    </script>
-    {% block scripts %}{% endblock %}
-</body>
+    // Mark notifications as read and go to home
+    function markReadAndGoHome() {
+        fetch('/api/mark_notifications_read', { method: 'POST' })
+            .then(() => {
+                window.location.href = '/home?highlight_first=true';
+            })
+            .catch(error => {
+                console.error('Error marking notifications read:', error);
+                window.location.href = '/home?highlight_first=true'; // Proceed anyway
+            });
+    }
+</script>
+{% block scripts %}{% endblock %}</body>
 </html>
+
