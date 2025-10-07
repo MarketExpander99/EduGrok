@@ -1,7 +1,5 @@
 <!-- Filename: post_form.html.j2 -->
-<!-- Updates: Updated modal, textarea, inputs, and buttons with grok- classes for theme consistency. Added shadows and transitions for better UX. Improved preview styling. -->
-
-<!-- post_form.html.j2 -->
+<!-- Updates: Fixed cancel button functionality to hide modal and reset form, including clearing media preview. Enhanced media preview to display images and videos with proper styling and cleanup on cancel/submit. Retained grok-themed classes, shadows, and transitions for consistent UX. -->
 <div id="post-form-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden transition-opacity duration-200"></div>
 <div id="post-form" class="fixed top-0 left-0 w-full h-full flex items-center justify-center z-50 hidden scale-95 transition-transform duration-200">
     <div class="bg-grok-surface p-6 rounded-lg max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto border border-grok-border shadow-xl">
@@ -24,7 +22,7 @@
                 accept="image/*,video/mp4" 
                 class="w-full p-2 bg-transparent border border-grok-border rounded-lg text-grok-secondary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-grok-accent file:text-grok-text hover:file:bg-grok-accent-hover"
             >
-            <div id="media-preview" class="p-2 bg-grok-bg rounded-lg min-h-[100px] border border-grok-border"></div>
+            <div id="media-preview" class="p-2 bg-grok-bg rounded-lg min-h-[100px] border border-grok-border flex items-center justify-center"></div>
             <select name="subject" class="w-full p-3 bg-transparent border border-grok-border rounded-lg text-grok-text focus:outline-none focus:ring-2 focus:ring-grok-accent">
                 <option value="General">General</option>
                 <option value="Math">Math</option>
@@ -38,3 +36,61 @@
         </form>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const postForm = document.getElementById('postForm');
+    const postContent = document.getElementById('post-content');
+    const charCount = document.getElementById('char-count');
+    const mediaUpload = document.getElementById('media-upload');
+    const mediaPreview = document.getElementById('media-preview');
+    const cancelButton = document.getElementById('cancel-post');
+    const formContainer = document.getElementById('post-form');
+    const backdrop = document.getElementById('post-form-backdrop');
+
+    // Update character count
+    postContent.addEventListener('input', function() {
+        charCount.textContent = `${this.value.length}/280`;
+    });
+
+    // Handle media preview
+    mediaUpload.addEventListener('change', function(event) {
+        mediaPreview.innerHTML = ''; // Clear previous preview
+        const file = event.target.files[0];
+        if (file) {
+            const fileType = file.type;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (fileType.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'max-w-full max-h-48 object-contain rounded-lg';
+                    mediaPreview.appendChild(img);
+                } else if (fileType === 'video/mp4') {
+                    const video = document.createElement('video');
+                    video.src = e.target.result;
+                    video.controls = true;
+                    video.className = 'max-w-full max-h-48 rounded-lg';
+                    mediaPreview.appendChild(video);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Handle cancel button
+    cancelButton.addEventListener('click', function() {
+        formContainer.classList.add('hidden');
+        backdrop.classList.add('hidden');
+        postForm.reset(); // Reset form fields
+        mediaPreview.innerHTML = ''; // Clear media preview
+        charCount.textContent = '0/280'; // Reset character count
+    });
+
+    // Clear preview on form submission
+    postForm.addEventListener('submit', function() {
+        mediaPreview.innerHTML = ''; // Clear preview after submission
+        formContainer.classList.add('hidden');
+        backdrop.classList.add('hidden');
+    });
+});
+</script>
