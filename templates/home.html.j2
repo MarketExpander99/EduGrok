@@ -1,5 +1,5 @@
 <!-- Filename: home.html.j2 -->
-<!-- home.html.j2 (updated: Enhanced FAB scroll behavior to include smooth opacity transition with visibility: hidden on scroll down and visibility: visible on scroll up in mobile mode (<768px), mimicking X social media app. Desktop (≥768px) FAB remains always visible. Retained 'Create Post' text on desktop and '+' on mobile with Tailwind classes. Preserved responsive positioning.) -->
+<!-- Updates: Adjusted FAB positioning on desktop (≥768px) to bottom-4 right-4 for a snug fit in the bottom-right corner. Enhanced sorting functionality to ensure feed updates with selected sort order (latest, most_views, most_likes) by reloading page with correct query parameter. Retained smooth FAB visibility transition on mobile and 'Create Post' text on desktop/+ on mobile. -->
 {% extends "base.html.j2" %}
 {% block title %}Home - EduGrok{% endblock %}
 {% block content %}
@@ -21,7 +21,7 @@
                     <button onclick="fetchNotifications()" class="text-grok-secondary hover:text-grok-accent"><i class="fas fa-bell"></i></button>
                     <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1 min-w-[18px] hidden">{{ notifications_count or 0 }}</span>
                 </div>
-                <select onchange="window.location.href='?sort='+this.value" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1">
+                <select id="sort-select" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1">
                     <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
                     <option value="most_views" {% if sort == 'most_views' %}selected{% endif %}>Most Views</option>
                     <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Likes</option>
@@ -123,7 +123,7 @@
 </div>
 
 <!-- FAB for new posts -->
-<div id="fab" class="fixed bottom-20 right-4 z-[60] transition-all duration-300 ease-in-out md:bottom-20 sm:bottom-16">
+<div id="fab" class="fixed bottom-16 right-4 z-[60] transition-all duration-300 ease-in-out md:bottom-4 md:right-4">
     <button onclick="openPostModal()" class="bg-grok-accent text-grok-text rounded-full flex items-center justify-center hover:bg-grok-accent-hover transition shadow-lg w-12 h-12 md:w-auto md:px-4 md:h-10">
         <span class="block md:hidden text-xl">+</span>
         <span class="hidden md:block text-sm font-semibold">Create Post</span>
@@ -197,6 +197,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         lastScrollTop = st <= 0 ? 0 : st;
+    });
+    // Handle sort selection
+    const sortSelect = document.getElementById('sort-select');
+    sortSelect.addEventListener('change', function() {
+        const sortValue = this.value;
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('sort', sortValue);
+        window.location.href = currentUrl.toString();
     });
 });
 </script>
