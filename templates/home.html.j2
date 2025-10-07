@@ -1,139 +1,131 @@
-<!-- home.html.j2 (updated: Added flash messages display at the top for better error visibility. Used Tailwind classes for alert styling consistent with grok- theme. Placed before the grid to ensure visibility.) -->
-{% extends "base.html.j2" %}
-
-{% block title %}Home - EduGrok{% endblock %}
-
-{% block content %}
-<div class="min-h-screen bg-grok-bg">
+<!-- home.html.j2 (updated: Added auto-hide functionality for flash messages with 5-second timeout and localStorage flagging to prevent re-display on reload. Added 'sticky top-0 z-50' classes to the header div for floating behavior on scroll, compatible with mobile and desktop via Tailwind.) -->
+{% extends "base.html.j2" %}{% block title %}Home - EduGrok{% endblock %}{% block content %}<div class="min-h-screen bg-grok-bg">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="mb-4 p-4 rounded-lg border {% if category == 'error' %}border-red-400 bg-red-50 text-red-700{% elif category == 'success' %}border-green-400 bg-green-50 text-green-700{% else %}border-blue-400 bg-blue-50 text-blue-700{% endif %}">
+                <div class="mb-4 p-4 rounded-lg border {% if category == 'error' %}border-red-400 bg-red-50 text-red-700{% elif category == 'success' %}border-green-400 bg-green-50 text-green-700{% else %}border-blue-400 bg-blue-50 text-blue-700{% endif %}" data-message-id="{{ message | e }}" id="flash-{{ loop.index }}">
                     {{ message }}
                 </div>
             {% endfor %}
         {% endif %}
     {% endwith %}
 
-    <div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
-        <div class="flex items-center space-x-4">
-            <div id="notifications-badge" class="relative">
-                <button onclick="fetchNotifications()" class="text-grok-secondary hover:text-grok-accent">🔔</button>
-                <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1 min-w-[18px] hidden">{{ notifications_count or 0 }}</span>
-            </div>
-            <select onchange="window.location.href='?sort='+this.value" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1">
-                <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
-                <option value="most_views" {% if sort == 'most_views' %}selected{% endif %}>Most Views</option>
-                <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Likes</option>
-            </select>
-            <button onclick="openPostModal()" class="bg-grok-accent text-grok-text px-4 py-2 rounded-lg hover:bg-grok-accent-hover transition shadow-md">+</button>
+<div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center sticky top-0 z-50">
+    <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
+    <div class="flex items-center space-x-4">
+        <div id="notifications-badge" class="relative">
+            <button onclick="fetchNotifications()" class="text-grok-secondary hover:text-grok-accent"></button>
+            <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1 min-w-[18px] hidden">{{ notifications_count or 0 }}</span>
         </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 max-w-7xl mx-auto">
-        <div class="lg:col-span-2">
-            {% include 'posts.html.j2' %}
-            {% if not posts %}
-                <div class="text-center py-8 text-grok-secondary">
-                    <p>No posts yet. Create one above!</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <div class="lg:col-span-1 space-y-4">
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
-                <div class="flex items-center mb-3">
-                    <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
-                        {{ user.handle[0] | upper if user and user.handle else 'U' }}
-                    </div>
-                    <div>
-                        <p class="text-grok-text font-medium">{{ user.handle or session.email or 'User' }} (Grade {{ user.grade or 1 }})</p>
-                        <p class="text-grok-secondary text-sm">Star Coins: {{ user.star_coins or 0 }}</p>
-                        <p class="text-grok-secondary text-sm">Points: {{ user.points or 0 }}</p>
-                    </div>
-                </div>
-                <a href="{{ url_for('profile') }}" class="text-grok-accent hover:underline text-sm">View Full Profile →</a>
-            </div>
-
-            {% include 'recent_test.html.j2' %}
-
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Progress</h3>
-                <p class="text-grok-text mb-1">Lessons Completed: {{ lessons_completed }}</p>
-                <p class="text-grok-text mb-1">Games Played: {{ games_played }}</p>
-                <p class="text-grok-text">Avg Test Score: {{ avg_score }}</p>
-            </div>
-
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Badges</h3>
-                {% if badges %}
-                    <div class="flex flex-wrap gap-2">
-                        {% for badge in badges %}
-                            <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-grok-secondary text-sm">No badges yet. Keep going!</p>
-                {% endif %}
-            </div>
-
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Recent Feedback</h3>
-                {% if feedbacks %}
-                    {% for feedback in feedbacks %}
-                        <div class="mb-2 text-sm">
-                            <p class="text-grok-text"><strong>Rating:</strong> {{ feedback.rating }}/5</p>
-                            <p class="text-grok-secondary">{{ feedback.comments[:50] }}...</p>
-                            <p class="text-xs text-grok-secondary">{{ feedback.submitted_date[:10] }}</p>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-grok-secondary text-sm">No feedback yet. <a href="{{ url_for('feedback') }}" class="text-grok-accent hover:underline">Share yours</a></p>
-                {% endif %}
-            </div>
-
-            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                <h3 class="text-lg font-semibold text-grok-text mb-3">Friends</h3>
-                <p class="text-grok-text">{{ friend_count }} connected</p>
-                <a href="#" class="text-grok-accent hover:underline text-sm">Find more →</a>
-            </div>
-
-            {% if feed_lessons %}
-                <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
-                    <h3 class="text-lg font-semibold text-grok-text mb-3">Recommended Lessons</h3>
-                    {% for lesson in feed_lessons %}
-                        {% set dummy_post = {
-                            'id': lesson.id,
-                            'type': 'lesson',
-                            'lesson': lesson,
-                            'handle': 'Recommended',
-                            'created_at': lesson.created_at or getattr(lesson, 'assigned_at', '') or '',
-                            'subject': lesson.subject or 'General',
-                            'grade': lesson.grade or (session.get('grade') if session else 1),
-                            'completed': getattr(lesson, 'completed', false),
-                            'is_new': false,
-                            'liked_by_user': false,
-                            'reposted_by_user': false,
-                            'views': 0,
-                            'likes': 0,
-                            'reposts': 0
-                        } %}
-                        <div id="post-{{ dummy_post.id }}" class="mb-4">
-                            {% set post = dummy_post %}
-                            {% include 'lesson_card.html.j2' %}
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </div>
+        <select onchange="window.location.href='?sort='+this.value" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1">
+            <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
+            <option value="most_views" {% if sort == 'most_views' %}selected{% endif %}>Most Views</option>
+            <option value="most_likes" {% if sort == 'most_likes' %}selected{% endif %}>Most Likes</option>
+        </select>
+        <button onclick="openPostModal()" class="bg-grok-accent text-grok-text px-4 py-2 rounded-lg hover:bg-grok-accent-hover transition shadow-md">+</button>
     </div>
 </div>
 
-{% include 'post_form.html.j2' %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 max-w-7xl mx-auto">
+    <div class="lg:col-span-2">
+        {% include 'posts.html.j2' %}
+        {% if not posts %}
+            <div class="text-center py-8 text-grok-secondary">
+                <p>No posts yet. Create one above!</p>
+            </div>
+        {% endif %}
+    </div>
 
-<script>
+    <div class="lg:col-span-1 space-y-4">
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
+            <div class="flex items-center mb-3">
+                <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
+                    {{ user.handle[0] | upper if user and user.handle else 'U' }}
+                </div>
+                <div>
+                    <p class="text-grok-text font-medium">{{ user.handle or session.email or 'User' }} (Grade {{ user.grade or 1 }})</p>
+                    <p class="text-grok-secondary text-sm">Star Coins: {{ user.star_coins or 0 }}</p>
+                    <p class="text-grok-secondary text-sm">Points: {{ user.points or 0 }}</p>
+                </div>
+            </div>
+            <a href="{{ url_for('profile') }}" class="text-grok-accent hover:underline text-sm">View Full Profile →</a>
+        </div>
+
+        {% include 'recent_test.html.j2' %}
+
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Progress</h3>
+            <p class="text-grok-text mb-1">Lessons Completed: {{ lessons_completed }}</p>
+            <p class="text-grok-text mb-1">Games Played: {{ games_played }}</p>
+            <p class="text-grok-text">Avg Test Score: {{ avg_score }}</p>
+        </div>
+
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Badges</h3>
+            {% if badges %}
+                <div class="flex flex-wrap gap-2">
+                    {% for badge in badges %}
+                        <span class="bg-yellow-900/50 text-yellow-100 px-3 py-1 rounded-full text-sm font-medium shadow-sm">{{ badge.badge_name }} ({{ badge.awarded_date[:10] }})</span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-grok-secondary text-sm">No badges yet. Keep going!</p>
+            {% endif %}
+        </div>
+
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Recent Feedback</h3>
+            {% if feedbacks %}
+                {% for feedback in feedbacks %}
+                    <div class="mb-2 text-sm">
+                        <p class="text-grok-text"><strong>Rating:</strong> {{ feedback.rating }}/5</p>
+                        <p class="text-grok-secondary">{{ feedback.comments[:50] }}...</p>
+                        <p class="text-xs text-grok-secondary">{{ feedback.submitted_date[:10] }}</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-grok-secondary text-sm">No feedback yet. <a href="{{ url_for('feedback') }}" class="text-grok-accent hover:underline">Share yours</a></p>
+            {% endif %}
+        </div>
+
+        <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-3">Friends</h3>
+            <p class="text-grok-text">{{ friend_count }} connected</p>
+            <a href="#" class="text-grok-accent hover:underline text-sm">Find more →</a>
+        </div>
+
+        {% if feed_lessons %}
+            <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
+                <h3 class="text-lg font-semibold text-grok-text mb-3">Recommended Lessons</h3>
+                {% for lesson in feed_lessons %}
+                    {% set dummy_post = {
+                        'id': lesson.id,
+                        'type': 'lesson',
+                        'lesson': lesson,
+                        'handle': 'Recommended',
+                        'created_at': lesson.created_at or getattr(lesson, 'assigned_at', '') or '',
+                        'subject': lesson.subject or 'General',
+                        'grade': lesson.grade or (session.get('grade') if session else 1),
+                        'completed': getattr(lesson, 'completed', false),
+                        'is_new': false,
+                        'liked_by_user': false,
+                        'reposted_by_user': false,
+                        'views': 0,
+                        'likes': 0,
+                        'reposts': 0
+                    } %}
+                    <div id="post-{{ dummy_post.id }}" class="mb-4">
+                        {% set post = dummy_post %}
+                        {% include 'lesson_card.html.j2' %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</div></div>
+
+{% include 'post_form.html.j2' %}<script>
 function fetchNotifications() {
     fetch('/api/notifications_count')
         .then(r => r.json())
@@ -149,5 +141,27 @@ function openPostModal() {
     document.getElementById('post-form').classList.remove('hidden');
     document.getElementById('post-form-backdrop').classList.remove('hidden');
 }
+
+// Auto-hide flash messages
+document.addEventListener('DOMContentLoaded', function() {
+    const flashMessages = document.querySelectorAll('[id^="flash-"]');
+    flashMessages.forEach(function(msg, index) {
+        const messageId = msg.getAttribute('data-message-id');
+        const displayedKey = `flash-displayed-${messageId}-${index}`;
+        if (localStorage.getItem(displayedKey)) {
+            msg.style.display = 'none';
+            return;
+        }
+        setTimeout(function() {
+            msg.style.opacity = '0';
+            msg.style.transition = 'opacity 0.5s ease-out';
+            setTimeout(function() {
+                msg.style.display = 'none';
+                localStorage.setItem(displayedKey, 'true');
+            }, 500);
+        }, 5000);
+    });
+});
 </script>
 {% endblock %}
+
