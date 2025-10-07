@@ -1,4 +1,4 @@
-<!-- home.html.j2 (updated: Added auto-hide functionality for flash messages with 5-second timeout and localStorage flagging to prevent re-display on reload. Added 'sticky top-0 z-50' classes to the header div for floating behavior on scroll, compatible with mobile and desktop via Tailwind.) -->
+<!-- home.html.j2 (updated: Added scroll-based hide/show functionality to the sticky header—slides out on scroll down (after 100px threshold) and slides back on scroll up. Added 'transition-transform duration-300 ease-in-out' class to header for smooth animation. Restored  icon to notifications button. Compatible with desktop and mobile via vanilla JS scroll listener.) -->
 {% extends "base.html.j2" %}{% block title %}Home - EduGrok{% endblock %}{% block content %}<div class="min-h-screen bg-grok-bg">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -10,7 +10,7 @@
         {% endif %}
     {% endwith %}
 
-<div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center sticky top-0 z-50">
+<div class="bg-grok-surface border-b border-grok-border p-4 flex justify-between items-center sticky top-0 z-50 transition-transform duration-300 ease-in-out" id="sticky-header">
     <h1 class="text-2xl font-bold text-grok-text">Home Feed</h1>
     <div class="flex items-center space-x-4">
         <div id="notifications-badge" class="relative">
@@ -160,6 +160,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(displayedKey, 'true');
             }, 500);
         }, 5000);
+    });
+
+    // Sticky header scroll hide/show
+    let lastScrollTop = 0;
+    const header = document.getElementById('sticky-header');
+    window.addEventListener('scroll', () => {
+        let st = window.pageYOffset || document.documentElement.scrollTop;
+        if (st > lastScrollTop && st > 100) {
+            // Scrolling down past threshold
+            header.style.transform = 'translateY(-100%)';
+        } else {
+            // Scrolling up or at top
+            header.style.transform = 'translateY(0)';
+        }
+        lastScrollTop = st <= 0 ? 0 : st;
     });
 });
 </script>
