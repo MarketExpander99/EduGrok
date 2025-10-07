@@ -1,5 +1,5 @@
 <!-- Filename: home.html.j2 -->
-<!-- Updates: Adjusted FAB positioning on desktop (≥768px) to bottom-4 right-4 for a snug fit in the bottom-right corner. Enhanced sorting functionality to ensure feed updates with selected sort order (latest, most_views, most_likes) by reloading page with correct query parameter. Retained smooth FAB visibility transition on mobile and 'Create Post' text on desktop/+ on mobile. -->
+<!-- Updates: Fixed sorting for 'most_likes' and 'latest'. Added secondary sort by created_at for 'most_likes' ties. Improved created_at parsing for 'latest' with robust selector and debug logging. Ensured only #posts-container post cards are sorted. Retained working 'most_views' logic, FAB, notifications, and sticky header functionality. -->
 {% extends "base.html.j2" %}
 {% block title %}Home - EduGrok{% endblock %}
 {% block content %}
@@ -30,7 +30,7 @@
         </div>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 max-w-7xl mx-auto">
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-2" id="posts-container">
             {% include 'posts.html.j2' %}
             {% if not posts %}
                 <div class="text-center py-8 text-grok-secondary">
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
         }, 5000);
     });
-    // Sticky header and bottom nav scroll hide/show (immediate on any scroll direction change)
+    // Sticky header and bottom nav scroll hide/show
     let lastScrollTop = 0;
     const header = document.getElementById('sticky-header');
     const bottomNav = document.getElementById('bottom-nav');
@@ -174,7 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', function() {
         let st = window.pageYOffset || document.documentElement.scrollTop;
         if (st > lastScrollTop) {
-            // Scrolling down (mouse wheel down / touch down)
             header.style.transform = 'translateY(-100%)';
             if (bottomNav) {
                 bottomNav.style.transform = 'translateY(100%)';
@@ -185,7 +184,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 fab.style.transition = 'opacity 0.3s ease-in-out, visibility 0.3s ease-in-out';
             }
         } else {
-            // Scrolling up (mouse wheel up / touch up)
             header.style.transform = 'translateY(0)';
             if (bottomNav) {
                 bottomNav.style.transform = 'translateY(0)';
@@ -198,14 +196,58 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         lastScrollTop = st <= 0 ? 0 : st;
     });
-    // Handle sort selection
+    // Handle sort selection with client-side sorting
     const sortSelect = document.getElementById('sort-select');
+    const postsContainer = document.getElementById('posts-container');
+    function sortPosts(sortValue) {
+        const posts = Array.from(postsContainer.querySelectorAll('[id^="post-"]'));
+        posts.sort((a, b) => {
+            try {
+                if (sortValue === 'most_likes') {
+                    const likesA = parseInt(a.querySelector('.flex.flex-wrap.gap-2 span:nth-child(2)')?.textContent.match(/Likes: (\d+)/)?.[1] || 0);
+                    const likesB = parseInt(b.querySelector('.flex.flex-wrap.gap-2 span:nth-child(2)')?.textContent.match(/Likes: (\d+)/)?.[1] || 0);
+                    console.log(`Likes A: ${likesA} (post-${a.id}), Likes B: ${likesB} (post-${b.id})`);
+                    if (likesA !== likesB) return likesB - likesA; // Primary: Descending by likes
+                    // Secondary: Latest first if likes are tied
+                    const dateA = new Date(a.querySelector('.flex.items-center.mb-3 p.text-grok-secondary.text-xs')?.textContent || '1970-01-01');
+                    const dateB = new Date(b.querySelector('.flex.items-center.mb-3 p.text-grok-secondary.text-xs')?.textContent || '1970-01-01');
+                    console.log(`Date A: ${dateA} (post-${a.id}), Date B: ${dateB} (post-${b.id})`);
+                    return dateB - dateA;
+                } else if (sortValue === 'most_views') {
+                    const viewsA = parseInt(a.querySelector('.flex.items-center.text-grok-secondary.text-xs')?.textContent.match(/(\d+) views/)?.[1] || 0);
+                    const viewsB = parseInt(b.querySelector('.flex.items-center.text-grok-secondary.text-xs')?.textContent.match(/(\d+) views/)?.[1] || 0);
+                    console.log(`Views A: ${viewsA} (post-${a.id}), Views B: ${viewsB} (post-${b.id})`);
+                    return viewsB - viewsA; // Descending by views
+                } else {
+                    const dateA = new Date(a.querySelector('.flex.items-center.mb-3 p.text-grok-secondary.text-xs')?.textContent || '1970-01-01');
+                    const dateB = new Date(b.querySelector('.flex.items-center.mb-3 p.text-grok-secondary.text-xs')?.textContent || '1970-01-01');
+                    console.log(`Date A: ${dateA} (post-${a.id}), Date B: ${dateB} (post-${b.id})`);
+                    if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+                        console.error(`Invalid date for post-${a.id}: ${dateA}, post-${b.id}: ${dateB}`);
+                        return 0; // Maintain order if dates are invalid
+                    }
+                    return dateB - dateA; // Descending by date (latest first)
+                }
+            } catch (e) {
+                console.error('Sorting error:', e);
+                return 0; // Maintain order if parsing fails
+            }
+        });
+        postsContainer.innerHTML = ''; // Clear container
+        posts.forEach(post => postsContainer.appendChild(post)); // Re-append sorted posts
+    }
     sortSelect.addEventListener('change', function() {
         const sortValue = this.value;
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('sort', sortValue);
         window.location.href = currentUrl.toString();
+        sortPosts(sortValue); // Apply client-side sorting immediately
     });
+    // Apply initial sorting based on URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialSort = urlParams.get('sort') || 'latest';
+    sortSelect.value = initialSort;
+    sortPosts(initialSort);
 });
 </script>
 {% endblock %}
