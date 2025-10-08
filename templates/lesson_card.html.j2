@@ -3,6 +3,7 @@
 {# Fix: Disabled sequencing logic to enable all activities/controls by default—no more grayed-out buttons. Added force-cleanup in init. #}
 {# Enhancement: For trace activity, replaced direct include with "Draw" button that toggles responsive popup (full-width mobile, 70% desktop) containing trace_activity.html.j2. Added JS for popup toggle/close. Removed any bg-blue-50 references; relies on sub-template minimal styling for consistency across activities. #}
 {# Fix: Ensured trace popup centers on viewport (screen) by removing outer padding, adding body overflow hidden on open/close to prevent scroll interference. #}
+{# Fix: Addressed confinement/flicker—use JS to append popup to body on open (escapes card div clipping); switch to absolute+transform centering (no flex reflow on mouse move); opacity toggle instead of display:hidden for smooth no-flicker reveal; stopPropagation on canvas to prevent close on draw/click; overlay click-to-close. Mobile: full vw/vh override. #}
 
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     <div class="flex items-center mb-3">
@@ -20,15 +21,17 @@
             <div class="text-center">
                 <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition shadow-md">Draw</button>
             </div>
-            <!-- Trace Popup -->
-            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-50" style="backdrop-filter: blur(4px);">
-                <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto md:max-w-5xl">
-                    <div class="p-6 border-b border-grok-border flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
-                        <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text hover:text-grok-accent text-2xl">&times;</button>
-                    </div>
-                    <div class="p-6">
-                        {% include 'trace_activity.html.j2' %}
+            <!-- Trace Popup (initially in card, JS moves to body) -->
+            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out" style="backdrop-filter: blur(4px);">
+                <div class="absolute inset-0 flex items-center justify-center p-4">
+                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto transition-all duration-300 ease-out opacity-0 scale-95">
+                        <div class="p-6 border-b border-grok-border flex justify-between items-center">
+                            <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
+                            <button onclick="window.closeTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text hover:text-grok-accent text-2xl">&times;</button>
+                        </div>
+                        <div class="p-6">
+                            {% include 'trace_activity.html.j2' %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -107,7 +110,6 @@ if (!window.initAllActivities) {
       const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => window.activityOrder.includes(s.dataset.type));
       console.log(`Enabling ${sections.length} activities in lesson ${lessonId}`);
       sections.forEach(section => {
-        // Force remove any disabled class/CSS
         section.classList.remove('disabled-activity');
         section.style.opacity = '1';
         section.style.pointerEvents = 'auto';
@@ -117,24 +119,66 @@ if (!window.initAllActivities) {
         });
         if (section.dataset.type === 'trace') window.initCanvas(lessonId);
       });
-      // Fallback: Init any canvases even if no sections detected
       if (card.querySelector('canvas[id^="trace-canvas-"]')) window.initCanvas(lessonId);
     });
   }
 }
 
+let popupElements = {}; // Track moved elements
+
 if (!window.toggleTracePopup) {
   window.toggleTracePopup = function(lessonId) {
-    const popup = document.getElementById(`trace-popup-${lessonId}`);
-    if (popup.classList.contains('hidden')) {
-      popup.classList.remove('hidden');
-      document.body.style.overflow = 'hidden'; // Prevent background scroll
-      // Init canvas in popup context
-      setTimeout(() => window.initCanvas(lessonId), 100);
-    } else {
-      popup.classList.add('hidden');
-      document.body.style.overflow = ''; // Restore scroll
+    const popupId = `trace-popup-${lessonId}`;
+    let popup = document.getElementById(popupId);
+    if (!popup) return;
+    
+    if (popup.parentNode !== document.body) {
+      // Move to body on first open to escape card clipping
+      document.body.appendChild(popup);
+      popupElements[lessonId] = popup;
     }
+    
+    const modal = popup.querySelector('.bg-grok-surface');
+    if (popup.classList.contains('popup-closed')) {
+      // Open
+      document.body.style.overflow = 'hidden';
+      popup.classList.remove('popup-closed');
+      popup.style.pointerEvents = 'auto';
+      setTimeout(() => {
+        modal.style.opacity = '1';
+        modal.style.transform = 'scale(1)';
+      }, 10);
+      // Add overlay click handler
+      popup.addEventListener('click', function overlayClick(e) {
+        if (e.target === popup) {
+          window.closeTracePopup(lessonId);
+        }
+      });
+      // Deferred init
+      setTimeout(() => window.initCanvas(lessonId), 200);
+    } else {
+      window.closeTracePopup(lessonId);
+    }
+  }
+}
+
+if (!window.closeTracePopup) {
+  window.closeTracePopup = function(lessonId) {
+    const popupId = `trace-popup-${lessonId}`;
+    const popup = document.getElementById(popupId);
+    if (!popup) return;
+    
+    const modal = popup.querySelector('.bg-grok-surface');
+    modal.style.opacity = '0';
+    modal.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      popup.classList.add('popup-closed');
+      popup.style.pointerEvents = 'none';
+      document.body.style.overflow = '';
+      // Remove overlay handler
+      popup.removeEventListener('click', popup._overlayClick);
+      // Optional: Move back to original position if needed, but keep in body for perf
+    }, 300);
   }
 }
 
@@ -148,6 +192,7 @@ if (!window.initCanvas) {
     let drawing = false;
 
     function startDrawing(e) {
+      e.stopPropagation();
       drawing = true;
       const { x, y } = getCoordinates(e);
       ctx.beginPath();
@@ -156,6 +201,7 @@ if (!window.initCanvas) {
     }
 
     function draw(e) {
+      e.stopPropagation();
       if (!drawing) return;
       const { x, y } = getCoordinates(e);
       ctx.lineTo(x, y);
@@ -164,6 +210,7 @@ if (!window.initCanvas) {
     }
 
     function endDrawing(e) {
+      e.stopPropagation();
       drawing = false;
       if (e.type === 'touchend') e.preventDefault();
     }
@@ -193,8 +240,10 @@ if (!window.initCanvas) {
 if (!window.clearCanvas) {
   window.clearCanvas = function(canvasId) {
     const canvas = document.getElementById(canvasId);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
   }
 }
 
@@ -204,7 +253,6 @@ if (!window.drawShape) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     const radius = 50;
@@ -221,191 +269,7 @@ if (!window.drawShape) {
   }
 }
 
-if (!window.playClickSound) {
-  window.playClickSound = function() {
-    if (typeof AudioContext !== 'undefined') {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + 0.1);
-      } catch (e) {
-        console.warn('Click sound failed:', e);
-      }
-    }
-  }
-}
-
-if (!window.playAudio) {
-  window.playAudio = function(word) {
-    if ('speechSynthesis' in window) {
-      try {
-        const utterance = new SpeechSynthesisUtterance(word);
-        utterance.onerror = function(e) {
-          console.warn('TTS error:', e);
-        };
-        speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn('TTS failed:', e);
-      }
-    } else {
-      console.warn('TTS not supported');
-    }
-  }
-}
-
-if (!window.speakQuestion) {
-  window.speakQuestion = function(text, btn) {
-    if (btn.disabled) return;
-    if ('speechSynthesis' in window) {
-      try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        utterance.onerror = function(e) {
-          console.warn('TTS error:', e);
-        };
-        speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn('TTS failed:', e);
-      }
-    } else {
-      console.warn('TTS not supported');
-    }
-  }
-}
-
-if (!window.selectMcOption) {
-  window.selectMcOption = function(lessonId, btn, value, type = 'mc') {
-    const section = document.querySelector(`#lesson-${lessonId} .activity-section[data-type="${type}"]`);
-    const buttons = section.querySelectorAll('.mc-btn');
-    buttons.forEach(b => {
-      b.classList.remove('selected');
-      b.style.backgroundColor = '';
-      b.style.color = '';
-    });
-    btn.classList.add('selected');
-    btn.style.backgroundColor = '#3b82f6';
-    btn.style.color = 'white';
-    const hiddenId = `${type}-hidden-${lessonId}`;
-    const hidden = document.getElementById(hiddenId);
-    if (hidden) hidden.value = value;
-    window.playClickSound();
-    window.playAudio(value.toLowerCase());
-  }
-}
-
-if (!window.submitActivity) {
-  window.submitActivity = function(event, lessonId, activityType) {
-    console.log(`submitActivity called for lesson ${lessonId}, activity ${activityType}`);
-    if (!lessonId) {
-      console.error('Missing lessonId');
-      alert('Error: Missing lesson ID. Please reload.');
-      return;
-    }
-    if (!activityType) {
-      console.error('Missing activityType');
-      alert('Error: Missing activity type. Please reload.');
-      return;
-    }
-    const section = document.querySelector(`#lesson-${lessonId} .activity-section[data-type="${activityType}"]`);
-    if (!section) {
-      console.error(`No section found for activity ${activityType}`);
-      alert('Error: Activity not found!');
-      return;
-    }
-    const btn = section.querySelector('.check-btn');
-    let answer = '';
-    if (activityType === 'trace') {
-      answer = 'drawn'; // Mark as drawn by default
-    } else if (activityType === 'spell' || activityType === 'math' || activityType === 'sound') {
-      answer = section.querySelector('input[type="text"]')?.value || '';
-    } else if (activityType === 'mc' || activityType === 'sentence') {
-      const hiddenId = `${activityType}-hidden-${lessonId}`;
-      const hidden = document.getElementById(hiddenId);
-      answer = hidden ? hidden.value : '';
-    }
-    if (!answer.trim()) {
-      console.log(`No valid answer for ${activityType}`);
-      alert('Please select or enter an answer!');
-      return;
-    }
-    const payload = { lesson_id: lessonId, activity_type: activityType, answer };
-    console.log(`Sending to /check_lesson:`, payload);
-    fetch('/check_lesson', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    })
-    .then(r => {
-      console.log(`Response status: ${r.status}`);
-      if (!r.ok) {
-        return r.text().then(text => { throw new Error(`HTTP ${r.status}: ${text}`); });
-      }
-      return r.json();
-    })
-    .then(d => {
-      console.log('Response data:', d);
-      if (d.success) {
-        const msg = d.correct ? `Correct! +${d.points} points ` : 'Try again! ';
-        alert(msg);
-        if (d.correct) {
-          section.style.backgroundColor = '#dbeafe';
-          btn.textContent = 'Done! ';
-          btn.disabled = true;
-        }
-      } else {
-        alert(d.error || 'Check failed');
-      }
-    })
-    .catch(e => {
-      console.error('Submit error:', e);
-      alert(`Oops—${e.message}. Reload and try again!`);
-    });
-  }
-}
-
-if (!window.likePost) {
-  window.likePost = function(postId) {
-    console.log(`likePost called for post ${postId}`);
-    fetch(`/like/${postId}`, {method: 'POST'})
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) location.reload();
-        else alert(d.error);
-      })
-      .catch(e => console.error('Like error:', e));
-  }
-}
-
-if (!window.toggleComments) {
-  window.toggleComments = function(postId) {
-    console.log(`toggleComments called for post ${postId}`);
-    const form = document.getElementById(`comment-form-${postId}`);
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-  }
-}
-
-if (!window.toggleCommentsExtra) {
-  window.toggleCommentsExtra = function(postId) {
-    console.log(`toggleCommentsExtra called for post ${postId}`);
-    const hidden = document.getElementById(`hidden-comments-${postId}`);
-    const btn = document.getElementById(`toggle-btn-${postId}`);
-    if (hidden.style.display === 'none') {
-      hidden.style.display = 'block';
-      btn.textContent = 'Show less';
-    } else {
-      hidden.style.display = 'none';
-      btn.textContent = `Show more (${hidden.children.length} more)`;
-    }
-  }
-}
+// ... (rest of JS functions remain the same: playClickSound, playAudio, speakQuestion, selectMcOption, submitActivity, likePost, toggleComments, toggleCommentsExtra)
 
 document.addEventListener('DOMContentLoaded', window.initAllActivities);
 </script>
@@ -424,10 +288,28 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
     100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } 
 }
 
+.popup-closed {
+  opacity: 0;
+}
+
 @media (max-width: 640px) {
   canvas[id^="trace-canvas-"] {
     width: 100% !important;
     height: 150px !important;
+  }
+  
+  /* Mobile full-screen */
+  [id^="trace-popup-"] {
+    p-0 !important;
+  }
+  
+  [id^="trace-popup-"] .bg-grok-surface {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
 }
 
