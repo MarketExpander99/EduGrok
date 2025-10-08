@@ -1,5 +1,5 @@
 <!-- Filename: profile.html.j2 -->
-<!-- Updates: Added sticky floating header matching lessons.html.j2 and games.html.j2 structure: full-width outside container, with dynamic h1 "Your Profile, [handle]!" (text-xl, left-aligned). Wrapped content in max-w-lg mx-auto p-6 pt-4 for offset and consistency. Removed original h2. Integrated exact scroll hide/show logic using requestAnimationFrame and ticking variable. Ensured theme consistency and smooth transitions. -->
+<!-- Updates: Added profile picture upload form in User Info card with file input, preview functionality via JS, and submit to new update_profile_picture endpoint. Enhanced avatar display to use img tag with current profile_picture URL (fallback to letter avatar). Ensured Tailwind/grok-theme consistency, responsive design, and smooth transitions. Preserved all previous updates including sticky header. -->
 
 {% extends "base.html.j2" %}
 
@@ -25,10 +25,16 @@
         <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
             <h3 class="text-lg font-semibold text-grok-text mb-4">User Info</h3>
             <div class="flex items-center mb-4">
-                <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-4 font-bold text-lg shadow-md">
-                    {{ user.handle[0] | upper if user.handle else 'U' }}
+                <div class="relative">
+                    {% if user.profile_picture %}
+                        <img id="profile-avatar" src="{{ user.profile_picture }}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover shadow-md">
+                    {% else %}
+                        <div id="profile-avatar" class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg shadow-md">
+                            {{ user.handle[0] | upper if user.handle else 'U' }}
+                        </div>
+                    {% endif %}
                 </div>
-                <div>
+                <div class="ml-4 flex-1">
                     <p class="text-grok-text text-base"><strong>Handle:</strong> {{ user.handle | default('User') }}</p>
                     <p class="text-grok-text text-base"><strong>Email:</strong> {{ session.email | default('Unknown') }}</p>
                     <p class="text-grok-text text-base"><strong>Grade:</strong> {{ grade | default('1') }}</p>
@@ -37,6 +43,17 @@
                     <p class="text-grok-text text-base"><strong>Role:</strong> {{ user.role | default('parent') | title }}</p>
                 </div>
             </div>
+
+            <!-- Profile Picture Upload Form -->
+            <form action="{{ url_for('update_profile_picture') }}" method="POST" enctype="multipart/form-data" id="profile-pic-form" class="space-y-3">
+                <label for="profile_picture" class="block text-grok-secondary font-medium">Update Profile Picture</label>
+                <input type="file" name="profile_picture" id="profile_picture" accept="image/*" class="w-full p-3 border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-grok-accent file:text-grok-text hover:file:bg-grok-accent-hover">
+                <div id="preview-container" class="hidden">
+                    <p class="text-grok-secondary text-sm mb-2">Preview:</p>
+                    <img id="preview-img" src="" alt="Preview" class="w-24 h-24 rounded-full object-cover border border-grok-border mx-auto">
+                </div>
+                <button type="submit" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md w-full">Upload Picture</button>
+            </form>
         </div>
 
         <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
@@ -164,6 +181,25 @@ document.addEventListener('DOMContentLoaded', function() {
         headerLastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     }, 100);
     updateHeaderPosition();
+
+    // Profile picture preview
+    const fileInput = document.getElementById('profile_picture');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImg = document.getElementById('preview-img');
+
+    fileInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                previewContainer.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewContainer.classList.add('hidden');
+        }
+    });
 });
 </script>
 {% endblock %}

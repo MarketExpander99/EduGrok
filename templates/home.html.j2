@@ -1,4 +1,4 @@
-<!-- home.html.j2 (Updated: Moved mobile FAB up to bottom-20 to avoid overlap with bottom nav; added hide FAB on openPostModal click; added MutationObserver to detect when post-form becomes hidden (on cancel or after submit reload) and show FAB again if on mobile. Preserved all existing scroll logic unchanged. Retained previous updates including sorting, notifications, and flash messages.) -->
+<!-- home.html.j2 (Updated: Enhanced "Your Profile" card to display profile picture if available, with fallback to letter avatar using conditional img tag and object-cover styling. Preserved all existing functionality including FAB behavior, scroll logic, sorting, and flash messages. Moved mobile FAB up to bottom-20 to avoid overlap with bottom nav; added hide FAB on openPostModal click; added MutationObserver to detect when post-form becomes hidden (on cancel or after submit reload) and show FAB again if on mobile. Retained previous updates including sorting, notifications, and flash messages.) -->
 {% extends "base.html.j2" %}
 {% block title %}Home - EduGrok{% endblock %}
 {% block content %}<div class="min-h-screen bg-grok-bg">
@@ -40,9 +40,13 @@
             <div class="card bg-grok-surface p-4 rounded-xl shadow-lg border border-grok-border">
                 <h3 class="text-lg font-semibold text-grok-text mb-3">Your Profile</h3>
                 <div class="flex items-center mb-3">
-                    <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
-                        {{ user.handle[0] | upper if user and user.handle else 'U' }}
-                    </div>
+                    {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture }}" alt="Profile Picture" class="w-12 h-12 rounded-full object-cover shadow-md mr-3">
+                    {% else %}
+                        <div class="w-12 h-12 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-lg mr-3 shadow-md">
+                            {{ user.handle[0] | upper if user and user.handle else 'U' }}
+                        </div>
+                    {% endif %}
                     <div>
                         <p class="text-grok-text font-medium">{{ user.handle or session.email or 'User' }} (Grade {{ user.grade or 1 }})</p>
                         <p class="text-grok-secondary text-sm">Star Coins: {{ user.star_coins or 0 }}</p>
@@ -286,4 +290,3 @@ sortSelect.value = initialSort;
 sortPosts(initialSort);});
 </script>
 {% endblock %}
-

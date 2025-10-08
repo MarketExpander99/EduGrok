@@ -1,11 +1,14 @@
-# [user_routes.py updated: Added role-based access control to parent_dashboard - redirects kids to home with a message, allowing only parents to access. Preserved all existing functionality for parents.]
+# [user_routes.py updated: Added update_profile_picture route to handle profile image upload, validation, saving to UPLOAD_FOLDER, and DB update. Enhanced profile() to fetch and pass profile_picture. Imported necessary modules for file handling. Preserved all existing functionality including role-based access.]
 
+import os
 import sqlite3
-from flask import jsonify, session, request, flash, redirect, url_for, render_template
+from flask import jsonify, session, request, flash, redirect, url_for, render_template, current_app
 import logging
 from datetime import datetime
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from db import get_db
+from utils import allowed_file
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +24,8 @@ def profile():
         conn = get_db()
         c = conn.cursor()
 
-        # Fetch user data including role
-        c.execute("SELECT id, handle, grade, star_coins, points, theme, language, role FROM users WHERE id = ?", (session['user_id'],))
+        # Fetch user data including role and profile_picture
+        c.execute("SELECT id, handle, grade, star_coins, points, theme, language, role, profile_picture FROM users WHERE id = ?", (session['user_id'],))
         user = c.fetchone()
         if not user:
             logger.error(f"User not found for ID: {session['user_id']}")
@@ -383,6 +386,39 @@ def update_coins():
     finally:
         if conn:
             conn.close()
+
+def update_profile_picture():
+    if 'user_id' not in session:
+        flash('Please log in to update profile picture', 'error')
+        return redirect(url_for('profile'))
+    
+    if request.method == 'POST':
+        file = request.files.get('profile_picture')
+        if file and file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            profile_url = f'/static/uploads/{filename}'
+            conn = None
+            try:
+                conn = get_db()
+                c = conn.cursor()
+                c.execute("UPDATE users SET profile_picture = ? WHERE id = ?", (profile_url, session['user_id']))
+                conn.commit()
+                logger.info(f"Profile picture updated for user {session['user_id']}: {profile_url}")
+                flash('Profile picture updated successfully!', 'success')
+            except Exception as e:
+                logger.error(f"Update profile picture failed for user {session['user_id']}: {str(e)}")
+                flash('Server error updating profile picture', 'error')
+                if conn:
+                    conn.rollback()
+            finally:
+                if conn:
+                    conn.close()
+        else:
+            flash('Invalid file. Please upload a valid image (png, jpg, jpeg, gif).', 'error')
+    
+    return redirect(url_for('profile'))
 
 def beta():
     if 'user_id' not in session:

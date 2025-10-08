@@ -1,4 +1,4 @@
-<!-- posts.html.j2 (Fixed: Wrapped lesson include in consistent card div with unique ID to prevent rendering breaks for multiple lessons. Ensured all grok- classes and structure match regular posts.) -->
+<!-- posts.html.j2 (Updated: Enhanced post header to display profile picture if available, with fallback to letter avatar. Used conditional img tag for profile_picture with responsive rounded-full styling and object-cover for consistency. Preserved all existing functionality including repost indicators, media handling, and JS interactions. Fixed: Wrapped lesson include in consistent card div with unique ID to prevent rendering breaks for multiple lessons. Ensured all grok- classes and structure match regular posts.) -->
 {% for post in posts %}
     {% if post.get('type') == 'lesson' and post.get('lesson') %}
         <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
@@ -7,8 +7,14 @@
     {% else %}
         <div id="post-{{ post.id }}" class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6">
             <div class="flex items-center mb-3">
-                <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
-                    {{ post.handle[0] | upper if post.handle else 'U' }}
+                <div class="mr-3">
+                    {% if post.profile_picture %}
+                        <img src="{{ post.profile_picture }}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover shadow-sm">
+                    {% else %}
+                        <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center font-bold text-sm shadow-sm">
+                            {{ post.handle[0] | upper if post.handle else 'U' }}
+                        </div>
+                    {% endif %}
                 </div>
                 <div>
                     <h3 class="text-sm font-semibold text-grok-text">{{ post.handle | default('User') }} (Grade {{ post.grade | default(1) }})</h3>

@@ -1,4 +1,4 @@
-# [home_routes.py updated: Added subtle kid-friendly note by fetching user role and passing 'is_kid' flag to template for conditional display (e.g., "Explore the feed and play games!"). Preserved all existing feed logic, cleanup, and features.]
+# [home_routes.py updated: Added profile_picture to user query in home() for sidebar display. Enhanced post queries (global and lesson) to include poster's profile_picture for feed consistency. Ensured dict conversion preserves the field. Added subtle kid-friendly note by fetching user role and passing 'is_kid' flag to template for conditional display (e.g., "Explore the feed and play games!"). Preserved all existing feed logic, cleanup, and features.]
 
 from flask import render_template, session, redirect, url_for, request, flash
 from db import get_db
@@ -66,7 +66,7 @@ def home():
 
         # FIXED: Separate queries for global posts (type='post') and user-specific lessons (type='lesson')
         # Global posts: from all users
-        global_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
+        global_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle, u.profile_picture,
                           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                           (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
                           FROM posts p 
@@ -80,7 +80,7 @@ def home():
         global_posts = [dict(post) for post in global_posts_raw]
 
         # User lessons: only from current user, exclude confirmed (parent_confirmed=1)
-        lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle,
+        lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle, u.profile_picture,
                           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                           (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
                           FROM posts p 
@@ -160,7 +160,7 @@ def home():
 
         # User fetch
         try:
-            c.execute("SELECT handle, grade, star_coins, points FROM users WHERE id = ?", (user_id,))
+            c.execute("SELECT handle, grade, star_coins, points, profile_picture FROM users WHERE id = ?", (user_id,))
             user = c.fetchone()
         except Exception as e:
             logger.error(f"Error fetching user for id {user_id}: {e}\n{traceback.format_exc()}")

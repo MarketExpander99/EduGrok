@@ -1,3 +1,5 @@
+# [users_db.py]
+
 import logging
 import sqlite3
 from werkzeug.security import generate_password_hash
@@ -16,7 +18,8 @@ def init_users_tables(conn):
             subscribed INTEGER DEFAULT 0,
             handle TEXT,
             language TEXT DEFAULT 'en',
-            star_coins INTEGER DEFAULT 0
+            star_coins INTEGER DEFAULT 0,
+            profile_picture TEXT
         )''')
         conn.commit()
         logger.info("Users table initialized")
@@ -31,11 +34,11 @@ def seed_users(conn):
     try:
         # Bot users (passwords hashed)
         hashed_bot = generate_password_hash('botpass', method='pbkdf2:sha256')
-        c.execute("INSERT OR IGNORE INTO users (email, password, grade, handle, theme, language, star_coins) VALUES (?, ?, ?, ?, ?, ?, 0)",
+        c.execute("INSERT OR IGNORE INTO users (email, password, grade, handle, theme, language, star_coins, profile_picture) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
                   ('skykidz@grok.com', hashed_bot, 2, 'SkyKidz', 'astronaut', 'en'))
         skykidz_id = c.lastrowid if c.lastrowid else c.execute("SELECT id FROM users WHERE email=?", ('skykidz@grok.com',)).fetchone()[0]
         
-        c.execute("INSERT OR IGNORE INTO users (email, password, grade, handle, theme, language, star_coins) VALUES (?, ?, ?, ?, ?, ?, 0)",
+        c.execute("INSERT OR IGNORE INTO users (email, password, grade, handle, theme, language, star_coins, profile_picture) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
                   ('grokedu@grok.com', hashed_bot, 3, 'GrokEdu', 'farm', 'bilingual'))
         grokedu_id = c.lastrowid if c.lastrowid else c.execute("SELECT id FROM users WHERE email=?", ('grokedu@grok.com',)).fetchone()[0]
         
@@ -66,6 +69,14 @@ def check_users_schema(conn):
             print("Added handle to users table")
         # Post-add default for existing rows
         c.execute("UPDATE users SET handle = COALESCE(handle, email) WHERE handle IS NULL")
+        conn.commit()
+        if 'profile_picture' not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN profile_picture TEXT")
+            conn.commit()
+            logger.info("Added profile_picture to users table")
+            print("Added profile_picture to users table")
+        # Post-add default for existing rows
+        c.execute("UPDATE users SET profile_picture = COALESCE(profile_picture, '') WHERE profile_picture IS NULL")
         conn.commit()
         logger.debug("Users schema check passed")
     except Exception as e:
