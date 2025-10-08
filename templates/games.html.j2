@@ -1,27 +1,115 @@
 <!-- Filename: games.html.j2 -->
-<!-- Updates: Updated headings, cards, and buttons with grok- classes for theme consistency. Added shadows, transitions, and better spacing for polish. Made list items more responsive. -->
+<!-- Updates: Matched the sticky header structure and width exactly to lessons.html.j2 by placing it outside the container div with full-width classes (w-full left-0, no rounded/shadow constraints). Adjusted h1 to text-xl for consistency. Wrapped content in container mx-auto p-6 max-w-4xl pt-4. Retained filter dropdown in right-aligned flex div. Updated scroll logic to exactly match lessons.html.j2: using requestAnimationFrame, ticking variable, no nearTop threshold (hide on any down scroll, show on up), and renamed variables for clarity. Ensured theme consistency and smooth transitions. -->
 
 {% extends "base.html.j2" %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-8 text-center text-grok-text">Available Games</h1>
-    <ul class="space-y-6">
-        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+<!-- Sticky Floating Header (exact match to lessons structure) -->
+<div class="bg-grok-bg border-b border-grok-border sticky top-0 z-50 transition-transform duration-300 ease-in-out w-full left-0" id="sticky-header">
+    <div class="p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-grok-text">Games</h1>
+        <div class="flex items-center space-x-4">
+            <!-- Game Filter -->
+            <select id="game-filter" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1 focus:outline-none focus:ring-2 focus:ring-grok-accent" onchange="filterGames(this.value)">
+                <option value="all">All Games</option>
+                <option value="phonics">Phonics</option>
+                <option value="numbers">Numbers</option>
+                <option value="math">Math</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Content Container (matches lessons pt-4 for header offset) -->
+<div class="container mx-auto p-6 max-w-4xl pt-4">
+    <ul class="space-y-6" id="games-list">
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl" data-category="phonics">
             <h2 class="text-2xl font-semibold text-grok-text mb-2">Phonics Game</h2>
             <p class="text-grok-secondary mb-4">Match words to their sounds in this exciting memory challenge!</p>
             <a href="{{ url_for('phonics_game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
-        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl" data-category="numbers">
             <h2 class="text-2xl font-semibold text-grok-text mb-2">Number Match</h2>
             <p class="text-grok-secondary mb-4">Match numbers to their word representations!</p>
             <a href="{{ url_for('number_game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
-        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl">
+        <li class="card bg-grok-surface p-6 rounded-lg shadow-lg border border-grok-border transition-shadow hover:shadow-xl" data-category="math">
             <h2 class="text-2xl font-semibold text-grok-text mb-2">Math Challenge</h2>
             <p class="text-grok-secondary mb-4">Solve math questions in a farm-themed adventure!</p>
             <a href="{{ url_for('game') }}" class="bg-grok-accent text-grok-text px-6 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Play Now</a>
         </li>
     </ul>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelect = document.getElementById('game-filter');
+    const gameItems = document.querySelectorAll('#games-list li[data-category]');
+
+    // Initial filter application (default to 'all')
+    filterGames('all');
+
+    // Filter functionality
+    function filterGames(category) {
+        gameItems.forEach(function(item) {
+            if (category === 'all' || item.dataset.category === category) {
+                item.style.display = 'block';
+                item.style.opacity = '1';
+                item.style.transform = 'translateY(0)';
+            } else {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(10px)';
+                setTimeout(() => {
+                    item.style.display = 'none';
+                }, 300);
+            }
+        });
+    }
+
+    filterSelect.addEventListener('change', function() {
+        filterGames(this.value);
+    });
+
+    // Sticky header scroll hide/show logic (exact match to lessons.html.j2)
+    let headerLastScrollTop = 0;
+    let headerTicking = false;
+    const headerScrollThreshold = 10;
+
+    function updateHeaderPosition() {
+        let st = window.pageYOffset || document.documentElement.scrollTop;
+        const delta = st - headerLastScrollTop;
+        const isScrollingDown = delta > headerScrollThreshold;
+        const isScrollingUp = delta < -headerScrollThreshold;
+
+        const header = document.getElementById('sticky-header');
+        if (header) {
+            if (isScrollingDown) {
+                header.style.transform = 'translateY(-100%)';
+            } else if (isScrollingUp) {
+                header.style.transform = 'translateY(0)';
+            }
+        }
+
+        headerLastScrollTop = st <= 0 ? 0 : st;
+        headerTicking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+        if (!headerTicking) {
+            requestAnimationFrame(updateHeaderPosition);
+            headerTicking = true;
+        }
+    });
+
+    // Initial setup
+    const header = document.getElementById('sticky-header');
+    if (header) {
+        header.style.transform = 'translateY(0)';
+    }
+    setTimeout(() => {
+        headerLastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    }, 100);
+    updateHeaderPosition();
+});
+</script>
 {% endblock %}
