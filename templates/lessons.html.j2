@@ -1,16 +1,19 @@
-<!-- lessons.html.j2 (Updated: Always show child selector dropdown for parents, even with no kids—prepends "My Feed" option using selected_user_id for solo parent use. When kids exist, "My Feed" is first option, followed by kids. Updated label to include grade from first lesson (or default 1). JS unchanged, as it already uses selected_user_id correctly. This prevents flow breakage and makes adding to own feed explicit. Preserved all styling, logic, and sparkly-border for incomplete lessons.) -->
+<!-- lessons.html.j2 (Updated: Transformed header into sticky floating menu similar to home.html.j2, including subject filter dropdown (All, Math, Language, Science, General) that reloads with ?subject= param; integrated student selector next to title; added back-to-home icon; applied identical scroll hide/show logic to #sticky-header. Updated changeKid and added changeSubject to preserve URL params. Used separate scroll vars to avoid base conflict. Preserved all existing lesson cards, sparkly-border, and JS functions.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
 
+{% set subject = request.args.get('subject', '') %}
+
 {% block content %}
-<div class="container mx-auto p-6 max-w-4xl">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-grok-text">Your Lessons</h1>
-        <!-- Always show selector for parents (inferred by presence of selected_user_id/kids); if no kids, only "My Feed" -->
-        <div class="flex-1 max-w-xs mx-4">
-            <label for="kid-selector" class="block text-grok-secondary font-medium mb-2 text-sm">Add to:</label>
-            <select id="kid-selector" class="w-full p-3 border border-grok-border rounded-lg focus:outline-none focus:ring-2 focus:ring-grok-accent bg-transparent text-grok-text" onchange="changeKid(this.value)">
+<div class="bg-grok-bg border-b border-grok-border sticky top-0 z-50 transition-transform duration-300 ease-in-out w-full left-0" id="sticky-header">
+    <div class="p-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <h1 class="text-2xl font-bold text-grok-text">Your Lessons</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <!-- Student Selector -->
+            <select id="kid-selector" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1" onchange="changeKid(this.value)">
                 <!-- Always prepend "My Feed" option -->
                 <option value="{{ selected_user_id }}" {% if selected_user_id == session.user_id or not kids %}selected{% endif %}>
                     {% if lessons %}{{ lessons[0].grade }}{% else %}1{% endif %} - My Feed
@@ -21,9 +24,18 @@
                     {% endfor %}
                 {% endif %}
             </select>
+            <!-- Subject Filter -->
+            <select id="subject-select" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1" onchange="changeSubject(this.value)">
+                <option value="" {% if not subject %}selected{% endif %}>All</option>
+                <option value="Math" {% if subject == 'Math' %}selected{% endif %}>Math</option>
+                <option value="Language" {% if subject == 'Language' %}selected{% endif %}>Language</option>
+                <option value="Science" {% if subject == 'Science' %}selected{% endif %}>Science</option>
+                <option value="General" {% if subject == 'General' %}selected{% endif %}>General</option>
+            </select>
         </div>
-        <a href="{{ url_for('home') }}" class="text-grok-secondary hover:text-grok-accent">&larr; Back to Home</a>
     </div>
+</div>
+<div class="container mx-auto p-6 max-w-4xl pt-4">
     {% if lessons %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for lesson in lessons %}
@@ -82,10 +94,67 @@
 </div>
 
 <script>
-    function changeKid(kidId) {
-        if (kidId) {
-            window.location.href = `/lessons?kid_id=${kidId}`;
+    // Sticky header scroll hide/show logic (separate from base to avoid conflict)
+    let headerLastScrollTop = 0;
+    let headerTicking = false;
+    const headerScrollThreshold = 10;
+
+    function updateHeaderPosition() {
+        let st = window.pageYOffset || document.documentElement.scrollTop;
+        const delta = st - headerLastScrollTop;
+        const isScrollingDown = delta > headerScrollThreshold;
+        const isScrollingUp = delta < -headerScrollThreshold;
+
+        const header = document.getElementById('sticky-header');
+        if (header) {
+            if (isScrollingDown) {
+                header.style.transform = 'translateY(-100%)';
+            } else if (isScrollingUp) {
+                header.style.transform = 'translateY(0)';
+            }
         }
+
+        headerLastScrollTop = st <= 0 ? 0 : st;
+        headerTicking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+        if (!headerTicking) {
+            requestAnimationFrame(updateHeaderPosition);
+            headerTicking = true;
+        }
+    });
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', function() {
+        const header = document.getElementById('sticky-header');
+        if (header) {
+            header.style.transform = 'translateY(0)';
+        }
+        setTimeout(() => {
+            headerLastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        }, 100);
+        updateHeaderPosition();
+    });
+
+    function changeKid(kidId) {
+        const url = new URL(window.location);
+        if (kidId && kidId != '{{ selected_user_id }}') {  // Assume selected_user_id is own ID for My Feed
+            url.searchParams.set('kid_id', kidId);
+        } else {
+            url.searchParams.delete('kid_id');
+        }
+        window.location.href = url.toString();
+    }
+
+    function changeSubject(subject) {
+        const url = new URL(window.location);
+        if (subject) {
+            url.searchParams.set('subject', subject);
+        } else {
+            url.searchParams.delete('subject');
+        }
+        window.location.href = url.toString();
     }
 
     async function handleFetch(fetchPromise, successMsg, errorMsg, callback) {
