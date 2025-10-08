@@ -1,11 +1,4 @@
-<!-- Filename: lesson_card.html.j2 -->
-{# Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling. #}
-{# Fix: Disabled sequencing logic to enable all activities/controls by default—no more grayed-out buttons. Added force-cleanup in init. #}
-{# Enhancement: For trace activity, replaced direct include with "Draw" button that toggles responsive popup (full-width mobile, 70% desktop) containing trace_activity.html.j2. Added JS for popup toggle/close. Removed any bg-blue-50 references; relies on sub-template minimal styling for consistency across activities. #}
-{# Fix: Ensured trace popup centers on viewport (screen) by removing outer padding, adding body overflow hidden on open/close to prevent scroll interference. #}
-{# Fix: Addressed confinement/flicker—use JS to append popup to body on open (escapes card div clipping); switch to absolute+transform centering (no flex reflow on mouse move); opacity toggle instead of display:hidden for smooth no-flicker reveal; stopPropagation on canvas to prevent close on draw/click; overlay click-to-close. Mobile: full vw/vh override. #}
-
-<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
+<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     <div class="flex items-center mb-3">
         <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
             {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
@@ -19,15 +12,15 @@
     <div class="space-y-4 mb-4">
         {% if post.lesson.trace_word %}
             <div class="text-center">
-                <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition shadow-md">Draw</button>
+                <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold shadow-md">Draw</button>
             </div>
             <!-- Trace Popup (initially in card, JS moves to body) -->
-            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out" style="backdrop-filter: blur(4px);">
+            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50">
                 <div class="absolute inset-0 flex items-center justify-center p-4">
-                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto transition-all duration-300 ease-out opacity-0 scale-95">
+                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto opacity-0 scale-95">
                         <div class="p-6 border-b border-grok-border flex justify-between items-center">
                             <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
-                            <button onclick="window.closeTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text hover:text-grok-accent text-2xl">&times;</button>
+                            <button onclick="window.closeTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text text-2xl">&times;</button>
                         </div>
                         <div class="p-6">
                             {% include 'trace_activity.html.j2' %}
@@ -58,10 +51,10 @@
         <span> {{ (comments[post.id] | length) if post.id in comments else 0 }} notes</span>
     </div>
     <div class="flex justify-between border-t border-blue-300 pt-3 text-sm">
-        <button onclick="window.likePost({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
+        <button onclick="window.likePost({{ post.id }})" class="text-grok-text flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
             <i class="fas fa-heart mr-1"></i>{{ 'Unlike' if post.liked_by_user else 'Like' }}
         </button>
-        <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center">
+        <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text flex items-center">
             <i class="fas fa-comment mr-1"></i>Notes
         </button>
         <button class="text-grok-text flex items-center opacity-50 cursor-not-allowed" disabled>
@@ -71,7 +64,7 @@
     <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
         <form method="POST" action="/comment/{{ post.id }}">
             <textarea name="content" placeholder="Add a note..." class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" required rows="2"></textarea>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2">Post Note</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md mt-2">Post Note</button>
         </form>
     </div>
     {% if post.id in comments %}
@@ -140,22 +133,21 @@ if (!window.toggleTracePopup) {
     
     const modal = popup.querySelector('.bg-grok-surface');
     if (popup.classList.contains('popup-closed')) {
-      // Open
+      // Open instantly
       document.body.style.overflow = 'hidden';
       popup.classList.remove('popup-closed');
       popup.style.pointerEvents = 'auto';
-      setTimeout(() => {
-        modal.style.opacity = '1';
-        modal.style.transform = 'scale(1)';
-      }, 10);
+      modal.style.opacity = '1';
+      modal.style.transform = 'scale(1)';
       // Add overlay click handler
       popup.addEventListener('click', function overlayClick(e) {
         if (e.target === popup) {
           window.closeTracePopup(lessonId);
         }
       });
-      // Deferred init
-      setTimeout(() => window.initCanvas(lessonId), 200);
+      popup._overlayClick = overlayClick; // Store for removal
+      // Immediate init
+      window.initCanvas(lessonId);
     } else {
       window.closeTracePopup(lessonId);
     }
@@ -171,14 +163,14 @@ if (!window.closeTracePopup) {
     const modal = popup.querySelector('.bg-grok-surface');
     modal.style.opacity = '0';
     modal.style.transform = 'scale(0.95)';
-    setTimeout(() => {
-      popup.classList.add('popup-closed');
-      popup.style.pointerEvents = 'none';
-      document.body.style.overflow = '';
-      // Remove overlay handler
+    popup.classList.add('popup-closed');
+    popup.style.pointerEvents = 'none';
+    document.body.style.overflow = '';
+    // Remove overlay handler
+    if (popup._overlayClick) {
       popup.removeEventListener('click', popup._overlayClick);
-      // Optional: Move back to original position if needed, but keep in body for perf
-    }, 300);
+      delete popup._overlayClick;
+    }
   }
 }
 

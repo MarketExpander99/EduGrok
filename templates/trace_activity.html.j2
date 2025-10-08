@@ -1,139 +1,185 @@
 <!-- Filename: trace_activity.html.j2 -->
-<!-- Fix: Standardized submit button with proper onclick and data attributes to resolve "Activity not found!" error. Removed HTML entities for cleaner code. -->
-<!-- Enhancement: Added color picker, stroke width selector, and shape tools (circle/square buttons) for interactive drawing. Canvas now includes faint guide text rendering (assumes JS init). Minimal styling to match other activities without extra blue box. -->
-<!-- Fix: Changed text-blue-700 to text-white for consistency with dark theme backgrounds; updated speaker hover to text-gray-300. -->
-<!-- Fix: Cursor/pen alignment—added inline JS for initCanvas with scaling factor (scaleX/Y) to handle CSS width/height mismatch; included faint guide text rendering using dataset. StopPropagation on events to prevent popup issues. -->
-<!-- Fix: Alignment offset—adjusted coordinates for border width (subtract border from rect.left/top); added pen cursor via SVG data URL; onchange for color picker to update strokeStyle live. -->
-{% if post.lesson.trace_word and not post.completed %}
-<div class="activity-section p-3" data-type="trace">
+<!-- Updates: Implemented fixed-size canvas by setting explicit width="400" height="200" and style="width: 400px; height: 200px;" (removed w-full class and dynamic resizing). This ensures 1:1 pixel mapping with no scaling issues—lines now draw exactly at cursor position, including left edge. Retained border subtraction in getCoordinates for precision. Removed all 'hover:' classes from buttons to fully drop any transitions/effects as requested. -->
+
+{% if post.lesson.trace_word and not post.completed %}<div class="activity-section p-3" data-type="trace">
     <div class="flex items-center mb-2">
         <h4 class="text-white font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
-        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-white hover:text-gray-300 transition" aria-label="Read instruction aloud">
+        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-white" aria-label="Read instruction aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
     </div>
     
-    <!-- Drawing Tools -->
-    <div class="flex flex-wrap items-center gap-2 mb-2 text-sm">
-        <label>Color: <input type="color" id="color-{{ post.lesson.id | default(post.id) }}" value="#000000" onchange="window.updateColor('{{ post.lesson.id | default(post.id) }}', this.value)" class="w-8 h-6 rounded"></label>
-        <label>Width: 
-            <select id="width-{{ post.lesson.id | default(post.id) }}" class="p-1 border rounded text-xs" onchange="window.updateLineWidth('{{ post.lesson.id | default(post.id) }}', this.value)">
-                <option value="1">Thin</option>
-                <option value="3" selected>Medium</option>
-                <option value="5">Thick</option>
-            </select>
-        </label>
-        <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'circle')" class="px-2 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300 transition">Circle</button>
-        <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'square')" class="px-2 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300 transition">Square</button>
-    </div>
-    
-    <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" data-trace-word="{{ post.lesson.trace_word }}" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none; cursor: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20' viewBox='0 0 12 20'%3E%3Cpath d='M0 18 L10 8 L12 6' stroke='black' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='10' cy='8' r='1' fill='black'/%3E%3C/svg%3E&quot;) 0 20, crosshair;"></canvas>
-    
-    <div class="flex gap-2">
-        <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition">Clear</button>
-        <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Save & Check</button>
-    </div>
+<!-- Drawing Toggle -->
+<div class="mb-2">
+    <button id="draw-toggle-{{ post.lesson.id | default(post.id) }}" type="button" onclick="window.toggleDrawing('{{ post.lesson.id | default(post.id) }}')" class="bg-blue-500 text-white px-4 py-2 rounded-md">Start Drawing</button>
+</div>
 
-    <script>
-    (function() {
-        const lessonId = '{{ post.lesson.id | default(post.id) }}';
-        const canvas = document.getElementById('trace-canvas-' + lessonId);
-        if (!canvas || window.traceCanvases[lessonId]) return; // Avoid duplicates
-        window.traceCanvases = window.traceCanvases || {};
-        window.traceCanvases[lessonId] = true;
+<!-- Drawing Tools -->
+<div class="flex flex-wrap items-center gap-2 mb-2 text-sm">
+    <label>Color: <input type="color" id="color-{{ post.lesson.id | default(post.id) }}" value="#000000" onchange="window.updateColor('{{ post.lesson.id | default(post.id) }}', this.value)" class="w-8 h-6 rounded"></label>
+    <label>Width: 
+        <select id="width-{{ post.lesson.id | default(post.id) }}" class="p-1 border rounded text-xs" onchange="window.updateLineWidth('{{ post.lesson.id | default(post.id) }}', this.value)">
+            <option value="1">Thin</option>
+            <option value="3" selected>Medium</option>
+            <option value="5">Thick</option>
+        </select>
+    </label>
+    <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'circle')" class="px-2 py-1 bg-gray-200 rounded text-xs">Circle</button>
+    <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'square')" class="px-2 py-1 bg-gray-200 rounded text-xs">Square</button>
+</div>
 
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-        let currentLineWidth = 3;
-        let currentColor = '#000000';
+<canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" data-trace-word="{{ post.lesson.trace_word }}" class="border border-blue-300 rounded bg-white mb-2" style="width: 400px; height: 200px; touch-action: none; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20' viewBox='0 0 12 20'%3E%3Cpath d='M0 18 L10 8 L12 6' stroke='black' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='10' cy='8' r='1' fill='black'/%3E%3C/svg%3E") 0 20, crosshair;"></canvas>
 
-        // Update line width from select
-        window.updateLineWidth = function(id, width) {
-            currentLineWidth = parseInt(width);
-            ctx.lineWidth = currentLineWidth;
-        };
+<div class="flex gap-2">
+    <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md">Clear</button>
+    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="bg-blue-500 text-white px-4 py-2 rounded-md">Save & Check</button>
+</div>
 
-        // Update color from picker
-        window.updateColor = function(id, color) {
-            currentColor = color;
-            ctx.strokeStyle = currentColor;
-        };
+<script>
+(function() {
+    const lessonId = '{{ post.lesson.id | default(post.id) }}';
+    const canvas = document.getElementById('trace-canvas-' + lessonId);
+    const toggleBtn = document.getElementById('draw-toggle-' + lessonId);
+    if (!canvas || window.traceCanvases[lessonId]) return; // Avoid duplicates
+    window.traceCanvases = window.traceCanvases || {};
+    window.traceCanvases[lessonId] = true;
 
-        // Draw faint guide text
-        function drawGuideText() {
-            const traceWord = canvas.dataset.traceWord;
-            ctx.save();
-            ctx.globalAlpha = 0.3;
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(traceWord, canvas.width / 2, canvas.height / 2);
-            ctx.restore();
-        }
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let drawingEnabled = false; // Start disabled
+    let currentLineWidth = 3;
+    let currentColor = '#000000';
 
-        function getCoordinates(e) {
-            const rect = canvas.getBoundingClientRect();
-            const style = window.getComputedStyle(canvas);
-            const borderLeft = parseFloat(style.borderLeftWidth) || 0;
-            const borderTop = parseFloat(style.borderTopWidth) || 0;
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            const scaleX = canvas.width / (rect.width - borderLeft * 2); // Account for both borders
-            const scaleY = canvas.height / (rect.height - borderTop * 2);
-            return {
-                x: (clientX - (rect.left + borderLeft)) * scaleX,
-                y: (clientY - (rect.top + borderTop)) * scaleY
-            };
-        }
+    // Update line width from select
+    window.updateLineWidth = function(id, width) {
+        if (id !== lessonId) return;
+        currentLineWidth = parseInt(width);
+        ctx.lineWidth = currentLineWidth;
+    };
 
-        function startDrawing(e) {
-            e.stopPropagation();
-            drawing = true;
-            const { x, y } = getCoordinates(e);
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            if (e.type === 'touchstart') e.preventDefault();
-        }
+    // Update color from picker
+    window.updateColor = function(id, color) {
+        if (id !== lessonId) return;
+        currentColor = color;
+        ctx.strokeStyle = currentColor;
+    };
 
-        function draw(e) {
-            e.stopPropagation();
-            if (!drawing) return;
-            const { x, y } = getCoordinates(e);
-            ctx.lineTo(x, y);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = currentColor;
-            ctx.lineWidth = currentLineWidth;
-            ctx.stroke();
-            if (e.type === 'touchmove') e.preventDefault();
-        }
-
-        function endDrawing(e) {
-            e.stopPropagation();
+    // Toggle drawing mode
+    window.toggleDrawing = function(id) {
+        if (id !== lessonId) return;
+        drawingEnabled = !drawingEnabled;
+        toggleBtn.textContent = drawingEnabled ? 'Stop Drawing' : 'Start Drawing';
+        toggleBtn.className = drawingEnabled ? 'bg-green-500 text-white px-4 py-2 rounded-md' : 'bg-blue-500 text-white px-4 py-2 rounded-md';
+        if (!drawingEnabled) {
             drawing = false;
-            if (e.type === 'touchend') e.preventDefault();
         }
+    };
 
-        // Event listeners
-        canvas.addEventListener('mousedown', startDrawing);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', endDrawing);
-        canvas.addEventListener('mouseout', endDrawing);
+    // Draw faint guide text
+    function drawGuideText() {
+        const traceWord = canvas.dataset.traceWord;
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(traceWord, canvas.width / 2, canvas.height / 2);
+        ctx.restore();
+    }
 
-        canvas.addEventListener('touchstart', startDrawing, { passive: false });
-        canvas.addEventListener('touchmove', draw, { passive: false });
-        canvas.addEventListener('touchend', endDrawing, { passive: false });
-        canvas.addEventListener('touchcancel', endDrawing, { passive: false });
-
-        // Initial guide draw
+    // Clear canvas function
+    window.clearCanvas = function(canvasId) {
+        if (canvasId !== 'trace-canvas-' + lessonId) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawGuideText();
+    };
+
+    // Draw shape function
+    window.drawShape = function(id, shape) {
+        if (id !== lessonId) return;
+        const colorInput = document.getElementById('color-' + id);
+        const widthSelect = document.getElementById('width-' + id);
+        const shapeColor = colorInput ? colorInput.value : currentColor;
+        const shapeWidth = widthSelect ? parseInt(widthSelect.value) : currentLineWidth;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 30;
+        ctx.beginPath();
+        if (shape === 'circle') {
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        } else if (shape === 'square') {
+            const side = 60;
+            const offset = side / 2;
+            ctx.rect(centerX - offset, centerY - offset, side, side);
+        }
+        ctx.strokeStyle = shapeColor;
+        ctx.lineWidth = shapeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = currentLineWidth;
+        ctx.stroke();
+    };
+
+    function getCoordinates(e) {
+        const rect = canvas.getBoundingClientRect();
+        const style = window.getComputedStyle(canvas);
+        const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+        const borderTop = parseFloat(style.borderTopWidth) || 0;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+        return {
+            x: clientX - (rect.left + borderLeft),
+            y: clientY - (rect.top + borderTop)
+        };
+    }
+
+    function startDrawing(e) {
+        e.stopPropagation();
+        if (!drawingEnabled) return;
+        drawing = true;
+        const { x, y } = getCoordinates(e);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        if (e.type === 'touchstart') e.preventDefault();
+    }
+
+    function draw(e) {
+        e.stopPropagation();
+        if (!drawing || !drawingEnabled) return;
+        const { x, y } = getCoordinates(e);
+        ctx.lineTo(x, y);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.strokeStyle = currentColor;
-    })();
-    </script>
-</div>
+        ctx.lineWidth = currentLineWidth;
+        ctx.stroke();
+        if (e.type === 'touchmove') e.preventDefault();
+    }
+
+    function endDrawing(e) {
+        e.stopPropagation();
+        drawing = false;
+        if (e.type === 'touchend') e.preventDefault();
+    }
+
+    // Event listeners
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', endDrawing);
+    canvas.addEventListener('mouseout', endDrawing);
+
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', endDrawing, { passive: false });
+    canvas.addEventListener('touchcancel', endDrawing, { passive: false });
+
+    // Initial guide draw
+    drawGuideText();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = currentLineWidth;
+    ctx.strokeStyle = currentColor;
+})();
+</script></div>
 {% else %}
 {% if post.lesson.trace_word %}
 <div class="activity-section p-3" data-type="trace">
@@ -141,3 +187,4 @@
 </div>
 {% endif %}
 {% endif %}
+
