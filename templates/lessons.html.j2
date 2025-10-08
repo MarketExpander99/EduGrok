@@ -1,14 +1,18 @@
-<!-- lessons.html.j2 (Updated: Transformed header into sticky floating menu similar to home.html.j2, including subject filter dropdown (All, Math, Language, Science, General) that reloads with ?subject= param; integrated student selector next to title; added back-to-home icon; applied identical scroll hide/show logic to #sticky-header. Updated changeKid and added changeSubject to preserve URL params. Used separate scroll vars to avoid base conflict. Preserved all existing lesson cards, sparkly-border, and JS functions.) -->
+<!-- lessons.html.j2 (Updated: Fixed subject filtering to be case-insensitive with .toLowerCase() matching; ensured filterBySubject is called in changeSubject without page reload (using history.replaceState); added initial filter application on load; restored back-to-home arrow icon and adjusted h1 to text-2xl for consistency. Preserved all sorting, scroll, and other logic.) -->
 {% extends "base.html.j2" %}
 
 {% block title %}Lessons - EduGrok{% endblock %}
 
 {% set subject = request.args.get('subject', '') %}
+{% set sort = request.args.get('sort', 'latest') %}
 
 {% block content %}
 <div class="bg-grok-bg border-b border-grok-border sticky top-0 z-50 transition-transform duration-300 ease-in-out w-full left-0" id="sticky-header">
     <div class="p-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
+            <a href="{{ url_for('home') }}" class="text-grok-secondary hover:text-grok-accent">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
             <h1 class="text-2xl font-bold text-grok-text">Your Lessons</h1>
         </div>
         <div class="flex items-center space-x-4">
@@ -32,14 +36,20 @@
                 <option value="Science" {% if subject == 'Science' %}selected{% endif %}>Science</option>
                 <option value="General" {% if subject == 'General' %}selected{% endif %}>General</option>
             </select>
+            <!-- Sort Select -->
+            <select id="sort-select" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1" onchange="changeSort(this.value)">
+                <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
+                <option value="title" {% if sort == 'title' %}selected{% endif %}>A-Z</option>
+                <option value="grade" {% if sort == 'grade' %}selected{% endif %}>By Grade</option>
+            </select>
         </div>
     </div>
 </div>
 <div class="container mx-auto p-6 max-w-4xl pt-4">
     {% if lessons %}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="lessons-grid">
             {% for lesson in lessons %}
-                <div class="card bg-grok-surface border-grok-border p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if not lesson.completed %}sparkly-border{% else %}completed opacity-75 cursor-not-allowed{% endif %}" id="lesson-{{ lesson.id }}">
+                <div class="card bg-grok-surface border-grok-border p-5 rounded-xl shadow-lg border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if not lesson.completed %}sparkly-border{% else %}completed opacity-75 cursor-not-allowed{% endif %}" id="lesson-{{ lesson.id }}" data-subject="{{ lesson.subject }}" data-created-at="{{ lesson.created_at }}" data-title="{{ lesson.title }}" data-grade="{{ lesson.grade }}">
                     <!-- Lesson Header (mirrors post header) -->
                     <div class="flex items-center mb-3">
                         <div class="w-10 h-10 rounded-full bg-grok-accent text-grok-text flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
@@ -135,6 +145,22 @@
             headerLastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
         }, 100);
         updateHeaderPosition();
+
+        // Apply initial sort
+        const initialSort = '{{ sort }}';
+        const sortSelect = document.getElementById('sort-select');
+        if (sortSelect) {
+            sortSelect.value = initialSort;
+            sortLessons(initialSort);
+        }
+
+        // Apply initial subject filter
+        const initialSubject = '{{ subject }}';
+        const subjectSelect = document.getElementById('subject-select');
+        if (subjectSelect) {
+            subjectSelect.value = initialSubject;
+            filterBySubject(initialSubject);
+        }
     });
 
     function changeKid(kidId) {
@@ -148,13 +174,64 @@
     }
 
     function changeSubject(subject) {
+        // Update URL param for persistence/backend sync
         const url = new URL(window.location);
         if (subject) {
             url.searchParams.set('subject', subject);
         } else {
             url.searchParams.delete('subject');
         }
-        window.location.href = url.toString();
+        history.replaceState({}, '', url.toString());
+
+        // Client-side filtering
+        filterBySubject(subject);
+    }
+
+    function filterBySubject(subject) {
+        const cards = document.querySelectorAll('[id^="lesson-"]');
+        cards.forEach(card => {
+            const cardSubject = (card.getAttribute('data-subject') || '').trim();
+            if (subject === '' || cardSubject.toLowerCase() === subject.toLowerCase()) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function changeSort(sortValue) {
+        const url = new URL(window.location);
+        url.searchParams.set('sort', sortValue);
+        history.replaceState({}, '', url.toString());
+        sortLessons(sortValue);
+    }
+
+    function sortLessons(sortValue) {
+        const grid = document.getElementById('lessons-grid');
+        if (!grid) return;
+        const lessons = Array.from(grid.querySelectorAll('[id^="lesson-"]'));
+        lessons.sort((a, b) => {
+            try {
+                if (sortValue === 'latest') {
+                    const dateA = new Date(a.getAttribute('data-created-at') || '1970-01-01');
+                    const dateB = new Date(b.getAttribute('data-created-at') || '1970-01-01');
+                    return dateB - dateA; // Descending by date
+                } else if (sortValue === 'title') {
+                    const titleA = a.getAttribute('data-title') || '';
+                    const titleB = b.getAttribute('data-title') || '';
+                    return titleA.localeCompare(titleB); // Ascending by title
+                } else if (sortValue === 'grade') {
+                    const gradeA = parseInt(a.getAttribute('data-grade') || 1);
+                    const gradeB = parseInt(b.getAttribute('data-grade') || 1);
+                    return gradeA - gradeB; // Ascending by grade
+                }
+            } catch (e) {
+                console.error('Sorting error:', e);
+                return 0;
+            }
+        });
+        grid.innerHTML = ''; // Clear container
+        lessons.forEach(lesson => grid.appendChild(lesson)); // Re-append sorted lessons
     }
 
     async function handleFetch(fetchPromise, successMsg, errorMsg, callback) {
