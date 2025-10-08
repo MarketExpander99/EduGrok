@@ -1,5 +1,5 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling, and sequencing logic. -->
+{# Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling, and sequencing logic. #}
 
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
