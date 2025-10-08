@@ -1,18 +1,41 @@
-{% if not post.completed %}
-
-    
-        Trace the word: {{ post.lesson.trace_word }}
-        <button type="button" onclick="window.speakQuestion(&#x27;Trace the word: {{ post.lesson.trace_word }}&#x27;, this)" class="ml-2 text-blue-700 hover:text-blue-500 transition" aria-label="Read instruction aloud">
+<!-- Filename: trace_activity.html.j2 -->
+<!-- Fix: Standardized submit button with proper onclick and data attributes to resolve "Activity not found!" error. Removed HTML entities for cleaner code. -->
+<!-- Enhancement: Added color picker, stroke width selector, and shape tools (circle/square buttons) for interactive drawing. Canvas now includes faint guide text rendering (assumes JS init). Minimal styling to match other activities without extra blue box. -->
+<!-- Fix: Changed text-blue-700 to text-white for consistency with dark theme backgrounds; updated speaker hover to text-gray-300. -->
+{% if post.lesson.trace_word and not post.completed %}
+<div class="activity-section p-3" data-type="trace">
+    <div class="flex items-center mb-2">
+        <h4 class="text-white font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
+        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-white hover:text-gray-300 transition" aria-label="Read instruction aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
+    </div>
     
-    <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none;"></canvas>
-    <button type="button" onclick="window.clearCanvas(&#x27;trace-canvas-{{ post.lesson.id | default(post.id) }}&#x27;)" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition mr-2">Clear</button>
-    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, &#x27;trace&#x27;)" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Save &#x26; Check</button>
-
+    <!-- Drawing Tools -->
+    <div class="flex flex-wrap items-center gap-2 mb-2 text-sm">
+        <label>Color: <input type="color" id="color-{{ post.lesson.id | default(post.id) }}" value="#000000" class="w-8 h-6 rounded"></label>
+        <label>Width: 
+            <select id="width-{{ post.lesson.id | default(post.id) }}" class="p-1 border rounded text-xs">
+                <option value="1">Thin</option>
+                <option value="3" selected>Medium</option>
+                <option value="5">Thick</option>
+            </select>
+        </label>
+        <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'circle')" class="px-2 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300 transition">Circle</button>
+        <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'square')" class="px-2 py-1 bg-gray-200 rounded text-xs hover:bg-gray-300 transition">Square</button>
+    </div>
+    
+    <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none; cursor: crosshair;"></canvas>
+    
+    <div class="flex gap-2">
+        <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition">Clear</button>
+        <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Save & Check</button>
+    </div>
+</div>
 {% else %}
-
-    
-    Trace the word: {{ post.lesson.trace_word }} (Completed)
-
+{% if post.lesson.trace_word %}
+<div class="activity-section p-3" data-type="trace">
+    <h4 class="text-green-700 font-medium">Trace the word: {{ post.lesson.trace_word }} (Completed)</h4>
+</div>
+{% endif %}
 {% endif %}

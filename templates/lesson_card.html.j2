@@ -1,6 +1,8 @@
 <!-- Filename: lesson_card.html.j2 -->
 {# Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling. #}
 {# Fix: Disabled sequencing logic to enable all activities/controls by default—no more grayed-out buttons. Added force-cleanup in init. #}
+{# Enhancement: For trace activity, replaced direct include with "Draw" button that toggles responsive popup (full-width mobile, 70% desktop) containing trace_activity.html.j2. Added JS for popup toggle/close. Removed any bg-blue-50 references; relies on sub-template minimal styling for consistency across activities. #}
+{# Fix: Ensured trace popup centers on viewport (screen) by removing outer padding, adding body overflow hidden on open/close to prevent scroll interference. #}
 
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     <div class="flex items-center mb-3">
@@ -15,7 +17,21 @@
     <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
     <div class="space-y-4 mb-4">
         {% if post.lesson.trace_word %}
-            {% include 'trace_activity.html.j2' %}
+            <div class="text-center">
+                <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition shadow-md">Draw</button>
+            </div>
+            <!-- Trace Popup -->
+            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-50" style="backdrop-filter: blur(4px);">
+                <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto md:max-w-5xl">
+                    <div class="p-6 border-b border-grok-border flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
+                        <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text hover:text-grok-accent text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        {% include 'trace_activity.html.j2' %}
+                    </div>
+                </div>
+            </div>
         {% endif %}
         {% if post.lesson.spell_word %}
             {% include 'spell_activity.html.j2' %}
@@ -107,6 +123,21 @@ if (!window.initAllActivities) {
   }
 }
 
+if (!window.toggleTracePopup) {
+  window.toggleTracePopup = function(lessonId) {
+    const popup = document.getElementById(`trace-popup-${lessonId}`);
+    if (popup.classList.contains('hidden')) {
+      popup.classList.remove('hidden');
+      document.body.style.overflow = 'hidden'; // Prevent background scroll
+      // Init canvas in popup context
+      setTimeout(() => window.initCanvas(lessonId), 100);
+    } else {
+      popup.classList.add('hidden');
+      document.body.style.overflow = ''; // Restore scroll
+    }
+  }
+}
+
 if (!window.initCanvas) {
   window.initCanvas = function(lessonId) {
     const canvas = document.getElementById(`trace-canvas-${lessonId}`);
@@ -164,6 +195,29 @@ if (!window.clearCanvas) {
     const canvas = document.getElementById(canvasId);
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+if (!window.drawShape) {
+  window.drawShape = function(lessonId, shape) {
+    const canvasId = `trace-canvas-${lessonId}`;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 50;
+    ctx.strokeStyle = document.getElementById(`color-${lessonId}`)?.value || '#000';
+    ctx.lineWidth = parseInt(document.getElementById(`width-${lessonId}`)?.value || 3);
+    ctx.beginPath();
+    if (shape === 'circle') {
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    } else if (shape === 'square') {
+      const size = 100;
+      ctx.rect(centerX - size/2, centerY - size/2, size, size);
+    }
+    ctx.stroke();
   }
 }
 

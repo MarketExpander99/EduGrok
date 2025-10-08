@@ -1,11 +1,11 @@
 <!-- Filename: mc_activity.html.j2 -->
 <!-- New: Extracted multiple-choice activity section. Includes question, speaker/sound buttons, option buttons, hidden input, and check button. Uses selectMcOption for selection. -->
-<!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. -->
+<!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. Removed bg-blue-50 and border-blue-200 wrappers to match trace activity's minimal display. Changed text-blue-700 to text-white for better contrast on dark backgrounds. -->
 {% if not post.completed %}
-<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200" data-type="mc">
+<div class="activity-section p-3" data-type="mc">
     <div class="flex items-center mb-2">
-        <h4 class="text-blue-700 font-medium flex-grow">{{ post.lesson.mc_question }}</h4>
-        <button type="button" onclick="window.speakQuestion('{{ post.lesson.mc_question }}', this)" class="ml-2 text-blue-700 hover:text-blue-500 transition" aria-label="Read question aloud">
+        <h4 class="text-white font-medium flex-grow">{{ post.lesson.mc_question }}</h4>
+        <button type="button" onclick="window.speakQuestion('{{ post.lesson.mc_question }}', this)" class="ml-2 text-white hover:text-gray-300 transition" aria-label="Read question aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
         {% if '/' in post.lesson.mc_question %}
@@ -24,7 +24,7 @@
     <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'mc')" data-type="mc" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition">Check</button>
 </div>
 {% else %}
-<div class="activity-section p-3 bg-green-50 rounded-lg border border-green-200" data-type="mc">
+<div class="activity-section p-3" data-type="mc">
     <h4 class="text-green-700 font-medium">{{ post.lesson.mc_question }} (Completed)</h4>
 </div>
 {% endif %}
