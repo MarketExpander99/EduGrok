@@ -1,127 +1,128 @@
-<!-- lesson_card.html.j2 (Updated: Softened new post flash to subtle blue pulse animation instead of harsh orange sparkle; changed all orange accents to blue for eye comfort (borders, backgrounds, buttons, hovers); improved text contrast in inputs/textareas by adding bg-white text-gray-900; made drawing canvas responsive on mobile with media query to reduce size (width:100%, height:150px); adjusted touch events in JS to minimize scroll interference by removing preventDefault from touchstart and only applying on touchmove when drawing. Preserved all previous updates.) -->
+<!-- lesson_card.html.j2 (Updated: Added Font Awesome icons to action buttons: heart for like/unlike, comment for notes, share for share (disabled). For completed lessons, added check icon to the "Completed!" badge. Ensured consistent mr-1 spacing and flex alignment. Preserved all previous updates including MC buttons with sounds/TTS and mobile TTS enhancements.) -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
         <div class="flex justify-end mb-3">
-            <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">Completed! </span>
+            <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                <i class="fas fa-check mr-1"></i>Completed!
+            </span>
         </div>
     {% endif %}
     <div class="flex items-center mb-3">
         <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
             
+    </div>
+    <div class="flex-1">
+        <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
+        <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
+    </div>
+</div>
+<p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
+<div class="space-y-4 mb-4">
+    {% if post.lesson.trace_word %}
+        <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="trace">
+            <h4 class="text-blue-700 font-medium mb-2"> Trace the word: {{ post.lesson.trace_word }}</h4>
+            <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none;"></canvas>
+            <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Clear</button>
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Save & Check</button>
         </div>
-        <div class="flex-1">
-            <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
-            <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
+    {% endif %}
+    {% if post.lesson.spell_word %}
+        <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="spell">
+            <h4 class="text-blue-700 font-medium mb-2"> Spell the word you hear</h4>
+            <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}> Play Sound</button>
+            <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 mt-2 bg-white text-gray-900" placeholder="Type the word here" {% if post.completed %}readonly disabled{% endif %}>
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
         </div>
-    </div>
-    <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
-    <div class="space-y-4 mb-4">
-        {% if post.lesson.trace_word %}
-            <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="trace">
-                <h4 class="text-blue-700 font-medium mb-2"> Trace the word: {{ post.lesson.trace_word }}</h4>
-                <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none;"></canvas>
-                <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Clear</button>
-                <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Save & Check</button>
+    {% endif %}
+    {% if post.lesson.mc_question %}
+        <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="mc">
+            <div class="flex items-center mb-2">
+                <h4 class="text-blue-700 font-medium flex-grow">{{ post.lesson.mc_question }}</h4>
+                {% if '/' in post.lesson.mc_question %}
+                    <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}> Play Sound</button>
+                {% endif %}
             </div>
-        {% endif %}
-        {% if post.lesson.spell_word %}
-            <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="spell">
-                <h4 class="text-blue-700 font-medium mb-2"> Spell the word you hear</h4>
-                <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}> Play Sound</button>
-                <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 mt-2 bg-white text-gray-900" placeholder="Type the word here" {% if post.completed %}readonly disabled{% endif %}>
-                <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
+            {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
+            <input type="hidden" name="mc{{ post.lesson.id | default(post.id) }}" id="mc-hidden-{{ post.lesson.id | default(post.id) }}" value="">
+            <div class="space-y-2">
+                {% for option in options %}
+                    <button type="button" class="mc-btn w-full text-left p-3 border border-grok-border rounded bg-white text-gray-900 hover:bg-grok-accent transition text-grok-text" data-value="{{ option }}" onclick="window.selectMcOption('{{ post.lesson.id | default(post.id) }}', this, '{{ option }}')">
+                        <span class="font-semibold">{% if options|length <= 4 %}{{ 'A' if loop.index0 == 0 else 'B' if loop.index0 == 1 else 'C' if loop.index0 == 2 else 'D' }}{% endif %}</span>. {{ option }}
+                    </button>
+                {% endfor %}
             </div>
-        {% endif %}
-        {% if post.lesson.mc_question %}
-            <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="mc">
-                <div class="flex items-center mb-2">
-                    <h4 class="text-blue-700 font-medium flex-grow">{{ post.lesson.mc_question }}</h4>
-                    {% if '/' in post.lesson.mc_question %}
-                        <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}> Play Sound</button>
-                    {% endif %}
-                </div>
-                {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
-                <div class="space-y-2">
-                    {% for option in options %}
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="mc{{ post.lesson.id | default(post.id) }}" value="{{ option }}" class="text-blue-500 focus:ring-blue-500" {% if post.completed %}disabled{% endif %}>
-                            <span class="text-grok-text">{{ option }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
-                <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'mc')" data-type="mc" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'mc')" data-type="mc" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
+        </div>
+    {% endif %}
+    {% if post.lesson.sentence_question %}
+        <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="sentence">
+            <h4 class="text-blue-700 font-medium mb-2">{{ post.lesson.sentence_question }}</h4>
+            {% set options = (post.lesson.sentence_options if post.lesson.sentence_options is iterable and not post.lesson.sentence_options is string else []) %}
+            <input type="hidden" name="sentence{{ post.lesson.id | default(post.id) }}" id="sentence-hidden-{{ post.lesson.id | default(post.id) }}" value="">
+            <div class="space-y-2">
+                {% for option in options %}
+                    <button type="button" class="mc-btn w-full text-left p-3 border border-grok-border rounded bg-white text-gray-900 hover:bg-grok-accent transition text-grok-text" data-value="{{ option }}" onclick="window.selectMcOption('{{ post.lesson.id | default(post.id) }}', this, '{{ option }}', 'sentence')">
+                        <span class="font-semibold">{% if options|length <= 4 %}{{ 'A' if loop.index0 == 0 else 'B' if loop.index0 == 1 else 'C' if loop.index0 == 2 else 'D' }}{% endif %}</span>. {{ option }}
+                    </button>
+                {% endfor %}
             </div>
-        {% endif %}
-        {% if post.lesson.sentence_question %}
-            <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="sentence">
-                <h4 class="text-blue-700 font-medium mb-2">{{ post.lesson.sentence_question }}</h4>
-                {% set options = (post.lesson.sentence_options if post.lesson.sentence_options is iterable and not post.lesson.sentence_options is string else []) %}
-                <div class="space-y-2">
-                    {% for option in options %}
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="sentence{{ post.lesson.id | default(post.id) }}" value="{{ option }}" class="text-blue-500 focus:ring-blue-500" {% if post.completed %}disabled{% endif %}>
-                            <span class="text-grok-text">{{ option }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
-                <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'sentence')" data-type="sentence" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
-            </div>
-        {% endif %}
-        {% if post.lesson.math_question %}
-            <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="math">
-                <h4 class="text-blue-700 font-medium mb-2">{{ post.lesson.math_question }}</h4>
-                <input id="math-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" placeholder="Type your answer here" {% if post.completed %}readonly disabled{% endif %}>
-                <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'math')" data-type="math" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
-            </div>
-        {% endif %}
-    </div>
-    <div class="flex justify-between text-grok-secondary mb-4 text-xs">
-        <span> {{ post.views or 0 }} views</span>
-        <span> {{ post.likes or 0 }} likes</span>
-        <span> {{ (comments[post.id] | length) if post.id in comments else 0 }} notes</span>
-    </div>
-    <div class="flex justify-between border-t border-blue-300 pt-3 text-sm">
-        <button onclick="window.likePost({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
-             {{ 'Unlike' if post.liked_by_user else 'Like' }}
-        </button>
-        <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center">
-             Notes
-        </button>
-        <button class="text-grok-text flex items-center opacity-50 cursor-not-allowed" disabled>
-             Share
-        </button>
-    </div>
-    <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
-        <form method="POST" action="/comment/{{ post.id }}">
-            <textarea name="content" placeholder="Add a note..." class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" required rows="2"></textarea>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2">Post Note</button>
-        </form>
-    </div>
-    {% if post.id in comments %}
-        <div class="mt-4">
-            <h4 class="text-sm font-semibold text-grok-text mb-2">Notes:</h4>
-            {% for comment in (comments[post.id] | sort(attribute='created_at'))[:3] %}
-                <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
-                    <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
-
-                    {{ comment.content | safe }}
-                </div>
-            {% endfor %}
-            {% if (comments[post.id] | length) > 3 %}
-                <div id="hidden-comments-{{ post.id }}" style="display: none;">
-                    {% for comment in comments[post.id] | slice(3) %}
-                        <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
-                            <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
-
-                            {{ comment.content | safe }}
-                        </div>
-                    {% endfor %}
-                </div>
-                <button id="toggle-btn-{{ post.id }}" onclick="window.toggleCommentsExtra({{ post.id }})" class="text-blue-500 underline text-sm">Show more ({{ (comments[post.id] | length) - 3 }} more)</button>
-            {% endif %}
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'sentence')" data-type="sentence" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
+        </div>
+    {% endif %}
+    {% if post.lesson.math_question %}
+        <div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="math">
+            <h4 class="text-blue-700 font-medium mb-2">{{ post.lesson.math_question }}</h4>
+            <input id="math-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" placeholder="Type your answer here" {% if post.completed %}readonly disabled{% endif %}>
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'math')" data-type="math" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
         </div>
     {% endif %}
 </div>
+<div class="flex justify-between text-grok-secondary mb-4 text-xs">
+    <span> {{ post.views or 0 }} views</span>
+    <span> {{ post.likes or 0 }} likes</span>
+    <span> {{ (comments[post.id] | length) if post.id in comments else 0 }} notes</span>
+</div>
+<div class="flex justify-between border-t border-blue-300 pt-3 text-sm">
+    <button onclick="window.likePost({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
+        <i class="fas fa-heart mr-1"></i>{{ 'Unlike' if post.liked_by_user else 'Like' }}
+    </button>
+    <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text hover:text-blue-500 flex items-center">
+        <i class="fas fa-comment mr-1"></i>Notes
+    </button>
+    <button class="text-grok-text flex items-center opacity-50 cursor-not-allowed" disabled>
+        <i class="fas fa-share mr-1"></i>Share
+    </button>
+</div>
+<div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
+    <form method="POST" action="/comment/{{ post.id }}">
+        <textarea name="content" placeholder="Add a note..." class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" required rows="2"></textarea>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2">Post Note</button>
+    </form>
+</div>
+{% if post.id in comments %}
+    <div class="mt-4">
+        <h4 class="text-sm font-semibold text-grok-text mb-2">Notes:</h4>
+        {% for comment in (comments[post.id] | sort(attribute='created_at'))[:3] %}
+            <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
+                <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
+
+                {{ comment.content | safe }}
+            </div>
+        {% endfor %}
+        {% if (comments[post.id] | length) > 3 %}
+            <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                {% for comment in comments[post.id] | slice(3) %}
+                    <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
+                        <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
+
+                        {{ comment.content | safe }}
+                    </div>
+                {% endfor %}
+            </div>
+            <button id="toggle-btn-{{ post.id }}" onclick="window.toggleCommentsExtra({{ post.id }})" class="text-blue-500 underline text-sm">Show more ({{ (comments[post.id] | length) - 3 }} more)</button>
+        {% endif %}
+    </div>
+{% endif %}</div>
 
 <script>
 if (!window.activityOrder) {
@@ -224,14 +225,64 @@ if (!window.clearCanvas) {
   }
 }
 
+if (!window.playClickSound) {
+  window.playClickSound = function() {
+    if (typeof AudioContext !== 'undefined') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.1);
+      } catch (e) {
+        console.warn('Click sound failed:', e);
+      }
+    }
+  }
+}
+
 if (!window.playAudio) {
   window.playAudio = function(word) {
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      speechSynthesis.speak(utterance);
+      try {
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.onerror = function(e) {
+          console.warn('TTS error:', e);
+        };
+        speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('TTS failed:', e);
+      }
     } else {
-      alert('Sorry, your browser does not support text-to-speech!');
+      console.warn('TTS not supported');
     }
+  }
+}
+
+if (!window.selectMcOption) {
+  window.selectMcOption = function(lessonId, btn, value, type = 'mc') {
+    const section = document.querySelector(`#lesson-${lessonId} .activity-section[data-type="${type}"]`);
+    if (section.classList.contains('disabled-activity')) return;
+    const buttons = section.querySelectorAll('.mc-btn');
+    buttons.forEach(b => {
+      b.classList.remove('selected');
+      b.style.backgroundColor = '';
+      b.style.color = '';
+    });
+    btn.classList.add('selected');
+    btn.style.backgroundColor = '#3b82f6';
+    btn.style.color = 'white';
+    const hiddenId = `${type}-hidden-${lessonId}`;
+    const hidden = document.getElementById(hiddenId);
+    if (hidden) hidden.value = value;
+    window.playClickSound();
+    window.playAudio(value.toLowerCase());
   }
 }
 
@@ -269,11 +320,13 @@ if (!window.submitActivity) {
     } else if (activityType === 'spell' || activityType === 'math') {
       answer = section.querySelector('input[type="text"]')?.value || '';
     } else if (activityType === 'mc' || activityType === 'sentence') {
-      answer = section.querySelector(`input[name="${activityType}${lessonId}"]:checked`)?.value || '';
+      const hiddenId = `${activityType}-hidden-${lessonId}`;
+      const hidden = document.getElementById(hiddenId);
+      answer = hidden ? hidden.value : '';
     }
     if (!answer.trim()) {
       console.log(`No valid answer for ${activityType}`);
-      alert('Please enter an answer!');
+      alert('Please select or enter an answer!');
       return;
     }
     const payload = { lesson_id: lessonId, activity_type: activityType, answer };
@@ -379,6 +432,12 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
 .disabled-activity {
     opacity: 0.5;
     pointer-events: none;
+}
+
+.mc-btn.selected {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-color: #3b82f6 !important;
 }
 </style>
 
