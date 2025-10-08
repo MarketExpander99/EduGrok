@@ -217,8 +217,11 @@ def check_lesson():
             correct_answer = correct_answer
         user_answer = str(user_answer).strip().lower()
         correct_answer = [str(c).strip().lower() for c in (correct_answer if isinstance(correct_answer, list) else [correct_answer])]
-        # Compare answers
-        is_correct = user_answer in correct_answer
+        # Compare answers - special case for trace: always correct if 'drawn'
+        if activity_type == 'trace':
+            is_correct = (user_answer == 'drawn')
+        else:
+            is_correct = user_answer in correct_answer
         points = 10 if is_correct else 0
         now = datetime.now().isoformat()
         # FIXED: Use UPSERT to update if already exists for this activity

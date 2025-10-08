@@ -1,4 +1,4 @@
-<!-- lesson_card.html.j2 (Updated: Implemented sequential activity unlocking—starts with first activity enabled, unlocks next only on correct submission via AJAX to /check_lesson. Added initAllActivities() to disable all but first per card on load. Defined activityOrder for top-down progression. Added .disabled-activity CSS for visual disable. Preserved all existing logic, styling, and completed lesson handling. Allows any-order optional but defaults to progressive top-down UX.) -->
+<!-- lesson_card.html.j2 (Updated: Added canvas for trace activities with mouse/touch drawing; save button sends 'drawn' to mark correct by default. For spelling, changed to "Spell the word you hear" with audio play button using SpeechSynthesis; removed direct word display to avoid giving answer. Preserved sequential unlocking, styling, and all other logic.) -->
 <div class="card bg-grok-surface border-2 border-orange-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}sparkly-border bg-orange-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
         <div class="flex justify-end mb-3">
@@ -19,13 +19,16 @@
         {% if post.lesson.trace_word %}
             <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="trace">
                 <h4 class="text-orange-700 font-medium mb-2">✏️ Trace the word: {{ post.lesson.trace_word }}</h4>
-                <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="{{ post.lesson.trace_word }}" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check Trace</button>
+                <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-orange-300 rounded bg-white mb-2" style="touch-action: none;"></canvas>
+                <button type="button" onclick="clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Clear</button>
+                <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Save & Check</button>
             </div>
         {% endif %}
         {% if post.lesson.spell_word %}
             <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="spell">
-                <h4 class="text-orange-700 font-medium mb-2">🔤 Spell the word: {{ post.lesson.spell_word }}</h4>
-                <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500" placeholder="Type the word here" {% if post.completed %}readonly disabled{% endif %}>
+                <h4 class="text-orange-700 font-medium mb-2">🔤 Spell the word you hear</h4>
+                <button type="button" onclick="playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2 {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>🔊 Play Sound</button>
+                <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500 mt-2" placeholder="Type the word here" {% if post.completed %}readonly disabled{% endif %}>
                 <button type="button" onclick="submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 mt-2 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>Check</button>
             </div>
         {% endif %}
@@ -123,11 +126,12 @@ function initAllActivities() {
         const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => activityOrder.includes(s.dataset.type));
         sections.slice(1).forEach(section => {
             section.classList.add('disabled-activity');
-            section.querySelectorAll('input, button').forEach(el => el.disabled = true);
+            section.querySelectorAll('input, button, canvas').forEach(el => el.disabled = true);
         });
         if (sections.length > 0) {
             sections[0].classList.remove('disabled-activity');
-            sections[0].querySelectorAll('input, button').forEach(el => el.disabled = false);
+            sections[0].querySelectorAll('input, button, canvas').forEach(el => el.disabled = false);
+            if (sections[0].dataset.type === 'trace') initCanvas(lessonId);
         }
     });
 }
@@ -140,7 +144,56 @@ function enableNextActivity(lessonId, currentType) {
     if (currentIndex < 0 || currentIndex >= sections.length - 1) return; // No next or last
     const nextSection = sections[currentIndex + 1];
     nextSection.classList.remove('disabled-activity');
-    nextSection.querySelectorAll('input, button').forEach(el => el.disabled = false);
+    nextSection.querySelectorAll('input, button, canvas').forEach(el => el.disabled = false);
+    if (nextSection.dataset.type === 'trace') initCanvas(lessonId);
+}
+
+function initCanvas(lessonId) {
+    const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000';
+    let drawing = false;
+
+    // Mouse events
+    canvas.addEventListener('mousedown', () => drawing = true);
+    canvas.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('mouseout', () => drawing = false);
+    canvas.addEventListener('mousemove', draw);
+
+    // Touch events
+    canvas.addEventListener('touchstart', (e) => { drawing = true; draw(e); });
+    canvas.addEventListener('touchend', () => drawing = false);
+    canvas.addEventListener('touchcancel', () => drawing = false);
+    canvas.addEventListener('touchmove', draw);
+
+    function draw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX || e.touches[0].clientX) - rect.left;
+        const y = (e.clientY || e.touches[0].clientY) - rect.top;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    }
+}
+
+function clearCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function playAudio(word) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(word);
+        speechSynthesis.speak(utterance);
+    } else {
+        alert('Sorry, your browser does not support text-to-speech!');
+    }
 }
 
 function submitActivity(event, lessonId, activityType) {
@@ -172,7 +225,7 @@ function submitActivity(event, lessonId, activityType) {
     const btn = section.querySelector('.check-btn');
     let answer = '';
     if (activityType === 'trace') {
-        answer = btn.dataset.value || '';
+        answer = 'drawn'; // Mark as drawn by default
     } else if (activityType === 'spell' || activityType === 'math') {
         answer = section.querySelector('input[type="text"]')?.value || '';
     } else if (activityType === 'mc' || activityType === 'sentence') {
@@ -209,7 +262,7 @@ function submitActivity(event, lessonId, activityType) {
                 enableNextActivity(lessonId, activityType);
                 if (d.lesson_completed) {
                     document.getElementById(`lesson-${lessonId}`).classList.add('opacity-70');
-                    document.getElementById(`lesson-${lessonId}`).querySelectorAll('.check-btn, input').forEach(el => el.disabled = true);
+                    document.getElementById(`lesson-${lessonId}`).querySelectorAll('.check-btn, input, canvas').forEach(el => el.disabled = true);
                 }
             }
         } else {
