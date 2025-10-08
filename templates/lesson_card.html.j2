@@ -1,4 +1,4 @@
-<!-- lesson_card.html.j2 (Updated: Fixed canvas drawing by properly initializing path on mousedown/touchstart and simplifying draw function for continuous lines. Made JS idempotent to prevent redeclaration errors; wrapped globals and functions in checks using window namespace. Preserved trace canvas, spell audio, sequential unlocking, etc.) -->
+<!-- lesson_card.html.j2 (Updated: Added play sound button next to mc_question if it contains phonetic notation like '/'. Button plays the spell_word using existing playAudio. Placed in flex div for alignment. Preserved all previous updates including fixed canvas drawing, idempotent JS, etc.) -->
 <div class="card bg-grok-surface border-2 border-orange-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}sparkly-border bg-orange-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     {% if post.completed %}
         <div class="flex justify-end mb-3">
@@ -34,7 +34,12 @@
         {% endif %}
         {% if post.lesson.mc_question %}
             <div class="activity-section p-3 bg-orange-50 rounded-lg border border-orange-200 {% if post.completed %}opacity-50 disabled-activity{% endif %}" data-type="mc">
-                <h4 class="text-orange-700 font-medium mb-2">{{ post.lesson.mc_question }}</h4>
+                <div class="flex items-center mb-2">
+                    <h4 class="text-orange-700 font-medium flex-grow">{{ post.lesson.mc_question }}</h4>
+                    {% if '/' in post.lesson.mc_question %}
+                        <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition {% if post.completed %}opacity-50 cursor-not-allowed{% endif %}" {% if post.completed %}disabled{% endif %}>🔊 Play Sound</button>
+                    {% endif %}
+                </div>
                 {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
                 <div class="space-y-2">
                     {% for option in options %}
@@ -349,7 +354,7 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
 <style>
 .sparkly-border { position: relative; border: 2px solid transparent; border-radius: 0.75rem; }
 .sparkly-border::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border-radius: 0.75rem; background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706, #b45309); background-size: 400%; animation: sparkle 2s linear infinite; z-index: -1; }
-@keyframes sparkle { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes sparkle { 0%, 10% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
 .disabled-activity {
     opacity: 0.5;
