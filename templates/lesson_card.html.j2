@@ -1,14 +1,8 @@
 <!-- Filename: lesson_card.html.j2 -->
-{# Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling, and sequencing logic. #}
+{# Updated: Refactored to modular structure. Removed inline activity HTML; replaced with conditional {% include %} for each activity type. Retained overall card layout, header, description, stats, actions, and comments. Moved activity-specific JS to sub-templates where possible, but kept shared global functions (e.g., submitActivity, speakQuestion) here. Adjusted classes and IDs for consistency. Preserved pulse-border, completion styling. #}
+{# Fix: Disabled sequencing logic to enable all activities/controls by default—no more grayed-out buttons. Added force-cleanup in init. #}
 
-<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %} {% if post.completed %}opacity-70{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
-    {% if post.completed %}
-        <div class="flex justify-end mb-3">
-            <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                <i class="fas fa-check mr-1"></i>Completed!
-            </span>
-        </div>
-    {% endif %}
+<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-200 max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     <div class="flex items-center mb-3">
         <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
             {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
@@ -94,32 +88,22 @@ if (!window.initAllActivities) {
   window.initAllActivities = function() {
     document.querySelectorAll('.card[id^="lesson-"]').forEach(card => {
       const lessonId = card.id.split('-')[1];
-      if (document.getElementById(`lesson-${lessonId}`).classList.contains('opacity-70')) return; // Skip completed lessons
       const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => window.activityOrder.includes(s.dataset.type));
-      sections.slice(1).forEach(section => {
-        section.classList.add('disabled-activity');
-        section.querySelectorAll('input, button, canvas').forEach(el => el.disabled = true);
+      console.log(`Enabling ${sections.length} activities in lesson ${lessonId}`);
+      sections.forEach(section => {
+        // Force remove any disabled class/CSS
+        section.classList.remove('disabled-activity');
+        section.style.opacity = '1';
+        section.style.pointerEvents = 'auto';
+        section.querySelectorAll('input, button, canvas').forEach(el => {
+          el.disabled = false;
+          el.style.opacity = '1';
+        });
+        if (section.dataset.type === 'trace') window.initCanvas(lessonId);
       });
-      if (sections.length > 0) {
-        sections[0].classList.remove('disabled-activity');
-        sections[0].querySelectorAll('input, button, canvas').forEach(el => el.disabled = false);
-        if (sections[0].dataset.type === 'trace') window.initCanvas(lessonId);
-      }
+      // Fallback: Init any canvases even if no sections detected
+      if (card.querySelector('canvas[id^="trace-canvas-"]')) window.initCanvas(lessonId);
     });
-  }
-}
-
-if (!window.enableNextActivity) {
-  window.enableNextActivity = function(lessonId, currentType) {
-    const card = document.getElementById(`lesson-${lessonId}`);
-    if (card.classList.contains('opacity-70')) return; // Already completed
-    const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => window.activityOrder.includes(s.dataset.type));
-    const currentIndex = sections.findIndex(s => s.dataset.type === currentType);
-    if (currentIndex < 0 || currentIndex >= sections.length - 1) return; // No next or last
-    const nextSection = sections[currentIndex + 1];
-    nextSection.classList.remove('disabled-activity');
-    nextSection.querySelectorAll('input, button, canvas').forEach(el => el.disabled = false);
-    if (nextSection.dataset.type === 'trace') window.initCanvas(lessonId);
   }
 }
 
@@ -137,7 +121,6 @@ if (!window.initCanvas) {
       const { x, y } = getCoordinates(e);
       ctx.beginPath();
       ctx.moveTo(x, y);
-      // Removed preventDefault from touchstart to allow scroll initiation; handle in touchmove only when drawing
       if (e.type === 'touchstart') e.preventDefault();
     }
 
@@ -146,7 +129,7 @@ if (!window.initCanvas) {
       const { x, y } = getCoordinates(e);
       ctx.lineTo(x, y);
       ctx.stroke();
-      if (e.type === 'touchmove') e.preventDefault(); // Prevent scroll only while actively drawing
+      if (e.type === 'touchmove') e.preventDefault();
     }
 
     function endDrawing(e) {
@@ -164,13 +147,11 @@ if (!window.initCanvas) {
       };
     }
 
-    // Mouse events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', endDrawing);
     canvas.addEventListener('mouseout', endDrawing);
 
-    // Touch events
     canvas.addEventListener('touchstart', startDrawing, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', endDrawing, { passive: false });
@@ -249,7 +230,6 @@ if (!window.speakQuestion) {
 if (!window.selectMcOption) {
   window.selectMcOption = function(lessonId, btn, value, type = 'mc') {
     const section = document.querySelector(`#lesson-${lessonId} .activity-section[data-type="${type}"]`);
-    if (section.classList.contains('disabled-activity')) return;
     const buttons = section.querySelectorAll('.mc-btn');
     buttons.forEach(b => {
       b.classList.remove('selected');
@@ -280,18 +260,10 @@ if (!window.submitActivity) {
       alert('Error: Missing activity type. Please reload.');
       return;
     }
-    if (document.getElementById(`lesson-${lessonId}`).classList.contains('opacity-70')) {
-      console.log(`Lesson ${lessonId} is completed, exiting`);
-      return;
-    }
     const section = document.querySelector(`#lesson-${lessonId} .activity-section[data-type="${activityType}"]`);
     if (!section) {
       console.error(`No section found for activity ${activityType}`);
       alert('Error: Activity not found!');
-      return;
-    }
-    if (section.classList.contains('disabled-activity')) {
-      console.log(`Activity ${activityType} is disabled, skipping`);
       return;
     }
     const btn = section.querySelector('.check-btn');
@@ -333,11 +305,6 @@ if (!window.submitActivity) {
           section.style.backgroundColor = '#dbeafe';
           btn.textContent = 'Done! ';
           btn.disabled = true;
-          window.enableNextActivity(lessonId, activityType);
-          if (d.lesson_completed) {
-            document.getElementById(`lesson-${lessonId}`).classList.add('opacity-70');
-            document.getElementById(`lesson-${lessonId}`).querySelectorAll('.check-btn, input, canvas').forEach(el => el.disabled = true);
-          }
         }
       } else {
         alert(d.error || 'Check failed');
@@ -408,11 +375,6 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
     width: 100% !important;
     height: 150px !important;
   }
-}
-
-.disabled-activity {
-    opacity: 0.5;
-    pointer-events: none;
 }
 
 .mc-btn.selected {

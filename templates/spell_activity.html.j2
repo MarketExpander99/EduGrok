@@ -1,19 +1,20 @@
 <!-- Filename: spell_activity.html.j2 -->
 <!-- New: Extracted spelling activity section. Includes sound play button, input field, and check button. Speaker icon for instruction. -->
+<!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. -->
 {% if not post.completed %}
-<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 opacity-50 disabled-activity" data-type="spell">
+<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200" data-type="spell">
     <div class="flex items-center mb-2">
         <h4 class="text-blue-700 font-medium flex-grow">Spell the word you hear</h4>
-        <button type="button" onclick="window.speakQuestion('Spell the word you hear', this)" class="ml-2 text-blue-700 hover:text-blue-500 transition opacity-75 hover:opacity-100 opacity-50 cursor-not-allowed" disabled aria-label="Read instruction aloud">
+        <button type="button" onclick="window.speakQuestion('Spell the word you hear', this)" class="ml-2 text-blue-700 hover:text-blue-500 transition" aria-label="Read instruction aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
     </div>
-    <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2 opacity-50 cursor-not-allowed" disabled> Play Sound</button>
-    <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 mt-2 bg-white text-gray-900" placeholder="Type the word here" readonly disabled>
-    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition opacity-50 cursor-not-allowed" disabled>Check</button>
+    <button type="button" onclick="window.playAudio('{{ post.lesson.spell_word }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2"> Play Sound</button>
+    <input id="spell-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 mt-2 bg-white text-gray-900" placeholder="Type the word here">
+    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'spell')" data-type="spell" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition">Check</button>
 </div>
 {% else %}
-<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 opacity-50 disabled-activity" data-type="spell">
-    <h4 class="text-blue-700 font-medium">Spell the word you hear: {{ post.lesson.spell_word }} (Completed)</h4>
+<div class="activity-section p-3 bg-green-50 rounded-lg border border-green-200" data-type="spell">
+    <h4 class="text-green-700 font-medium">Spell the word you hear: {{ post.lesson.spell_word }} (Completed)</h4>
 </div>
 {% endif %}
