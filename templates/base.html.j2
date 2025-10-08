@@ -1,4 +1,4 @@
-<!-- base.html.j2 (updated: Changed mobile bottom nav ID to 'bottom-nav' to match home.html.j2 script for consistent scroll hide/show behavior. Added badge span to mobile notifications with id='mobile-notif-count' and updated fetch script to set count on both sidebar and mobile badges for shared logic. Ensured initial show on load by explicitly removing 'translate-y-full' class in DOMContentLoaded.) -->
+<!-- base.html.j2 (Updated: Improved mobile bottom nav scroll logic with scroll delta threshold (10px) to prevent flickering/hiding on minor scrolls or initial load jitters; only apply hide/show if absolute scroll change exceeds threshold. Added near-top check: don't hide if scrollTop < 50px to keep nav visible when at/near top. Ensured initial lastScrollTop set after a short delay to capture stable position. Preserved all previous updates including notification badges and shared fetch logic.) -->
 <!DOCTYPE html>
 <html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% else %}astronaut-theme{% endif %}">
 <head>
@@ -114,22 +114,31 @@
         if (bottomNav) {
             bottomNav.classList.remove('translate-y-full');
         }
+        // Set initial lastScrollTop after a short delay to capture stable position
+        setTimeout(() => {
+            lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        }, 100);
     });
 
     // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
     let lastScrollTop = 0;
     let ticking = false;
     const bottomNav = document.getElementById('bottom-nav');
+    const scrollThreshold = 10; // Minimum scroll change to trigger hide/show
+    const topThreshold = 50; // Don't hide if near top
 
     function updateNavPosition() {
         let st = window.pageYOffset || document.documentElement.scrollTop;
-        const isScrollingDown = st > lastScrollTop;
+        const delta = st - lastScrollTop;
+        const isScrollingDown = delta > scrollThreshold;
+        const isScrollingUp = delta < -scrollThreshold;
+        const nearTop = st < topThreshold;
 
-        // Mobile bottom nav: hide on down, show on up
+        // Mobile bottom nav: hide on significant down scroll (unless near top), show on up
         if (bottomNav) {
-            if (isScrollingDown) {
+            if (isScrollingDown && !nearTop) {
                 bottomNav.classList.add('translate-y-full');
-            } else {
+            } else if (isScrollingUp || nearTop) {
                 bottomNav.classList.remove('translate-y-full');
             }
         }
@@ -182,6 +191,4 @@
             });
     }
 </script>
-{% block scripts %}{% endblock %}</body>
-</html>
-
+{% block scripts %}{% endblock %}</body></html>

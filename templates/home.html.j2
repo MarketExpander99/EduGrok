@@ -1,9 +1,7 @@
-<!-- Filename: home.html.j2 -->
-<!-- Updates: Fixed sorting for 'most_likes' and 'latest'. Added secondary sort by created_at for 'most_likes' ties. Improved created_at parsing for 'latest' with robust selector and debug logging. Ensured only #posts-container post cards are sorted. Retained working 'most_views' logic, FAB, notifications, and sticky header functionality. -->
+<!-- home.html.j2 (Updated: Improved FAB and bottom nav scroll hide/show logic with scroll delta threshold (10px) to prevent flickering on minor scrolls; only hide if significant down scroll and not near top (scrollTop > 50px). Removed duplicated bottomNav handling to avoid conflicts with base.html.j2; now defers to base for nav, focuses here on header and FAB. Added initial lastScrollTop set after delay for stable load. Ensured FAB shows initially on mobile. Preserved all previous updates including sorting, notifications, and flash messages.) -->
 {% extends "base.html.j2" %}
 {% block title %}Home - EduGrok{% endblock %}
-{% block content %}
-<div class="min-h-screen bg-grok-bg">
+{% block content %}<div class="min-h-screen bg-grok-bg">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -130,8 +128,7 @@
     </button>
 </div>
 
-{% include 'post_form.html.j2' %}
-<script>
+{% include 'post_form.html.j2' %}<script>
 function fetchNotifications() {
     fetch('/api/notifications_count')
         .then(r => r.json())
@@ -165,35 +162,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
         }, 5000);
     });
-    // Sticky header and bottom nav scroll hide/show
+    // Ensure FAB shows initially on mobile
+    const fab = document.getElementById('fab');
+    if (window.innerWidth < 768 && fab) {
+        fab.style.opacity = '1';
+        fab.style.visibility = 'visible';
+    }
+    // Set initial lastScrollTop after a short delay to capture stable position
+    setTimeout(() => {
+        lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    }, 100);
+    // Sticky header and FAB scroll hide/show (defer bottom nav to base.html.j2 to avoid duplication)
     let lastScrollTop = 0;
     const header = document.getElementById('sticky-header');
-    const bottomNav = document.getElementById('bottom-nav');
-    const fab = document.getElementById('fab');
+    const fabEl = document.getElementById('fab');
     const isMobile = () => window.innerWidth < 768;
+    const scrollThreshold = 10; // Minimum scroll change to trigger
+    const topThreshold = 50; // Don't hide if near top
     window.addEventListener('scroll', function() {
         let st = window.pageYOffset || document.documentElement.scrollTop;
-        if (st > lastScrollTop) {
+        const delta = st - lastScrollTop;
+        const isScrollingDown = delta > scrollThreshold;
+        const isScrollingUp = delta < -scrollThreshold;
+        const nearTop = st < topThreshold;
+
+        // Header: always hide on down scroll
+        if (isScrollingDown) {
             header.style.transform = 'translateY(-100%)';
-            if (bottomNav) {
-                bottomNav.style.transform = 'translateY(100%)';
-            }
-            if (isMobile() && fab) {
-                fab.style.opacity = '0';
-                fab.style.visibility = 'hidden';
-                fab.style.transition = 'opacity 0.3s ease-in-out, visibility 0.3s ease-in-out';
-            }
-        } else {
+        } else if (isScrollingUp) {
             header.style.transform = 'translateY(0)';
-            if (bottomNav) {
-                bottomNav.style.transform = 'translateY(0)';
-            }
-            if (fab) {
-                fab.style.opacity = '1';
-                fab.style.visibility = 'visible';
-                fab.style.transition = 'opacity 0.3s ease-in-out';
+        }
+
+        // FAB: hide on significant down scroll on mobile (unless near top), show on up
+        if (isMobile() && fabEl) {
+            if (isScrollingDown && !nearTop) {
+                fabEl.style.opacity = '0';
+                fabEl.style.visibility = 'hidden';
+                fabEl.style.transition = 'opacity 0.3s ease-in-out, visibility 0.3s ease-in-out';
+            } else if (isScrollingUp || nearTop) {
+                fabEl.style.opacity = '1';
+                fabEl.style.visibility = 'visible';
+                fabEl.style.transition = 'opacity 0.3s ease-in-out';
             }
         }
+
         lastScrollTop = st <= 0 ? 0 : st;
     });
     // Handle sort selection with client-side sorting
@@ -251,3 +263,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
