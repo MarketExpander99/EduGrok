@@ -36,12 +36,6 @@
                 <option value="Science" {% if subject == 'Science' %}selected{% endif %}>Science</option>
                 <option value="General" {% if subject == 'General' %}selected{% endif %}>General</option>
             </select>
-            <!-- Sort Select -->
-            <select id="sort-select" class="bg-transparent border border-grok-border rounded text-grok-text px-2 py-1" onchange="changeSort(this.value)">
-                <option value="latest" {% if sort == 'latest' %}selected{% endif %}>Latest</option>
-                <option value="title" {% if sort == 'title' %}selected{% endif %}>A-Z</option>
-                <option value="grade" {% if sort == 'grade' %}selected{% endif %}>By Grade</option>
-            </select>
         </div>
     </div>
 </div>
