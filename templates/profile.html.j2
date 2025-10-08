@@ -1,12 +1,21 @@
-<!-- [profile.html.j2] -->
+<!-- Filename: profile.html.j2 -->
+<!-- Updates: Added sticky floating header matching lessons.html.j2 and games.html.j2 structure: full-width outside container, with dynamic h1 "Your Profile, [handle]!" (text-xl, left-aligned). Wrapped content in max-w-lg mx-auto p-6 pt-4 for offset and consistency. Removed original h2. Integrated exact scroll hide/show logic using requestAnimationFrame and ticking variable. Ensured theme consistency and smooth transitions. -->
+
 {% extends "base.html.j2" %}
 
 {% block title %}Profile - EduGrok{% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto p-6">
-    <h2 class="text-2xl font-semibold mb-6 text-center text-grok-text">Your Profile, {{ user.handle | default('Dino Cowboy') }}!</h2>
-    
+<!-- Sticky Floating Header (exact match to lessons/games structure) -->
+<div class="bg-grok-bg border-b border-grok-border sticky top-0 z-50 transition-transform duration-300 ease-in-out w-full left-0" id="sticky-header">
+    <div class="p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-grok-text">Your Profile, {{ user.handle | default('Dino Cowboy') }}!</h1>
+        <div></div> <!-- Empty div for justify-between alignment -->
+    </div>
+</div>
+
+<!-- Content Container (matches pt-4 for header offset, retains max-w-lg for profile layout) -->
+<div class="max-w-lg mx-auto p-6 pt-4">
     {% if error %}
         <div class="text-center py-4">
             <p class="text-red-400 text-lg">{{ error }}</p>
@@ -112,4 +121,49 @@
         </div>
     {% endif %}
 </div>
+
+<!-- Sticky header scroll hide/show logic (exact match to lessons.html.j2) -->
+<script>
+let headerLastScrollTop = 0;
+let headerTicking = false;
+const headerScrollThreshold = 10;
+
+function updateHeaderPosition() {
+    let st = window.pageYOffset || document.documentElement.scrollTop;
+    const delta = st - headerLastScrollTop;
+    const isScrollingDown = delta > headerScrollThreshold;
+    const isScrollingUp = delta < -headerScrollThreshold;
+
+    const header = document.getElementById('sticky-header');
+    if (header) {
+        if (isScrollingDown) {
+            header.style.transform = 'translateY(-100%)';
+        } else if (isScrollingUp) {
+            header.style.transform = 'translateY(0)';
+        }
+    }
+
+    headerLastScrollTop = st <= 0 ? 0 : st;
+    headerTicking = false;
+}
+
+window.addEventListener('scroll', () => {
+    if (!headerTicking) {
+        requestAnimationFrame(updateHeaderPosition);
+        headerTicking = true;
+    }
+});
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', function() {
+    const header = document.getElementById('sticky-header');
+    if (header) {
+        header.style.transform = 'translateY(0)';
+    }
+    setTimeout(() => {
+        headerLastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    }, 100);
+    updateHeaderPosition();
+});
+</script>
 {% endblock %}
