@@ -1,0 +1,25 @@
+<!-- Filename: trace_activity.html.j2 -->
+<!-- New: Extracted tracing activity section. Includes canvas, clear/submit buttons, and speaker icon. Calls window.initCanvas on load if not disabled. Passes lesson and post variables. -->
+{% if not post.completed %}
+<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 opacity-50 disabled-activity" data-type="trace">
+    <div class="flex items-center mb-2">
+        <h4 class="text-blue-700 font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
+        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-blue-700 hover:text-blue-500 transition opacity-75 hover:opacity-100 opacity-50 cursor-not-allowed" disabled aria-label="Read instruction aloud">
+            <i class="fas fa-volume-up text-sm"></i>
+        </button>
+    </div>
+    <canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" class="border border-blue-300 rounded bg-white mb-2 w-full" style="touch-action: none;" disabled></canvas>
+    <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md hover:bg-gray-400 transition mr-2 opacity-50 cursor-not-allowed" disabled>Clear</button>
+    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition opacity-50 cursor-not-allowed" disabled>Save & Check</button>
+</div>
+{% else %}
+<div class="activity-section p-3 bg-blue-50 rounded-lg border border-blue-200 opacity-50 disabled-activity" data-type="trace">
+    <!-- Completed version: Show static trace word or image if desired -->
+    <h4 class="text-blue-700 font-medium">Trace the word: {{ post.lesson.trace_word }} (Completed)</h4>
+</div>
+{% endif %}
+<script>
+if (!document.querySelector('#lesson-{{ post.lesson.id | default(post.id) }} .activity-section[data-type="trace"]').classList.contains('disabled-activity')) {
+    window.initCanvas('{{ post.lesson.id | default(post.id) }}');
+}
+</script>
