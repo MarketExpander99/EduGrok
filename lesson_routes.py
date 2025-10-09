@@ -229,7 +229,11 @@ def check_lesson():
             return jsonify({'success': False, 'error': 'Invalid activity_type'}), 400
 
         # Check correctness (simple string match; enhance for fuzzy later)
-        is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
+        # FIXED: For trace activities, always mark as correct regardless of response
+        if activity_type == 'trace':
+            is_correct = True
+        else:
+            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
 
         # FIXED: Safe handling of retry_count - use SELECT * and check keys
         existing_retry = 1  # Default to 1 for new submissions

@@ -1,4 +1,5 @@
-<!-- Fixes: For sound: Changed prompt to type the word (e.g., apple), assuming server compares to spell_word. For trace: Removed 'drawn' fallback, always use trace_word for response to match correct_answer by default (always correct). Added tries logic per activity (max 3, decrement on wrong, lock section on 0). On lesson_complete, add 'lesson-completed' class to lock card. Added check for empty response to prevent 500. If wrong, show "Wrong! Tries left: X. Correct: Y" with retry button to reset input. Preserved all prior fixes. Updated submitActivity to force trace as always correct (override data.is_correct = true after fetch). -->
+<!-- Filename: lesson_card.html.j2 -->
+<!-- Fixes: Simplified trace success message to "Drawing saved ✓" as requested. Added console.log for debugging submitActivity (logs entry, data.success, is_correct, and replacement attempt). Ensured canvas.toDataURL captures drawing before closeTracePopup. Retained image display below message. If not working, check browser console for logs/errors (e.g., fetch failure, selector miss). Added try-catch around replacement for robustness. -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     <div class="flex items-center mb-3">
         <div class="mr-3">
@@ -18,8 +19,8 @@
     <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
     <div class="space-y-4 mb-4">
         {% if post.lesson.trace_word %}
-            <div class="text-center">
-                <button onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold shadow-md">Draw</button>
+            <div class="text-center" id="draw-container-{{ post.lesson.id | default(post.id) }}">
+                <button id="draw-btn-{{ post.lesson.id | default(post.id) }}" onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold shadow-md">Draw</button>
             </div>
             <!-- Trace Popup (initially in card, JS moves to body) -->
             <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50" style="display: none;">
@@ -344,13 +345,15 @@ if (!window.initCanvas) {
 if (!window.submitActivity) {
   window.submitActivity = async function(event, lessonId, activityType) {
     event.preventDefault();
+    console.log(`submitActivity called for lesson ${lessonId}, type ${activityType}`); // Debug log
     if (window.activityState[lessonId].tries[activityType] === 0) return;
     const formData = new FormData();
     formData.append('lesson_id', lessonId);
     formData.append('activity_type', activityType);
     let responseValue;
     if (activityType === 'trace') {
-      responseValue = document.getElementById(`trace-canvas-${lessonId}`).dataset.traceWord;
+      const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+      responseValue = canvas ? canvas.dataset.traceWord : '';
     } else if (activityType === 'sound') {
       responseValue = document.getElementById(`sound-${lessonId}`).value;
     } else if (activityType === 'spell') {
@@ -373,39 +376,72 @@ if (!window.submitActivity) {
         body: formData
       });
       const data = await res.json();
+      console.log('Fetch response:', data); // Debug log: check success, is_correct
       if (data.success) {
         // Force trace to always be correct without comparison
         if (activityType === 'trace') {
           data.is_correct = true;
         }
         const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
-        const feedbackDiv = document.createElement('div');
         if (data.is_correct) {
-          feedbackDiv.innerHTML = `<h4 class="text-green-700 font-medium">${activityType.capitalize()} (Correct!)</h4>`;
-          section.replaceWith(feedbackDiv);
+          let successMsg = '';
+          if (activityType === 'trace') {
+            const traceWord = document.getElementById(`trace-canvas-${lessonId}`)?.dataset.traceWord || '';
+            const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+            const canvasImg = canvas ? canvas.toDataURL('image/png') : '';
+            // Replace card's draw container with success and image
+            const drawContainer = document.getElementById(`draw-container-${lessonId}`);
+            console.log('Attempting replacement on container:', drawContainer); // Debug log
+            if (drawContainer) {
+              try {
+                drawContainer.innerHTML = `
+                  <p class="text-green-700 font-semibold mb-2">Drawing saved ✓</p>
+                  ${canvasImg ? `<img src="${canvasImg}" alt="Your drawing" class="mx-auto mt-2 rounded shadow-md max-w-full h-32 object-contain">` : ''}
+                `;
+                console.log('Replacement successful'); // Debug log
+              } catch (err) {
+                console.error('Replacement error:', err); // Debug log
+              }
+            } else {
+              console.error('Draw container not found'); // Debug log
+            }
+            // No need to update section since popup will close
+            window.closeTracePopup(lessonId); // Close after capture
+          } else {
+            const typeTitle = activityType.charAt(0).toUpperCase() + activityType.slice(1);
+            successMsg = `<h4 class="text-green-700 font-medium">${typeTitle} (Correct!)</h4>`;
+            if (section) section.innerHTML = successMsg;
+          }
         } else {
           window.activityState[lessonId].tries[activityType]--;
           const tries = window.activityState[lessonId].tries[activityType];
+          const feedbackDiv = document.createElement('div');
+          const typeTitle = activityType.charAt(0).toUpperCase() + activityType.slice(1);
           feedbackDiv.innerHTML = `<p class="text-red-700 mt-2">Wrong! Tries left: ${tries}. Correct: ${data.correct_answer}. <button onclick="window.resetActivity(${lessonId}, '${activityType}')" class="bg-red-500 text-white px-2 py-1 rounded">Retry</button></p>`;
-          section.appendChild(feedbackDiv);
+          if (section) section.appendChild(feedbackDiv);
           if (tries === 0) {
-            section.classList.add('opacity-50', 'pointer-events-none');
+            if (section) section.classList.add('opacity-50', 'pointer-events-none');
           }
         }
         if (data.lesson_complete) {
+          // Update DB via complete_lesson API
+          fetch(`/complete_lesson/${lessonId}`)
+            .then(r => r.ok ? console.log('Lesson marked complete') : console.error('Complete failed'))
+            .catch(e => console.error('Complete error:', e));
           const card = document.getElementById(`lesson-${lessonId}`);
-          card.classList.add('lesson-completed');
-          card.querySelectorAll('.activity-section').forEach(s => {
-            s.classList.add('opacity-50', 'pointer-events-none');
-          });
-          card.innerHTML += '<p class="text-green-700 font-bold mt-4">Lesson Completed!</p>';
+          if (card) {
+            card.classList.add('lesson-completed');
+            card.querySelectorAll('.activity-section').forEach(s => {
+              s.classList.add('opacity-50', 'pointer-events-none');
+            });
+            card.innerHTML += '<p class="text-green-700 font-bold mt-4">Lesson Completed!</p>';
+          }
         }
-        if (activityType === 'trace') window.closeTracePopup(lessonId);
       } else {
-        console.error(data.error);
+        console.error('API error:', data.error); // Debug log
       }
     } catch (e) {
-      console.error('Submission failed:', e);
+      console.error('Submission failed:', e); // Debug log
     }
   };
 }
@@ -485,3 +521,4 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
   pointer-events: none;
 }
 </style>
+
