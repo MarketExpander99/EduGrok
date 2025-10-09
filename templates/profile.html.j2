@@ -1,5 +1,5 @@
 <!-- Filename: profile.html.j2 -->
-<!-- Updates: Added profile picture upload form in User Info card with file input, preview functionality via JS, and submit to new update_profile_picture endpoint. Enhanced avatar display to use img tag with current profile_picture URL (fallback to letter avatar). Ensured Tailwind/grok-theme consistency, responsive design, and smooth transitions. Preserved all previous updates including sticky header. -->
+<!-- Updates: Added 'Lilac Princess' and 'Dino Cowboy' theme options to the theme select dropdown with conditional selected attributes. Added profile picture upload form in User Info card with file input, preview functionality via JS, and submit to new update_profile_picture endpoint. Enhanced avatar display to use img tag with current profile_picture URL (fallback to letter avatar). Ensured Tailwind/grok-theme consistency, responsive design, and smooth transitions. Preserved all previous updates including sticky header. -->
 
 {% extends "base.html.j2" %}
 
@@ -119,6 +119,8 @@
                     <option value="astronaut" {% if theme == 'astronaut' %}selected{% endif %}>Astronaut</option>
                     <option value="farm" {% if theme == 'farm' %}selected{% endif %}>Farm</option>
                     <option value="space" {% if theme == 'space' %}selected{% endif %}>Space</option>
+                    <option value="lilac_princess" {% if theme == 'lilac_princess' %}selected{% endif %}>Lilac Princess</option>
+                    <option value="dino_cowboy" {% if theme == 'dino_cowboy' %}selected{% endif %}>Dino Cowboy</option>
                 </select>
                 <button type="submit" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition shadow-md">Update Theme</button>
             </form>

@@ -100,7 +100,7 @@ def set_theme():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     theme = request.form.get('theme')
-    if theme not in ['astronaut', 'farm', 'space']:
+    if theme not in ['astronaut', 'farm', 'space', 'lilac_princess', 'dino_cowboy']:
         return jsonify({'success': False, 'error': 'Invalid theme'}), 400
     try:
         conn = get_db()

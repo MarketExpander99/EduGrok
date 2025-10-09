@@ -1,8 +1,10 @@
 <!-- base.html.j2 (Updated: Added global TTS support detection and initialization for mobile browsers (iOS Safari/Android Chrome). Enhanced playAudio with resume-on-gesture for suspended contexts, support check, and visual fallback toast for unsupported devices. Integrated playClickSound globally for consistency. Preserved all previous updates including mobile nav scroll improvements and notifications. -->
 <!-- Update: Integrated lesson activity JS globals (selectMcOption for highlighting, submitActivity AJAX, speakQuestion TTS wrapper, trace drawing stubs). Merged with existing TTS/playAudio. Added .selected-mc CSS via style injection. Preps for retry limits and completion checks. -->
 <!-- Fix: Updated submitActivity to use FormData (for backend request.form compat); generalized response grabbing for mc/sentence (hidden), spell/sound (input), trace (canvas base64). Handles non-response types without alert. Enhanced trace drawing with full mouse/touch event implementation, initTraceCanvases for auto-setup on load (no toggle needed), and targeted UI replacement for trace completion. Added frontend override for 'sound' activity: matches user input to spell_word (case-insensitive) to bypass phonetic backend mismatch. -->
+<!-- New: Added CSS variable definitions for 'lilac_princess' and 'dino_cowboy' themes. Updated html class logic to apply corresponding theme classes (lilac-princess-theme, dino-cowboy-theme) when theme matches. -->
+
 <!DOCTYPE html>
-<html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% else %}astronaut-theme{% endif %}">
+<html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% elif theme == 'lilac_princess' %}lilac-princess-theme{% elif theme == 'dino_cowboy' %}dino-cowboy-theme{% else %}astronaut-theme{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,6 +31,8 @@
         .farm-theme { --grok-bg: #f0f8e8; --grok-text: #2d5016; --grok-surface: #e8f5e8; --grok-border: #90ee90; --grok-accent: #228b22; }
         .space-theme { --grok-bg: #000011; --grok-text: #00ffff; --grok-surface: #000022; --grok-border: #000044; --grok-accent: #ff00ff; }
         .astronaut-theme { --grok-bg: #0a0a0a; --grok-text: #e0e0e0; --grok-surface: #1f1f1f; --grok-border: #404040; --grok-accent: #4a90e2; }
+        .lilac-princess-theme { --grok-bg: #f8f4ff; --grok-text: #4b0082; --grok-surface: #e6d9ff; --grok-border: #c3a6e5; --grok-accent: #9370db; --grok-secondary: #dda0dd; }
+        .dino-cowboy-theme { --grok-bg: #fdf5e6; --grok-text: #8b4513; --grok-surface: #f4e4bc; --grok-border: #deb887; --grok-accent: #cd853f; --grok-secondary: #a0522d; }
         .card { @apply bg-grok-surface p-4 rounded-lg shadow-md border border-grok-border; }
         .hover\:bg-grok-accent-hover:hover { background-color: color-mix(in srgb, var(--grok-accent) 80%, black); }
         .selected-mc { background-color: #dbeafe !important; border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
