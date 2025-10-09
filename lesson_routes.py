@@ -208,36 +208,62 @@ def check_lesson():
             return jsonify({'success': False, 'error': 'Lesson not found'}), 404
         lesson = dict(lesson_row)
 
+        # Safely parse JSON fields to lists
+        for field in ['mc_options', 'sentence_options']:
+            value = lesson.get(field)
+            if value is not None:
+                try:
+                    lesson[field] = json.loads(value)
+                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                    logger.warning(f"Invalid JSON in {field} for lesson {lesson_id}: {value} - {e}")
+                    lesson[field] = []
+            else:
+                lesson[field] = []
+
         # Determine correct answer based on type
         correct_answer = ''
         question = ''
+        is_correct = False
         if activity_type == 'mc':
             correct_answer = lesson['mc_answer']
             question = lesson['mc_question']
+            if not response:
+                is_correct = False
+            elif response not in lesson['mc_options']:
+                logger.info(f"Invalid MC option '{response}' for lesson {lesson_id}, options: {lesson['mc_options']}")
+                is_correct = False
+            else:
+                is_correct = response.lower() == correct_answer.lower()
         elif activity_type == 'sentence':
             correct_answer = lesson['sentence_answer']
             question = lesson['sentence_question']
+            if not response:
+                is_correct = False
+            elif response not in lesson['sentence_options']:
+                logger.info(f"Invalid sentence option '{response}' for lesson {lesson_id}, options: {lesson['sentence_options']}")
+                is_correct = False
+            else:
+                is_correct = response.lower() == correct_answer.lower()
         elif activity_type == 'spell':
             correct_answer = lesson['spell_word']
             question = f'Spell the word: {lesson["spell_word"]}'
+            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
         elif activity_type == 'sound':
             correct_answer = lesson['spell_word']  # FIXED: Use spell_word for sound matching (full word)
             question = f'Repeat the sound: /{lesson["sound"]}/'
+            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
         elif activity_type == 'trace':
             correct_answer = lesson['trace_word']  # Or 'drawn' placeholder
             question = f'Trace the word: {lesson["trace_word"]}'
+            is_correct = True  # FIXED: For trace activities, always mark as correct regardless of response (drawing saved as base64)
         elif activity_type == 'math':
             correct_answer = lesson['math_answer']
             question = lesson['math_question']
+            stripped_response = response.strip()
+            logger.info(f"Math response: '{stripped_response}' vs correct: '{correct_answer}'")
+            is_correct = stripped_response.lower() == correct_answer.lower() if stripped_response and correct_answer else False
         else:
             return jsonify({'success': False, 'error': 'Invalid activity_type'}), 400
-
-        # Check correctness (simple string match; enhance for fuzzy later)
-        # FIXED: For trace activities, always mark as correct regardless of response (drawing saved as base64)
-        if activity_type == 'trace':
-            is_correct = True
-        else:
-            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
 
         # FIXED: Safe handling of retry_count - use SELECT * and check keys
         existing_retry = 1  # Default to 1 for new submissions

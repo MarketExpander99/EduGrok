@@ -1,5 +1,5 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Added conditional to hide entire card content if post.completed is true (passed from backend), showing a "Completed!" overlay instead. Enhanced JS to respect completed state more robustly, ensuring no interactions on completed cards. Confirmed base64 submission for trace via toDataURL in submitActivity. Retained inline trace integration, activity enabling/disabling, and all other existing functionality/JS. Updated description default for trace lessons. -->
+<!-- Fixes: Added conditional to hide entire card content if post.completed is true (passed from backend), showing a "Completed!" overlay instead. Enhanced JS to respect completed state more robustly, ensuring no interactions on completed cards. Confirmed base64 submission for trace via toDataURL in submitActivity. Retained inline trace integration, activity enabling/disabling, and all other existing functionality/JS. Updated description default for trace lessons. Updated submitActivity to trim response values for input-based activities (math, spell, sound) to prevent whitespace issues, and ensured validation alerts if trimmed value is empty. -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     {% if post.completed %}
         <!-- Completed Overlay -->
@@ -166,18 +166,18 @@ if (!window.submitActivity) {
       const canvas = document.getElementById(`trace-canvas-${lessonId}`);
       responseValue = canvas ? canvas.toDataURL('image/png') : ''; // Base64 PNG
     } else if (activityType === 'sound') {
-      responseValue = document.getElementById(`sound-${lessonId}`).value;
+      responseValue = document.getElementById(`sound-${lessonId}`).value.trim();
     } else if (activityType === 'spell') {
-      responseValue = document.getElementById(`spell-${lessonId}`).value;
+      responseValue = document.getElementById(`spell-${lessonId}`).value.trim();
     } else if (activityType === 'mc') {
       responseValue = document.getElementById(`mc-hidden-${lessonId}`).value;
     } else if (activityType === 'sentence') {
       responseValue = document.getElementById(`sentence-hidden-${lessonId}`).value;
     } else if (activityType === 'math') {
-      responseValue = document.getElementById(`math-${lessonId}`).value;
+      responseValue = document.getElementById(`math-${lessonId}`).value.trim();
     }
     if (!responseValue) {
-      alert('Please enter your response');
+      alert('Please provide a response');
       return;
     }
     formData.append('response', responseValue);
