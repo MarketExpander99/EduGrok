@@ -16,7 +16,7 @@ def lessons():
     try:
         # Fetch user role
         c.execute("SELECT role, grade FROM users WHERE id = ?", (session['user_id'],))
-        user_row = c.fetchone()
+        user_row = dict(c.fetchone())
         if not user_row:
             logger.error(f"User not found for ID: {session['user_id']}")
             return redirect(url_for('login'))
@@ -127,7 +127,7 @@ def add_to_feed():
         # If target_user_id provided and not self, validate (parent assigning to kid)
         if target_user_id and target_user_id != session_user_id:
             c.execute("SELECT role, parent_id, grade, handle FROM users WHERE id = ?", (target_user_id,))
-            target_user = c.fetchone()
+            target_user = dict(c.fetchone())
             if not target_user:
                 return jsonify({'success': False, 'error': 'Target user not found'}), 404
             if target_user['role'] != 'kid' or target_user['parent_id'] != session_user_id:
@@ -137,7 +137,7 @@ def add_to_feed():
         else:
             # Use session user - FIXED: No error if no child, just add to own feed
             c.execute("SELECT role, grade, handle FROM users WHERE id = ?", (session_user_id,))
-            user_row = c.fetchone()
+            user_row = dict(c.fetchone())
             if not user_row:
                 return jsonify({'success': False, 'error': 'User not found'}), 404
             if user_row['role'] == 'kid':
@@ -203,9 +203,10 @@ def check_lesson():
         c = conn.cursor()
         # Fetch lesson details
         c.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,))
-        lesson = c.fetchone()
-        if not lesson:
+        lesson_row = c.fetchone()
+        if not lesson_row:
             return jsonify({'success': False, 'error': 'Lesson not found'}), 404
+        lesson = dict(lesson_row)
 
         # Determine correct answer based on type
         correct_answer = ''
@@ -238,7 +239,7 @@ def check_lesson():
         # FIXED: Safe handling of retry_count - use SELECT * and check keys
         existing_retry = 1  # Default to 1 for new submissions
         c.execute("SELECT * FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND activity_type = ?", (lesson_id, session['user_id'], activity_type))
-        row = c.fetchone()
+        row = dict(c.fetchone()) if c.fetchone() else {}
         if row:
             retry_val = row.get('retry_count', 0)
             existing_retry = retry_val + 1 if not is_correct else 1  # Reset on correct, increment on wrong
@@ -258,15 +259,23 @@ def check_lesson():
             'spell': lesson['spell_word'] is not None,
             'sound': lesson['sound'] is not None,
             'trace': lesson['trace_word'] is not None,
-            'math': lesson['math_answer'] is not None  # If added
+            'math': lesson.get('math_answer') is not None  # If added
         }
         expected_activities = sum(1 for v in activity_fields.values() if v)
         c.execute("SELECT COUNT(DISTINCT activity_type) FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", (lesson_id, session['user_id']))
-        submitted_count = c.fetchone()[0]
+        submitted_count_result = c.fetchone()
+        submitted_count = submitted_count_result[0] if submitted_count_result else 0
         lesson_complete = submitted_count >= expected_activities
 
-        # Award points if complete and correct
-        if lesson_complete and is_correct:
+        # Mark lesson as completed in DB if all activities done
+        if lesson_complete:
+            now = datetime.now().isoformat()
+            c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at, parent_confirmed) VALUES (?, ?, ?, 0)", 
+                      (session['user_id'], lesson_id, now))
+            c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
+                      (session['user_id'], lesson_id))
+            conn.commit()
+            # Award points if complete
             c.execute("UPDATE users SET points = points + 50 WHERE id = ?", (session['user_id'],))
             conn.commit()
 
@@ -298,8 +307,8 @@ def complete_lesson(lesson_id):
     try:
         # FIXED: Only kids complete; parents confirm separately
         c.execute("SELECT role FROM users WHERE id = ?", (session['user_id'],))
-        role = c.fetchone()['role']
-        if role != 'kid':
+        role_row = dict(c.fetchone())
+        if not role_row or role_row['role'] != 'kid':
             flash('Only child accounts can complete lessons. Parents confirm via dashboard.', 'error')
             return redirect(url_for('lessons'))
         now = datetime.now().isoformat()
@@ -348,14 +357,15 @@ def generate_lesson():
     try:
         # Fetch user role and kids
         c.execute("SELECT role, grade, handle FROM users WHERE id = ?", (session['user_id'],))
-        user_row = c.fetchone()
+        user_row = dict(c.fetchone())
         if not user_row or user_row['role'] == 'kid':
             flash("Only parents can generate lessons.", "error")
             return redirect(url_for('home'))
         user_grade = user_row['grade']
         user_handle = user_row['handle']
         c.execute("SELECT COUNT(*) as count FROM users WHERE parent_id = ? AND role = 'kid'", (session['user_id'],))
-        kid_count = c.fetchone()['count']
+        kid_count_row = dict(c.fetchone())
+        kid_count = kid_count_row['count']
 
         # NEW: If no kids, add to own feed; else, assume assigning to self or redirect to lessons for selection
         if kid_count == 0:
@@ -404,7 +414,7 @@ def schedule_lessons():
         # If target_user_id provided, validate (parent assigning to kid)
         if target_user_id:
             c.execute("SELECT role, parent_id FROM users WHERE id = ?", (target_user_id,))
-            target_user = c.fetchone()
+            target_user = dict(c.fetchone())
             if not target_user:
                 return jsonify({'success': False, 'error': 'Target user not found'}), 404
             if target_user['role'] != 'kid' or target_user['parent_id'] != session_user_id:
@@ -412,7 +422,7 @@ def schedule_lessons():
         else:
             # FIXED: Use session user if no child specified - no error
             c.execute("SELECT role FROM users WHERE id = ?", (session_user_id,))
-            user_row = c.fetchone()
+            user_row = dict(c.fetchone())
             if not user_row or user_row['role'] == 'kid':
                 return jsonify({'success': False, 'error': 'Kids cannot schedule lessons'}), 403
         now = datetime.now().isoformat()
