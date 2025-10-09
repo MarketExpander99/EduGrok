@@ -389,6 +389,13 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to friendships table")
+        # NEW: Check and add retry_count to activity_responses
+        c.execute("PRAGMA table_info(activity_responses)")
+        columns = {col[1]: col[2] for col in c.fetchall()}
+        if 'retry_count' not in columns:
+            c.execute("ALTER TABLE activity_responses ADD COLUMN retry_count INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Added retry_count column to activity_responses table")
         from achievements_db import check_achievements_schema
         check_achievements_schema(conn)
     except sqlite3.Error as e:
