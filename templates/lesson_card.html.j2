@@ -1,5 +1,4 @@
-<!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: For sound: Changed prompt to type the word (e.g., apple), assuming server compares to spell_word. For trace: Removed 'drawn' fallback, always use trace_word for response to match correct_answer by default (always correct). Added tries logic per activity (max 3, decrement on wrong, lock section on 0). On lesson_complete, add 'lesson-completed' class to lock card. Added check for empty response to prevent 500. If wrong, show "Wrong! Tries left: X. Correct: Y" with retry button to reset input. Preserved all prior fixes. -->
+<!-- Fixes: For sound: Changed prompt to type the word (e.g., apple), assuming server compares to spell_word. For trace: Removed 'drawn' fallback, always use trace_word for response to match correct_answer by default (always correct). Added tries logic per activity (max 3, decrement on wrong, lock section on 0). On lesson_complete, add 'lesson-completed' class to lock card. Added check for empty response to prevent 500. If wrong, show "Wrong! Tries left: X. Correct: Y" with retry button to reset input. Preserved all prior fixes. Updated submitActivity to force trace as always correct (override data.is_correct = true after fetch). -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     <div class="flex items-center mb-3">
         <div class="mr-3">
@@ -375,6 +374,10 @@ if (!window.submitActivity) {
       });
       const data = await res.json();
       if (data.success) {
+        // Force trace to always be correct without comparison
+        if (activityType === 'trace') {
+          data.is_correct = true;
+        }
         const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
         const feedbackDiv = document.createElement('div');
         if (data.is_correct) {
