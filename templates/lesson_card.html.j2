@@ -1,5 +1,5 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Restored check button functionality by ensuring initAllActivities properly enables all activity elements (removed any residual disabled states). Enhanced popup hiding in closeTracePopup to fully set display:none and reset body overflow/position to prevent scroll issues. Ensured all popup buttons (Start Drawing, Clear, Save & Check) work by defining missing global functions (toggleDrawing, updateLineWidth, updateColor, clearCanvas, drawShape, submitActivity) in the main script. Consolidated JS to avoid conflicts with includes. -->
+<!-- Fixes: Defined overlayClick as a global function to handle overlay clicks reliably (fixes ReferenceError at toggleTracePopup). Adjusted popup modal dimensions to w-[450px] max-w-full for snug fit around 400x200 canvas with padding; reduced max-h to [60vh] for compact vertical sizing without overflow on desktop, while retaining mobile full-screen override. Consolidated JS to ensure all functions are globally accessible without conflicts. -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
     <div class="flex items-center mb-3">
         <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
@@ -19,7 +19,7 @@
             <!-- Trace Popup (initially in card, JS moves to body) -->
             <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50" style="display: none;">
                 <div class="absolute inset-0 flex items-center justify-center p-4">
-                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-full max-w-4xl max-h-[90vh] overflow-y-auto opacity-0 scale-95">
+                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-[450px] max-w-full max-h-[60vh] overflow-y-auto opacity-0 scale-95">
                         <div class="p-6 border-b border-grok-border flex justify-between items-center">
                             <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
                             <button onclick="window.closeTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text text-2xl">&times;</button>
@@ -123,6 +123,14 @@ if (!window.initAllActivities) {
 
 let popupElements = {}; // Track moved elements
 
+// Define global overlayClick function to fix ReferenceError
+window.overlayClick = function(e, lessonId) {
+  const popup = document.getElementById(`trace-popup-${lessonId}`);
+  if (e.target === popup) {
+    window.closeTracePopup(lessonId);
+  }
+};
+
 if (!window.toggleTracePopup) {
   window.toggleTracePopup = function(lessonId) {
     const popupId = `trace-popup-${lessonId}`;
@@ -145,13 +153,9 @@ if (!window.toggleTracePopup) {
       popup.style.pointerEvents = 'auto';
       modal.style.opacity = '1';
       modal.style.transform = 'scale(1)';
-      // Add overlay click handler
-      popup.addEventListener('click', function overlayClick(e) {
-        if (e.target === popup) {
-          window.closeTracePopup(lessonId);
-        }
-      });
-      popup._overlayClick = overlayClick; // Store for removal
+      // Add overlay click handler using global function
+      popup.addEventListener('click', (e) => window.overlayClick(e, lessonId));
+      popup._overlayClick = (e) => window.overlayClick(e, lessonId); // Store for removal
       // Immediate init
       window.initCanvas(lessonId);
     } else {

@@ -1,5 +1,5 @@
 <!-- Filename: trace_activity.html.j2 -->
-<!-- Fixes: Removed inline script to avoid duplication/conflicts with global functions defined in lesson_card.html.j2 (initCanvas, toggleDrawing, etc.). Buttons now fully rely on window.* globals for functionality (Start Drawing, Clear, Save & Check all work seamlessly in popup). Retained fixed-size canvas and no-hover classes for precision drawing and minimal effects. Popup hiding/scroll prevention handled externally via closeTracePopup. -->
+<!-- Fixes: Adjusted canvas inline styles for responsive snug fit in popup (width:100%; max-width:400px; height:auto; max-height:200px to maintain aspect while fitting 450px modal width with padding; prevents horizontal overflow). Retained touch-action:none and custom cursor for precision drawing. Confirmed all button onclicks use window.* globals without conflicts. Added flex container class to drawing tools for better alignment in constrained popup space. -->
 {% if post.lesson.trace_word and not post.completed %}<div class="activity-section p-3" data-type="trace">
     <div class="flex items-center mb-2">
         <h4 class="text-white font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
@@ -14,7 +14,7 @@
 </div>
 
 <!-- Drawing Tools -->
-<div class="flex flex-wrap items-center gap-2 mb-2 text-sm">
+<div class="flex flex-wrap items-center gap-2 mb-2 text-sm justify-center">
     <label>Color: <input type="color" id="color-{{ post.lesson.id | default(post.id) }}" value="#000000" onchange="window.updateColor('{{ post.lesson.id | default(post.id) }}', this.value)" class="w-8 h-6 rounded"></label>
     <label>Width: 
         <select id="width-{{ post.lesson.id | default(post.id) }}" class="p-1 border rounded text-xs" onchange="window.updateLineWidth('{{ post.lesson.id | default(post.id) }}', this.value)">
@@ -27,9 +27,9 @@
     <button type="button" onclick="window.drawShape('{{ post.lesson.id | default(post.id) }}', 'square')" class="px-2 py-1 bg-gray-200 rounded text-xs">Square</button>
 </div>
 
-<canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" data-trace-word="{{ post.lesson.trace_word }}" class="border border-blue-300 rounded bg-white mb-2" style="width: 400px; height: 200px; touch-action: none; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='20' viewBox='0 0 12 20'%3E%3Cpath d='M0 18 L10 8 L12 6' stroke='black' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='10' cy='8' r='1' fill='black'/%3E%3C/svg%3E") 0 20, crosshair;"></canvas>
+<canvas id="trace-canvas-{{ post.lesson.id | default(post.id) }}" width="400" height="200" data-trace-word="{{ post.lesson.trace_word }}" class="border border-blue-300 rounded bg-white mb-2 mx-auto block" style="width: 100%; max-width: 400px; height: auto; max-height: 200px; touch-action: none; cursor: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2720%27 viewBox=%270 0 12 20%27%3E%3Cpath d=%27M0 18 L10 8 L12 6%27 stroke=%27black%27 stroke-width=%271.5%27 fill=%27none%27/%3E%3Ccircle cx=%2710%27 cy=%278%27 r=%271%27 fill=%27black%27/%3E%3C/svg%3E') 0 20, crosshair;"></canvas>
 
-<div class="flex gap-2">
+<div class="flex gap-2 justify-center">
     <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md">Clear</button>
     <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="bg-blue-500 text-white px-4 py-2 rounded-md">Save & Check</button>
 </div>
