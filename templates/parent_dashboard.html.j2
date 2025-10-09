@@ -1,6 +1,5 @@
 <!-- Filename: parent_dashboard.html.j2 -->
-<!-- Updates: Added sticky floating header matching lessons.html.j2 and games.html.j2 structure: full-width outside container, with h1 "Parent Dashboard" (text-xl) and kid-selector dropdown. Wrapped content in container mx-auto p-6 max-w-4xl pt-4 for offset. Moved kid-selector from welcome card to header. Integrated exact scroll hide/show logic using requestAnimationFrame and ticking variable. Removed original h1; preserved welcome card without selector. Ensured theme consistency and smooth transitions. -->
-
+<!-- Updates: Added sticky floating header matching lessons.html.j2 and games.html.j2 structure: full-width outside container, with h1 "Parent Dashboard" (text-xl) and kid-selector dropdown. Wrapped content in container mx-auto p-6 max-w-4xl pt-4 for offset. Moved kid-selector from welcome card to header. Integrated exact scroll hide/show logic using requestAnimationFrame and ticking variable. Removed original h1; preserved welcome card without selector. Ensured theme consistency and smooth transitions. Enhanced "Child Progress" section with prominent completed lessons count and breakdown (total/pending via Jinja calc); added summary card at top for quick overview. -->
 {% extends "base.html.j2" %}
 {% block title %}Parent Dashboard - EduGrok{% endblock %}
 {% block content %}
@@ -27,6 +26,14 @@
             <a href="{{ url_for('login') }}" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent-hover transition inline-flex items-center shadow-md mt-4">Log In Again</a>
         </div>
     {% else %}
+        <!-- Summary: Completed Lessons Overview -->
+        <div class="mb-6 p-4 bg-grok-surface rounded-lg border border-grok-border">
+            <h3 class="text-lg font-semibold text-grok-text mb-2">Progress Overview</h3>
+            <p class="text-grok-text text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed | default(0) }} / {{ total_lessons | default(0) }}</p>
+            <p class="text-grok-text text-base mb-2"><strong>Pending Lessons:</strong> {{ (total_lessons | default(0) - lessons_completed | default(0)) }}</p>
+            <p class="text-grok-text text-base"><strong>Games Played:</strong> {{ games_played | default(0) }} | <strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
+        </div>
+
         <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
             <h2 class="text-xl font-semibold text-grok-text mb-4">Welcome, Parent!</h2>
             <p class="text-grok-secondary text-base mb-4">Monitor {{ kid_handle }}'s progress, view their achievements, and manage their learning activities.</p>
@@ -35,9 +42,16 @@
         <!-- Child Progress Section -->
         <div class="card bg-grok-surface p-5 rounded-xl shadow-lg border border-grok-border hover:-translate-y-1 hover:shadow-xl transition-all duration-200 mb-6">
             <h3 class="text-lg font-semibold text-grok-text mb-4">Child Progress</h3>
-            <p class="text-grok-text text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed | default(0) }}</p>
-            <p class="text-grok-text text-base mb-2"><strong>Games Played:</strong> {{ games_played | default(0) }}</p>
-            <p class="text-grok-text text-base"><strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-grok-text text-base mb-2"><strong>Lessons Completed:</strong> {{ lessons_completed | default(0) }}</p>
+                    <p class="text-grok-text text-base mb-2"><strong>Games Played:</strong> {{ games_played | default(0) }}</p>
+                </div>
+                <div>
+                    <p class="text-grok-text text-base mb-2"><strong>Average Test Score:</strong> {{ avg_score | default('N/A') }}</p>
+                    <p class="text-grok-text text-base"><strong>Points Earned:</strong> {{ points | default(0) }}</p>
+                </div>
+            </div>
         </div>
 
         <!-- Pending Lesson Confirmations Section -->
