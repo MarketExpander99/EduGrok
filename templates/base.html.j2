@@ -1,6 +1,6 @@
 <!-- base.html.j2 (Updated: Added global TTS support detection and initialization for mobile browsers (iOS Safari/Android Chrome). Enhanced playAudio with resume-on-gesture for suspended contexts, support check, and visual fallback toast for unsupported devices. Integrated playClickSound globally for consistency. Preserved all previous updates including mobile nav scroll improvements and notifications. -->
 <!-- Update: Integrated lesson activity JS globals (selectMcOption for highlighting, submitActivity AJAX, speakQuestion TTS wrapper, trace drawing stubs). Merged with existing TTS/playAudio. Added .selected-mc CSS via style injection. Preps for retry limits and completion checks. -->
-<!-- Fix: Updated submitActivity to use FormData (for backend request.form compat); generalized response grabbing for mc/sentence (hidden), spell/sound (input), trace (canvas base64). Handles non-response types without alert. -->
+<!-- Fix: Updated submitActivity to use FormData (for backend request.form compat); generalized response grabbing for mc/sentence (hidden), spell/sound (input), trace (canvas base64). Handles non-response types without alert. Enhanced trace drawing with full mouse/touch event implementation, initTraceCanvases for auto-setup on load (no toggle needed), and targeted UI replacement for trace completion. Added frontend override for 'sound' activity: matches user input to spell_word (case-insensitive) to bypass phonetic backend mismatch. -->
 <!DOCTYPE html>
 <html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% else %}astronaut-theme{% endif %}">
 <head>
@@ -121,6 +121,9 @@
         setTimeout(() => {
             lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
         }, 100);
+
+        // Initialize all trace canvases for drawing
+        window.initTraceCanvases();
     });
 
     // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
@@ -365,14 +368,34 @@
         .then(res => res.json())
         .then(data => {
             if (data.success) {
+                // Frontend override for 'sound' activity: match to spell_word if available
+                if (activityType === 'sound' && section.dataset.correctWord) {
+                    const correctWord = section.dataset.correctWord.toLowerCase();
+                    if (response.toLowerCase() === correctWord) {
+                        data.is_correct = true;
+                        data.correct_answer = section.dataset.correctWord;
+                    }
+                }
                 if (data.is_correct) {
-                    section.innerHTML = `<h4 class="text-green-600 font-medium">${data.question} <span class="text-green-700">✓ Correct!</span></h4>`;
+                    const successMsg = `<h4 class="text-green-600 font-medium">${data.question} <span class="text-green-700">✓ Correct!</span></h4>`;
+                    if (activityType === 'trace') {
+                        const uiDiv = document.getElementById(`trace-ui-${lessonId}`);
+                        if (uiDiv) uiDiv.innerHTML = successMsg;
+                    } else {
+                        section.innerHTML = successMsg;
+                    }
                     // Award points (via backend)
                 } else {
                     triesLeft--;
                     if (retryDiv) retryDiv.textContent = `Tries left: ${triesLeft}`;
                     if (triesLeft <= 0) {
-                        section.innerHTML = `<h4 class="text-red-600 font-medium">${data.question} <span class="text-red-700">✗ Out of tries! Correct: ${data.correct_answer}</span></h4>`;
+                        const failMsg = `<h4 class="text-red-600 font-medium">${data.question} <span class="text-red-700">✗ Out of tries! Correct: ${data.correct_answer}</span></h4>`;
+                        if (activityType === 'trace') {
+                            const uiDiv = document.getElementById(`trace-ui-${lessonId}`);
+                            if (uiDiv) uiDiv.innerHTML = failMsg;
+                        } else {
+                            section.innerHTML = failMsg;
+                        }
                     } else {
                         alert(`Wrong! Tries left: ${triesLeft}. Correct: ${data.correct_answer}`);
                     }
@@ -391,61 +414,125 @@
         });
     };
 
-    // Trace Drawing Helpers (stubs - expand as needed)
-    window.toggleDrawing = function(lessonId) {
-        const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const toggleBtn = document.getElementById(`draw-toggle-${lessonId}`);
-        // Toggle drawing mode (add full mouse/touch events here)
-        canvas.style.cursor = canvas.style.cursor === 'crosshair' ? 'default' : 'crosshair';
-        toggleBtn.textContent = canvas.style.cursor === 'crosshair' ? 'Stop Drawing' : 'Start Drawing';
-        // Example: Basic drawing setup (add onmousedown, etc.)
-        if (canvas.style.cursor === 'crosshair') {
-            let drawing = false;
-            function startDraw(e) {
-                drawing = true;
-                ctx.beginPath();
-                ctx.moveTo(e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop);
-            }
-            canvas.onmousedown = startDraw;
-            canvas.ontouchstart = (e) => { e.preventDefault(); startDraw(e.touches[0]); };
-            // Add onmousemove, onmouseup, etc. for full impl
-        }
-    };
-
-    window.updateColor = function(lessonId, color) {
-        const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-        if (canvas) canvas.getContext('2d').strokeStyle = color;
-    };
-
-    window.updateLineWidth = function(lessonId, width) {
-        const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-        if (canvas) canvas.getContext('2d').lineWidth = parseInt(width);
-    };
-
-    window.drawShape = function(lessonId, shape) {
-        const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = 50;
-        ctx.beginPath();
-        if (shape === 'circle') {
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        } else if (shape === 'square') {
-            ctx.rect(centerX - radius, centerY - radius, radius * 2, radius * 2);
-        }
-        ctx.stroke();
-    };
-
-    window.clearCanvas = function(canvasId) {
-        const canvas = document.getElementById(canvasId);
-        if (canvas) {
+    // Trace Drawing Initialization (auto-setup all canvases on load)
+    window.initTraceCanvases = function() {
+        const canvases = document.querySelectorAll('canvas[id^="trace-canvas-"]');
+        canvases.forEach(canvas => {
+            const lessonId = canvas.id.replace('trace-canvas-', '');
             const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+            let drawing = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            // Set default styles
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Mouse events
+            function getMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            canvas.onmousedown = function(e) {
+                drawing = true;
+                const pos = getMousePos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                lastX = pos.x;
+                lastY = pos.y;
+                canvas.style.cursor = 'crosshair';
+            };
+
+            canvas.onmousemove = function(e) {
+                if (!drawing) return;
+                const pos = getMousePos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                lastX = pos.x;
+                lastY = pos.y;
+            };
+
+            canvas.onmouseup = function() {
+                drawing = false;
+            };
+
+            canvas.onmouseout = function() {
+                drawing = false;
+            };
+
+            // Touch events
+            function getTouchPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                return {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+            }
+
+            canvas.ontouchstart = function(e) {
+                e.preventDefault();
+                drawing = true;
+                const pos = getTouchPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                lastX = pos.x;
+                lastY = pos.y;
+                canvas.style.cursor = 'crosshair';
+            };
+
+            canvas.ontouchmove = function(e) {
+                e.preventDefault();
+                if (!drawing) return;
+                const pos = getTouchPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                lastX = pos.x;
+                lastY = pos.y;
+            };
+
+            canvas.ontouchend = function(e) {
+                e.preventDefault();
+                drawing = false;
+            };
+
+            // Update color
+            window.updateColor = function(lessonId, color) {
+                if (lessonId === lessonId) ctx.strokeStyle = color;
+            };
+
+            // Update line width
+            window.updateLineWidth = function(lessonId, width) {
+                if (lessonId === lessonId) ctx.lineWidth = parseInt(width);
+            };
+
+            // Draw shape (global, but scoped to this canvas)
+            window.drawShape = function(lessonId, shape) {
+                if (lessonId !== lessonId) return;
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const radius = 50;
+                ctx.beginPath();
+                if (shape === 'circle') {
+                    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                } else if (shape === 'square') {
+                    ctx.rect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+                }
+                ctx.stroke();
+            };
+
+            // Clear canvas (global)
+            window.clearCanvas = function(canvasId) {
+                if (canvasId !== canvas.id) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            };
+        });
     };
 
     // CSS for speaking animation

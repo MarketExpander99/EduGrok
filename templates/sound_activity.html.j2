@@ -1,20 +1,20 @@
 <!-- Filename: sound_activity.html.j2 -->
 <!-- New: Standalone template for sound activity (phonics sound matching/repeat). Includes audio player, matching options or input, and speaker icon. Assumes lesson.sound field; can be extended for matching. For now, basic play and repeat input. -->
-<!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. Removed bg-blue-50 and border-blue-200 wrappers to match trace activity's minimal display; ensured data-type="sound" on submit button for proper handling. Updated prompt and placeholder to instruct typing the full word (e.g., apple) instead of phonetic, assuming server compares to spell_word. -->
-{% if post.lesson.sound and not post.completed %}<div class="activity-section p-3" data-type="sound">
+<!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. Removed bg-blue-50 and border-blue-200 wrappers to match trace activity's minimal display; ensured data-type="sound" on submit button for proper handling. Updated prompt and placeholder to instruct typing the full word (e.g., apple) instead of phonetic, assuming server compares to spell_word. Added data-correct-word attribute for frontend override of phonetic mismatch. -->
+{% if post.lesson.sound and not post.completed %}<div class="activity-section p-3" data-type="sound" data-correct-word="{{ post.lesson.spell_word }}">
     <div class="flex items-center mb-2">
-        <h4 class="text-white font-medium flex-grow">Listen and type the word you hear</h4>
-        <button type="button" onclick="window.speakQuestion('Listen and type the word you hear', this)" class="ml-2 text-blue-700 hover:text-blue-500 transition" aria-label="Read instruction aloud">
+        <h4 class="text-grok-text font-medium flex-grow">Listen and type the word you hear</h4>
+        <button type="button" onclick="window.speakQuestion('Listen and type the word you hear', this)" class="ml-2 text-grok-accent hover:text-grok-accent/80 transition" aria-label="Read instruction aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
     </div>
-    <button type="button" onclick="window.playAudio('{{ post.lesson.sound }}')" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition mr-2">Play Sound</button>
-    <input id="sound-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 mt-2 bg-white text-gray-900" placeholder="Type the word here (e.g., apple)">
-    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'sound')" data-type="sound" class="check-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-2 transition">Check</button></div>
+    <button type="button" onclick="window.playAudio('{{ post.lesson.sound }}')" class="bg-grok-accent text-grok-text px-3 py-1 rounded-md hover:bg-grok-accent/90 transition mr-2">Play Sound</button>
+    <input id="sound-{{ post.lesson.id | default(post.id) }}" type="text" class="w-full p-2 border border-grok-border rounded focus:ring-2 focus:ring-grok-accent mt-2 bg-grok-surface text-grok-text" placeholder="Type the word here (e.g., apple)">
+    <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'sound')" data-type="sound" class="bg-grok-accent text-grok-text px-4 py-2 rounded-md hover:bg-grok-accent/90 mt-2 transition">Check</button></div>
 {% else %}
 {% if post.lesson.sound %}
 <div class="activity-section p-3" data-type="sound">
-    <h4 class="text-green-700 font-medium">Listen and type the word you hear (Completed)</h4>
+    <h4 class="text-green-600 font-medium">Listen and type the word you hear (Completed)</h4>
 </div>
 {% endif %}
 {% endif %}

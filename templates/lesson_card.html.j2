@@ -1,5 +1,5 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Simplified trace success message to "Drawing saved ✓" as requested. Added console.log for debugging submitActivity (logs entry, data.success, is_correct, and replacement attempt). Ensured canvas.toDataURL captures drawing before closeTracePopup. Retained image display below message. If not working, check browser console for logs/errors (e.g., fetch failure, selector miss). Added try-catch around replacement for robustness. -->
+<!-- Fixes: Replaced "Draw" button and trace_popup with direct inline inclusion of trace_activity.html.j2 for seamless canvas display without modals. Removed all popup-related JS (toggleTracePopup, closeTracePopup, overlayClick, popup elements). Simplified submitActivity to handle inline replacement for trace success/failure without popup closing. Integrated with global initTraceCanvases from base.html.j2 for drawing setup. Updated description default to "Build phonics skills for reading readiness." for trace lessons. Retained other activity includes and general JS for compatibility. -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     <div class="flex items-center mb-3">
         <div class="mr-3">
@@ -16,26 +16,15 @@
             <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
         </div>
     </div>
-    <p class="text-grok-text mb-4 prose prose-sm max-w-none">{{ post.lesson.description | default('Dive into this interactive lesson!') | safe }}</p>
+    <p class="text-grok-text mb-4 prose prose-sm max-w-none">
+        {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
+        {% if post.lesson.trace_word and post.lesson.spell_word %}
+            Spell the word you hear
+        {% endif %}
+    </p>
     <div class="space-y-4 mb-4">
         {% if post.lesson.trace_word %}
-            <div class="text-center" id="draw-container-{{ post.lesson.id | default(post.id) }}">
-                <button id="draw-btn-{{ post.lesson.id | default(post.id) }}" onclick="window.toggleTracePopup({{ post.lesson.id | default(post.id) }})" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold shadow-md">Draw</button>
-            </div>
-            <!-- Trace Popup (initially in card, JS moves to body) -->
-            <div id="trace-popup-{{ post.lesson.id | default(post.id) }}" class="fixed inset-0 z-50 popup-closed pointer-events-none bg-black bg-opacity-50" style="display: none;">
-                <div class="absolute inset-0 flex items-center justify-center p-4">
-                    <div class="bg-grok-surface rounded-xl shadow-2xl border border-grok-border w-[450px] max-w-full max-h-[60vh] overflow-y-auto opacity-0 scale-95">
-                        <div class="p-6 border-b border-grok-border flex justify-between items-center">
-                            <h3 class="text-xl font-bold text-grok-text">Trace Activity</h3>
-                            <button onclick="window.closeTracePopup({{ post.lesson.id | default(post.id) }})" class="text-grok-text text-2xl">&times;</button>
-                        </div>
-                        <div class="p-6">
-                            {% include 'trace_activity.html.j2' %}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% include 'trace_activity.html.j2' %}
         {% endif %}
         {% if post.lesson.spell_word %}
             {% include 'spell_activity.html.j2' %}
@@ -129,215 +118,12 @@ if (!window.initAllActivities) {
             el.classList.remove('opacity-50', 'cursor-not-allowed');
           });
         }
-        if (type === 'trace' && !isCompleted) window.initCanvas(lessonId);
+        if (type === 'trace' && !isCompleted) {
+          // Use global init from base
+          window.initTraceCanvases();
+        }
       });
-      if (card.querySelector('canvas[id^="trace-canvas-"]') && !isCompleted) window.initCanvas(lessonId);
     });
-  }
-}
-
-let popupElements = {}; // Track moved elements
-
-// Define global overlayClick function
-window.overlayClick = function(e, lessonId) {
-  const popup = document.getElementById(`trace-popup-${lessonId}`);
-  if (e.target === popup) {
-    window.closeTracePopup(lessonId);
-  }
-};
-
-if (!window.toggleTracePopup) {
-  window.toggleTracePopup = function(lessonId) {
-    const popupId = `trace-popup-${lessonId}`;
-    let popup = document.getElementById(popupId);
-    if (!popup) return;
-    
-    if (popup.parentNode !== document.body) {
-      // Move to body on first open to escape card clipping
-      document.body.appendChild(popup);
-      popupElements[lessonId] = popup;
-    }
-    
-    const modal = popup.querySelector('.bg-grok-surface');
-    if (popup.classList.contains('popup-closed')) {
-      // Open instantly
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed'; // Prevent background scroll
-      popup.style.display = 'block';
-      popup.classList.remove('popup-closed');
-      popup.style.pointerEvents = 'auto';
-      modal.style.opacity = '1';
-      modal.style.transform = 'scale(1)';
-      // Add overlay click handler using global function
-      popup.addEventListener('click', (e) => window.overlayClick(e, lessonId));
-      popup._overlayClick = (e) => window.overlayClick(e, lessonId); // Store for removal
-      // Immediate init
-      window.initCanvas(lessonId);
-    } else {
-      window.closeTracePopup(lessonId);
-    }
-  }
-}
-
-if (!window.closeTracePopup) {
-  window.closeTracePopup = function(lessonId) {
-    const popupId = `trace-popup-${lessonId}`;
-    const popup = document.getElementById(popupId);
-    if (!popup) return;
-    
-    const modal = popup.querySelector('.bg-grok-surface');
-    modal.style.opacity = '0';
-    modal.style.transform = 'scale(0.95)';
-    popup.classList.add('popup-closed');
-    popup.style.pointerEvents = 'none';
-    popup.style.display = 'none'; // Fully hide to prevent scroll/layout issues
-    document.body.style.overflow = '';
-    document.body.style.position = ''; // Reset body styles
-    // Remove overlay handler
-    if (popup._overlayClick) {
-      popup.removeEventListener('click', popup._overlayClick);
-      delete popup._overlayClick;
-    }
-  }
-}
-
-// Consolidated trace functions (ensures popup buttons work)
-if (!window.traceCanvases) window.traceCanvases = {};
-if (!window.initCanvas) {
-  window.initCanvas = function(lessonId) {
-    const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-    if (!canvas || window.traceCanvases[lessonId]) return;
-    window.traceCanvases[lessonId] = true;
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-    let drawingEnabled = false;
-    let currentLineWidth = 3;
-    let currentColor = '#000000';
-
-    // Draw faint guide text
-    function drawGuideText() {
-      const traceWord = canvas.dataset.traceWord;
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.font = 'bold 24px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(traceWord, canvas.width / 2, canvas.height / 2);
-      ctx.restore();
-    }
-
-    window.toggleDrawing = function(id) {
-      if (id !== lessonId) return;
-      drawingEnabled = !drawingEnabled;
-      const toggleBtn = document.getElementById(`draw-toggle-${id}`);
-      if (toggleBtn) {
-        toggleBtn.textContent = drawingEnabled ? 'Stop Drawing' : 'Start Drawing';
-        toggleBtn.className = drawingEnabled ? 'bg-green-500 text-white px-4 py-2 rounded-md' : 'bg-blue-500 text-white px-4 py-2 rounded-md';
-      }
-      if (!drawingEnabled) drawing = false;
-    };
-
-    window.updateLineWidth = function(id, width) {
-      if (id !== lessonId) return;
-      currentLineWidth = parseInt(width);
-      ctx.lineWidth = currentLineWidth;
-    };
-
-    window.updateColor = function(id, color) {
-      if (id !== lessonId) return;
-      currentColor = color;
-      ctx.strokeStyle = currentColor;
-    };
-
-    window.clearCanvas = function(canvasId) {
-      if (canvasId !== `trace-canvas-${lessonId}`) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawGuideText();
-    };
-
-    window.drawShape = function(id, shape) {
-      if (id !== lessonId) return;
-      const colorInput = document.getElementById(`color-${id}`);
-      const widthSelect = document.getElementById(`width-${id}`);
-      const shapeColor = colorInput ? colorInput.value : currentColor;
-      const shapeWidth = widthSelect ? parseInt(widthSelect.value) : currentLineWidth;
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const radius = 30;
-      ctx.beginPath();
-      if (shape === 'circle') {
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      } else if (shape === 'square') {
-        const side = 60;
-        const offset = side / 2;
-        ctx.rect(centerX - offset, centerY - offset, side, side);
-      }
-      ctx.strokeStyle = shapeColor;
-      ctx.lineWidth = shapeWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-    };
-
-    function getCoordinates(e) {
-      const rect = canvas.getBoundingClientRect();
-      const style = window.getComputedStyle(canvas);
-      const borderLeft = parseFloat(style.borderLeftWidth) || 0;
-      const borderTop = parseFloat(style.borderTopWidth) || 0;
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
-      return {
-        x: clientX - (rect.left + borderLeft),
-        y: clientY - (rect.top + borderTop)
-      };
-    }
-
-    function startDrawing(e) {
-      e.stopPropagation();
-      if (!drawingEnabled) return;
-      drawing = true;
-      const { x, y } = getCoordinates(e);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      if (e.type === 'touchstart') e.preventDefault();
-    }
-
-    function draw(e) {
-      e.stopPropagation();
-      if (!drawing || !drawingEnabled) return;
-      const { x, y } = getCoordinates(e);
-      ctx.lineTo(x, y);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = currentColor;
-      ctx.lineWidth = currentLineWidth;
-      ctx.stroke();
-      if (e.type === 'touchmove') e.preventDefault();
-    }
-
-    function endDrawing(e) {
-      e.stopPropagation();
-      drawing = false;
-      if (e.type === 'touchend') e.preventDefault();
-    }
-
-    // Event listeners
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', endDrawing);
-    canvas.addEventListener('mouseout', endDrawing);
-
-    canvas.addEventListener('touchstart', startDrawing, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    canvas.addEventListener('touchend', endDrawing, { passive: false });
-    canvas.addEventListener('touchcancel', endDrawing, { passive: false });
-
-    // Initial guide draw
-    drawGuideText();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = currentLineWidth;
-    ctx.strokeStyle = currentColor;
   }
 }
 
@@ -353,7 +139,7 @@ if (!window.submitActivity) {
     let responseValue;
     if (activityType === 'trace') {
       const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-      responseValue = canvas ? canvas.dataset.traceWord : '';
+      responseValue = canvas ? canvas.toDataURL('image/png') : '';
     } else if (activityType === 'sound') {
       responseValue = document.getElementById(`sound-${lessonId}`).value;
     } else if (activityType === 'spell') {
@@ -388,25 +174,22 @@ if (!window.submitActivity) {
           if (activityType === 'trace') {
             const traceWord = document.getElementById(`trace-canvas-${lessonId}`)?.dataset.traceWord || '';
             const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-            const canvasImg = canvas ? canvas.toDataURL('image/png') : '';
-            // Replace card's draw container with success and image
-            const drawContainer = document.getElementById(`draw-container-${lessonId}`);
-            console.log('Attempting replacement on container:', drawContainer); // Debug log
-            if (drawContainer) {
+            let canvasImg = '';
+            if (canvas) {
               try {
-                drawContainer.innerHTML = `
-                  <p class="text-green-700 font-semibold mb-2">Drawing saved ✓</p>
-                  ${canvasImg ? `<img src="${canvasImg}" alt="Your drawing" class="mx-auto mt-2 rounded shadow-md max-w-full h-32 object-contain">` : ''}
-                `;
-                console.log('Replacement successful'); // Debug log
-              } catch (err) {
-                console.error('Replacement error:', err); // Debug log
+                canvasImg = canvas.toDataURL('image/png');
+              } catch (imgErr) {
+                console.error('Canvas toDataURL failed:', imgErr);
+                canvasImg = ''; // Fallback to no image
               }
-            } else {
-              console.error('Draw container not found'); // Debug log
             }
-            // No need to update section since popup will close
-            window.closeTracePopup(lessonId); // Close after capture
+            successMsg = `<p class="text-green-700 font-semibold mb-2">Correct!</p>`;
+            if (canvasImg) {
+              successMsg += `<img src="${canvasImg}" alt="Your drawing" class="mx-auto mt-2 rounded shadow-md max-w-full h-32 object-contain">`;
+            }
+            if (section) {
+              section.innerHTML = successMsg;
+            }
           } else {
             const typeTitle = activityType.charAt(0).toUpperCase() + activityType.slice(1);
             successMsg = `<h4 class="text-green-700 font-medium">${typeTitle} (Correct!)</h4>`;
@@ -453,7 +236,14 @@ window.resetActivity = function(lessonId, activityType) {
   if (input) input.value = '';
   const feedback = section.querySelector('.text-red-700');
   if (feedback) feedback.remove();
-  if (activityType === 'trace') window.clearCanvas(`trace-canvas-${lessonId}`);
+  if (activityType === 'trace') {
+    const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Redraw guide if needed
+    }
+  }
   if (activityType === 'mc' || activityType === 'sentence') {
     section.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
     section.querySelector(`#${activityType}-hidden-${lessonId}`).value = '';
@@ -489,24 +279,10 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
     100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } 
 }
 
-.popup-closed {
-  opacity: 0;
-}
-
 @media (max-width: 640px) {
   canvas[id^="trace-canvas-"] {
     width: 100% !important;
     height: 150px !important;
-  }
-  
-  /* Mobile full-screen */
-  [id^="trace-popup-"] .bg-grok-surface {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-width: none !important;
-    max-height: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
   }
 }
 
@@ -521,4 +297,3 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
   pointer-events: none;
 }
 </style>
-

@@ -1,20 +1,15 @@
 <!-- Filename: trace_activity.html.j2 -->
-<!-- Fixes: Added container div with id="trace-ui-{{ post.lesson.id | default(post.id) }}" around drawing toggle, tools, canvas, and action buttons for targeted JS replacement on completion success. Retained all previous responsive canvas styles, touch-action, cursor, and flex alignment. Confirmed onclicks use window.* globals. Structure supports dynamic update to success message without full re-render, and modal hiding via JS. -->
+<!-- Fixes: Removed "Start Drawing" toggle button to display canvas inline and directly ready for drawing. Retained all other controls (color picker, line width, shapes) and container div id="trace-ui-..." for targeted JS updates on completion. Updated text colors to 'text-grok-text' for theme consistency. Canvas is now always in drawing mode via global JS init. Confirmed submit button onclick passes event for card replacement and popup handling. -->
 {% if post.lesson.trace_word and not post.completed %}
 <div class="activity-section p-3" data-type="trace">
     <div class="flex items-center mb-2">
-        <h4 class="text-white font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
-        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-white" aria-label="Read instruction aloud">
+        <h4 class="text-grok-text font-medium flex-grow">Trace the word: {{ post.lesson.trace_word }}</h4>
+        <button type="button" onclick="window.speakQuestion('Trace the word: {{ post.lesson.trace_word }}', this)" class="ml-2 text-grok-text" aria-label="Read instruction aloud">
             <i class="fas fa-volume-up text-sm"></i>
         </button>
     </div>
     
     <div id="trace-ui-{{ post.lesson.id | default(post.id) }}">
-        <!-- Drawing Toggle -->
-        <div class="mb-2">
-            <button id="draw-toggle-{{ post.lesson.id | default(post.id) }}" type="button" onclick="window.toggleDrawing('{{ post.lesson.id | default(post.id) }}')" class="bg-blue-500 text-white px-4 py-2 rounded-md">Start Drawing</button>
-        </div>
-
         <!-- Drawing Tools -->
         <div class="flex flex-wrap items-center gap-2 mb-2 text-sm justify-center">
             <label>Color: <input type="color" id="color-{{ post.lesson.id | default(post.id) }}" value="#000000" onchange="window.updateColor('{{ post.lesson.id | default(post.id) }}', this.value)" class="w-8 h-6 rounded"></label>
@@ -33,7 +28,7 @@
 
         <div class="flex gap-2 justify-center">
             <button type="button" onclick="window.clearCanvas('trace-canvas-{{ post.lesson.id | default(post.id) }}')" class="bg-gray-300 text-grok-text px-3 py-1 rounded-md">Clear</button>
-            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" data-value="drawn" class="bg-blue-500 text-white px-4 py-2 rounded-md">Save & Check</button>
+            <button type="button" onclick="window.submitActivity(event, {{ post.lesson.id | default(post.id) }}, 'trace')" data-type="trace" class="bg-blue-500 text-white px-4 py-2 rounded-md">Save & Check</button>
         </div>
     </div>
 </div>
