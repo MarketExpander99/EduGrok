@@ -1,6 +1,7 @@
 <!-- Filename: mc_activity.html.j2 -->
 <!-- New: Extracted multiple-choice activity section. Includes question, speaker/sound buttons, option buttons, hidden input, and check button. Uses selectMcOption for selection. -->
 <!-- Fix: Removed hardcoded 'opacity-50 disabled-activity' classes and 'disabled' attrs—main JS now enables everything. Removed bg-blue-50 and border-blue-200 wrappers to match trace activity's minimal display. Changed text-blue-700 to text-white for better contrast on dark backgrounds. -->
+<!-- Update: Added selected highlighting (bg-blue-100 border-blue-400) via 'selected-mc' class toggled in selectMcOption JS. Added retry counter div for future JS updates (e.g., decrement on wrong). Removed inline <style> (now in base.html.j2). Fixed initial button classes (no 'selected-mc' on all—JS handles toggle). -->
 {% if not post.completed %}
 <div class="activity-section p-3" data-type="mc">
     <div class="flex items-center mb-2">
@@ -14,6 +15,7 @@
     </div>
     {% set options = (post.lesson.mc_options if post.lesson.mc_options is iterable and not post.lesson.mc_options is string else []) %}
     <input type="hidden" name="mc{{ post.lesson.id | default(post.id) }}" id="mc-hidden-{{ post.lesson.id | default(post.id) }}" value="">
+    <div id="retry-mc-{{ post.lesson.id | default(post.id) }}" class="text-sm text-red-500 mb-2">Tries left: 3</div>
     <div class="space-y-2">
         {% for option in options %}
             <button type="button" class="mc-btn w-full text-left p-3 border border-grok-border rounded bg-white text-gray-900 hover:bg-grok-accent transition text-grok-text" data-value="{{ option }}" onclick="window.selectMcOption('{{ post.lesson.id | default(post.id) }}', this, '{{ option }}')">
