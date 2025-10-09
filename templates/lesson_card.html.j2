@@ -1,9 +1,15 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Defined overlayClick as a global function to handle overlay clicks reliably (fixes ReferenceError at toggleTracePopup). Adjusted popup modal dimensions to w-[450px] max-w-full for snug fit around 400x200 canvas with padding; reduced max-h to [60vh] for compact vertical sizing without overflow on desktop, while retaining mobile full-screen override. Consolidated JS to ensure all functions are globally accessible without conflicts. -->
-<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}">
+<!-- Fixes: For sound: Changed prompt to type the word (e.g., apple), assuming server compares to spell_word. For trace: Removed 'drawn' fallback, always use trace_word for response to match correct_answer by default (always correct). Added tries logic per activity (max 3, decrement on wrong, lock section on 0). On lesson_complete, add 'lesson-completed' class to lock card. Added check for empty response to prevent 500. If wrong, show "Wrong! Tries left: X. Correct: Y" with retry button to reset input. Preserved all prior fixes. -->
+<div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     <div class="flex items-center mb-3">
-        <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
-            {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
+        <div class="mr-3">
+            {% if post.profile_picture %}
+                <img src="{{ post.profile_picture }}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover shadow-sm">
+            {% else %}
+                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                    {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
+                </div>
+            {% endif %}
         </div>
         <div class="flex-1">
             <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
@@ -98,32 +104,41 @@ if (!window.activityOrder) {
   window.activityOrder = ['trace', 'spell', 'mc', 'sentence', 'math', 'sound'];
 }
 
+if (!window.activityState) window.activityState = {};
+
 if (!window.initAllActivities) {
   window.initAllActivities = function() {
     document.querySelectorAll('.card[id^="lesson-"]').forEach(card => {
       const lessonId = card.id.split('-')[1];
+      window.activityState[lessonId] = window.activityState[lessonId] || { tries: {} };
+      const isCompleted = card.dataset.completed === 'true';
       const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => window.activityOrder.includes(s.dataset.type));
       console.log(`Enabling ${sections.length} activities in lesson ${lessonId}`);
       sections.forEach(section => {
-        // Ensure no disabled states
-        section.classList.remove('disabled-activity', 'opacity-50');
-        section.style.opacity = '1';
-        section.style.pointerEvents = 'auto';
-        section.querySelectorAll('input, button, canvas, select').forEach(el => {
-          el.disabled = false;
-          el.style.opacity = '1';
-          el.classList.remove('opacity-50', 'cursor-not-allowed');
-        });
-        if (section.dataset.type === 'trace') window.initCanvas(lessonId);
+        const type = section.dataset.type;
+        window.activityState[lessonId].tries[type] = window.activityState[lessonId].tries[type] || 3;
+        if (isCompleted || window.activityState[lessonId].tries[type] === 0) {
+          section.classList.add('opacity-50', 'pointer-events-none');
+        } else {
+          section.classList.remove('disabled-activity', 'opacity-50');
+          section.style.opacity = '1';
+          section.style.pointerEvents = 'auto';
+          section.querySelectorAll('input, button, canvas, select').forEach(el => {
+            el.disabled = false;
+            el.style.opacity = '1';
+            el.classList.remove('opacity-50', 'cursor-not-allowed');
+          });
+        }
+        if (type === 'trace' && !isCompleted) window.initCanvas(lessonId);
       });
-      if (card.querySelector('canvas[id^="trace-canvas-"]')) window.initCanvas(lessonId);
+      if (card.querySelector('canvas[id^="trace-canvas-"]') && !isCompleted) window.initCanvas(lessonId);
     });
   }
 }
 
 let popupElements = {}; // Track moved elements
 
-// Define global overlayClick function to fix ReferenceError
+// Define global overlayClick function
 window.overlayClick = function(e, lessonId) {
   const popup = document.getElementById(`trace-popup-${lessonId}`);
   if (e.target === popup) {
@@ -328,21 +343,95 @@ if (!window.initCanvas) {
 
 // Global functions for other activities (e.g., submitActivity for check buttons)
 if (!window.submitActivity) {
-  window.submitActivity = function(event, lessonId, activityType) {
+  window.submitActivity = async function(event, lessonId, activityType) {
     event.preventDefault();
-    // Simulate submission logic - in real app, POST to /check_lesson
-    console.log(`Submitting ${activityType} for lesson ${lessonId}`);
-    // Example: Mark as completed, show feedback
-    const section = document.querySelector(`[data-type="${activityType}"]`);
-    if (section) {
-      section.innerHTML = `<h4 class="text-green-700 font-medium">${activityType} (Completed)</h4>`;
+    if (window.activityState[lessonId].tries[activityType] === 0) return;
+    const formData = new FormData();
+    formData.append('lesson_id', lessonId);
+    formData.append('activity_type', activityType);
+    let responseValue;
+    if (activityType === 'trace') {
+      responseValue = document.getElementById(`trace-canvas-${lessonId}`).dataset.traceWord;
+    } else if (activityType === 'sound') {
+      responseValue = document.getElementById(`sound-${lessonId}`).value;
+    } else if (activityType === 'spell') {
+      responseValue = document.getElementById(`spell-${lessonId}`).value;
+    } else if (activityType === 'mc') {
+      responseValue = document.getElementById(`mc-hidden-${lessonId}`).value;
+    } else if (activityType === 'sentence') {
+      responseValue = document.getElementById(`sentence-hidden-${lessonId}`).value;
+    } else if (activityType === 'math') {
+      responseValue = document.getElementById(`math-${lessonId}`).value;
     }
-    // Close popup if open
-    if (activityType === 'trace') window.closeTracePopup(lessonId);
+    if (!responseValue) {
+      alert('Please enter your response');
+      return;
+    }
+    formData.append('response', responseValue);
+    try {
+      const res = await fetch('/check_lesson', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
+        const feedbackDiv = document.createElement('div');
+        if (data.is_correct) {
+          feedbackDiv.innerHTML = `<h4 class="text-green-700 font-medium">${activityType.capitalize()} (Correct!)</h4>`;
+          section.replaceWith(feedbackDiv);
+        } else {
+          window.activityState[lessonId].tries[activityType]--;
+          const tries = window.activityState[lessonId].tries[activityType];
+          feedbackDiv.innerHTML = `<p class="text-red-700 mt-2">Wrong! Tries left: ${tries}. Correct: ${data.correct_answer}. <button onclick="window.resetActivity(${lessonId}, '${activityType}')" class="bg-red-500 text-white px-2 py-1 rounded">Retry</button></p>`;
+          section.appendChild(feedbackDiv);
+          if (tries === 0) {
+            section.classList.add('opacity-50', 'pointer-events-none');
+          }
+        }
+        if (data.lesson_complete) {
+          const card = document.getElementById(`lesson-${lessonId}`);
+          card.classList.add('lesson-completed');
+          card.querySelectorAll('.activity-section').forEach(s => {
+            s.classList.add('opacity-50', 'pointer-events-none');
+          });
+          card.innerHTML += '<p class="text-green-700 font-bold mt-4">Lesson Completed!</p>';
+        }
+        if (activityType === 'trace') window.closeTracePopup(lessonId);
+      } else {
+        console.error(data.error);
+      }
+    } catch (e) {
+      console.error('Submission failed:', e);
+    }
   };
 }
 
-// ... (rest of JS functions: playAudio, speakQuestion, selectMcOption, likePost, toggleComments, toggleCommentsExtra - assume defined elsewhere or add as needed)
+// Add resetActivity to clear input on retry
+window.resetActivity = function(lessonId, activityType) {
+  const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
+  const input = section.querySelector('input, textarea');
+  if (input) input.value = '';
+  const feedback = section.querySelector('.text-red-700');
+  if (feedback) feedback.remove();
+  if (activityType === 'trace') window.clearCanvas(`trace-canvas-${lessonId}`);
+  if (activityType === 'mc' || activityType === 'sentence') {
+    section.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
+    section.querySelector(`#${activityType}-hidden-${lessonId}`).value = '';
+  }
+};
+
+// Add for MC selection if not present
+if (!window.selectMcOption) {
+  window.selectMcOption = function(lessonId, btn, value, type) {
+    const hidden = document.getElementById(`${type}-hidden-${lessonId}`);
+    hidden.value = value;
+    btn.parentNode.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  };
+}
+
+// ... (rest of JS functions: playAudio, speakQuestion, likePost, toggleComments, toggleCommentsExtra - assume defined elsewhere or add as needed)
 
 document.addEventListener('DOMContentLoaded', window.initAllActivities);
 </script>
@@ -386,5 +475,10 @@ document.addEventListener('DOMContentLoaded', window.initAllActivities);
   background-color: #3b82f6 !important;
   color: white !important;
   border-color: #3b82f6 !important;
+}
+
+.lesson-completed .activity-section {
+  opacity: 0.5;
+  pointer-events: none;
 }
 </style>

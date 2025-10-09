@@ -29,7 +29,7 @@ def register():
             logger.debug(f"Generated hash for {email}: {hashed_password}")
             conn = get_db()
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password, grade, theme, subscribed, handle, language, star_coins, points, parent_id, role) VALUES (?, ?, ?, 'astronaut', 0, ?, 'en', 0, 0, NULL, 'parent')", 
+            c.execute("INSERT INTO users (email, password, grade, theme, subscribed, handle, language, star_coins, points, parent_id, role, profile_picture) VALUES (?, ?, ?, 'astronaut', 0, ?, 'en', 0, 0, NULL, 'parent', '')", 
                       (email, hashed_password, int(grade), handle))
             conn.commit()
             logger.info(f"Parent user registered: {email}")
@@ -59,7 +59,7 @@ def login():
         try:
             conn = get_db()
             c = conn.cursor()
-            c.execute("SELECT id, password, grade, theme, language, handle, role FROM users WHERE email = ?", (email,))
+            c.execute("SELECT id, password, grade, theme, language, handle, role, profile_picture FROM users WHERE email = ?", (email,))
             user = c.fetchone()
             if user:
                 logger.debug(f"Found user {email}, stored hash: {user['password']}")
@@ -71,6 +71,7 @@ def login():
                     session['language'] = user['language'] or 'en'
                     session['handle'] = user['handle'] or email
                     session['role'] = user['role'] or 'parent'
+                    session['profile_picture'] = user['profile_picture'] or ''
                     logger.info(f"User logged in: {email}, role: {session['role']}")
                     flash("Login successful!", "success")
                     return redirect(url_for('home'))

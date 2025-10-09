@@ -1,4 +1,4 @@
-# lesson_routes.py
+# [lesson_routes.py]
 import logging
 import sqlite3
 import json
@@ -247,9 +247,18 @@ def check_lesson():
         conn.commit()
 
         # Check if lesson complete (all activities submitted correctly)
+        # FIXED: Dynamic expected_activities based on non-None fields
+        activity_fields = {
+            'mc': lesson['mc_answer'] is not None,
+            'sentence': lesson['sentence_answer'] is not None,
+            'spell': lesson['spell_word'] is not None,
+            'sound': lesson['sound'] is not None,
+            'trace': lesson['trace_word'] is not None,
+            'math': lesson['math_answer'] is not None  # If added
+        }
+        expected_activities = sum(1 for v in activity_fields.values() if v)
         c.execute("SELECT COUNT(DISTINCT activity_type) FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", (lesson_id, session['user_id']))
         submitted_count = c.fetchone()[0]
-        expected_activities = 5  # mc, sentence, spell, sound, trace - adjust per lesson
         lesson_complete = submitted_count >= expected_activities
 
         # Award points if complete and correct
@@ -283,20 +292,26 @@ def complete_lesson(lesson_id):
     conn = get_db()
     c = conn.cursor()
     try:
+        # FIXED: Only kids complete; parents confirm separately
+        c.execute("SELECT role FROM users WHERE id = ?", (session['user_id'],))
+        role = c.fetchone()['role']
+        if role != 'kid':
+            flash('Only child accounts can complete lessons. Parents confirm via dashboard.', 'error')
+            return redirect(url_for('lessons'))
         now = datetime.now().isoformat()
         c.execute("INSERT OR IGNORE INTO completed_lessons (user_id, lesson_id, completed_at, parent_confirmed) VALUES (?, ?, ?, 0)", 
                   (session['user_id'], lesson_id, now))
         c.execute("UPDATE lessons_users SET completed = 1 WHERE user_id = ? AND lesson_id = ?", 
                   (session['user_id'], lesson_id))
         conn.commit()
-        flash('Lesson completed successfully!', 'success')
+        flash('Lesson completed successfully! Waiting for parent confirmation.', 'success')
     except Exception as e:
         logger.error(f"Complete lesson error: {e}")
         conn.rollback()
         flash('Error completing lesson', 'error')
     finally:
         conn.close()
-    return redirect(url_for('lessons'))
+    return redirect(url_for('home'))  # Kids go to home/feed
 
 def reset_lesson(lesson_id):
     if 'user_id' not in session:
@@ -304,6 +319,7 @@ def reset_lesson(lesson_id):
     conn = get_db()
     c = conn.cursor()
     try:
+        # FIXED: Allow parents to reset for kids or self
         c.execute("DELETE FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", 
                   (session['user_id'], lesson_id))
         c.execute("UPDATE lessons_users SET completed = 0 WHERE user_id = ? AND lesson_id = ?", 

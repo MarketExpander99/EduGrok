@@ -1,5 +1,4 @@
-# [user_routes.py updated: Added update_profile_picture route to handle profile image upload, validation, saving to UPLOAD_FOLDER, and DB update. Enhanced profile() to fetch and pass profile_picture. Imported necessary modules for file handling. Preserved all existing functionality including role-based access.]
-
+# [user_routes.py]
 import os
 import sqlite3
 from flask import jsonify, session, request, flash, redirect, url_for, render_template, current_app
@@ -31,6 +30,9 @@ def profile():
             logger.error(f"User not found for ID: {session['user_id']}")
             flash("User not found. Please log in again.", "error")
             return redirect(url_for('login'))
+        
+        # Update session with latest profile_picture
+        session['profile_picture'] = user['profile_picture'] or ''
 
         # Fetch badges
         c.execute("SELECT badge_name, awarded_date FROM badges WHERE user_id = ?", (session['user_id'],))
@@ -56,7 +58,7 @@ def profile():
         # Fetch linked kids if parent
         kids = []
         if user['role'] == 'parent':
-            c.execute("SELECT id, handle, grade FROM users WHERE parent_id = ? AND role = 'kid'", (session['user_id'],))
+            c.execute("SELECT id, handle, grade, profile_picture FROM users WHERE parent_id = ? AND role = 'kid'", (session['user_id'],))
             kids = [dict(row) for row in c.fetchall()]
 
         logger.info(f"Profile loaded for user {session['user_id']}: handle={user['handle']}, role={user['role']}, kids={len(kids)}")
@@ -117,7 +119,7 @@ def register_child():
         
         try:
             hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
-            c.execute("INSERT INTO users (email, password, grade, handle, theme, subscribed, language, star_coins, points, parent_id, role) VALUES (?, ?, ?, ?, 'astronaut', 0, 'en', 0, 0, ?, 'kid')", 
+            c.execute("INSERT INTO users (email, password, grade, handle, theme, subscribed, language, star_coins, points, parent_id, role, profile_picture) VALUES (?, ?, ?, ?, 'astronaut', 0, 'en', 0, 0, ?, 'kid', '')", 
                       (email, hashed_password, int(grade), handle, session['user_id']))
             child_id = c.lastrowid
             # Create approved friendship between parent and child
@@ -405,6 +407,7 @@ def update_profile_picture():
                 c = conn.cursor()
                 c.execute("UPDATE users SET profile_picture = ? WHERE id = ?", (profile_url, session['user_id']))
                 conn.commit()
+                session['profile_picture'] = profile_url
                 logger.info(f"Profile picture updated for user {session['user_id']}: {profile_url}")
                 flash('Profile picture updated successfully!', 'success')
             except Exception as e:

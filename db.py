@@ -45,6 +45,7 @@ def init_tables():
                       parent_id INTEGER,
                       role TEXT DEFAULT 'kid',
                       last_feed_view TEXT,
+                      profile_picture TEXT DEFAULT '',
                       FOREIGN KEY (parent_id) REFERENCES users(id))''')
         # Lessons table
         c.execute('''CREATE TABLE IF NOT EXISTS lessons 
@@ -333,14 +334,19 @@ def check_db_schema():
         # Check users table for required columns
         c.execute("PRAGMA table_info(users)")
         columns = {col[1]: col[2] for col in c.fetchall()}
-        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role', 'last_feed_view']
+        required_user_columns = ['email', 'password', 'grade', 'handle', 'theme', 'subscribed', 'language', 'star_coins', 'points', 'parent_id', 'role', 'last_feed_view', 'profile_picture']
         for col in required_user_columns:
             if col not in columns:
                 default = "NULL" if col == 'parent_id' else "'kid'" if col == 'role' else "NULL" if col == 'last_feed_view' else 0 if col in ['subscribed', 'star_coins', 'points'] else "'en'" if col == 'language' else "'astronaut'" if col == 'theme' else "''"
-                col_type = 'TEXT' if col in ['last_feed_view'] else 'INTEGER' if col == 'parent_id' else 'TEXT'
+                col_type = 'TEXT' if col in ['last_feed_view', 'profile_picture'] else 'INTEGER' if col == 'parent_id' else 'TEXT'
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
+                # For profile_picture, update existing rows to default if added
+                if col == 'profile_picture':
+                    c.execute("UPDATE users SET profile_picture = '' WHERE profile_picture IS NULL")
+                    conn.commit()
+                    logger.info("Updated existing rows with default profile_picture")
         # Check posts table for views, type, lesson_id columns
         c.execute("PRAGMA table_info(posts)")
         columns = {col[1]: col[2] for col in c.fetchall()}
