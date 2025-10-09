@@ -181,6 +181,7 @@ def parent_dashboard():
         tests = []
         feedbacks = []
         pending_lessons = []
+        responses = []  # NEW: For lesson responses section
 
         if selected_kid_id:
             # Fetch lessons completed (confirmed)
@@ -227,10 +228,22 @@ def parent_dashboard():
                 cl_dict['correct_answers'] = stats['correct'] or 0
                 pending_lessons.append(cl_dict)
 
+            # NEW: Fetch recent activity responses joined with lessons for "Lesson Responses" section
+            c.execute("""
+                SELECT ar.id, ar.lesson_id, ar.activity_type, ar.response, ar.is_correct, ar.points, ar.responded_at, ar.retry_count,
+                       l.title, l.subject 
+                FROM activity_responses ar
+                JOIN lessons l ON ar.lesson_id = l.id
+                WHERE ar.user_id = ?
+                ORDER BY ar.responded_at DESC
+                LIMIT 20
+            """, (selected_kid_id,))
+            responses = [dict(row) for row in c.fetchall()]
+
         # Get selected kid handle
         selected_kid_handle = next((kid['handle'] for kid in kids if kid['id'] == selected_kid_id), kids[0]['handle'])
 
-        logger.info(f"Parent dashboard loaded for parent {session['user_id']}, selected kid {selected_kid_id}: {len(pending_lessons)} pending lessons")
+        logger.info(f"Parent dashboard loaded for parent {session['user_id']}, selected kid {selected_kid_id}: {len(pending_lessons)} pending lessons, {len(responses)} responses")
         return render_template(
             'parent_dashboard.html.j2',
             kids=kids,
@@ -243,6 +256,7 @@ def parent_dashboard():
             tests=tests,
             feedbacks=feedbacks,
             pending_lessons=pending_lessons,
+            responses=responses,  # NEW: Pass responses for Lesson Responses section
             theme=session.get('theme', 'astronaut'),
             language=session.get('language', 'en')
         )

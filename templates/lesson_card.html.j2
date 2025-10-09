@@ -1,90 +1,109 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Replaced "Draw" button and trace_popup with direct inline inclusion of trace_activity.html.j2 for seamless canvas display without modals. Removed all popup-related JS (toggleTracePopup, closeTracePopup, overlayClick, popup elements). Simplified submitActivity to handle inline replacement for trace success/failure without popup closing. Integrated with global initTraceCanvases from base.html.j2 for drawing setup. Updated description default to "Build phonics skills for reading readiness." for trace lessons. Retained other activity includes and general JS for compatibility. -->
+<!-- Fixes: Added conditional to hide entire card content if post.completed is true (passed from backend), showing a "Completed!" overlay instead. Enhanced JS to respect completed state more robustly, ensuring no interactions on completed cards. Confirmed base64 submission for trace via toDataURL in submitActivity. Retained inline trace integration, activity enabling/disabling, and all other existing functionality/JS. Updated description default for trace lessons. -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
-    <div class="flex items-center mb-3">
-        <div class="mr-3">
-            {% if post.profile_picture %}
-                <img src="{{ post.profile_picture }}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover shadow-sm">
-            {% else %}
-                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                    {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
-                </div>
+    {% if post.completed %}
+        <!-- Completed Overlay -->
+        <div class="relative bg-green-100/50 border-2 border-green-400 rounded-xl p-6 text-center">
+            <div class="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                <div class="text-green-700 font-bold text-2xl">✓ Completed!</div>
+            </div>
+            <div class="relative z-10 opacity-50">
+                <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
+                <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
+                <p class="text-grok-text mb-4 prose prose-sm max-w-none">
+                    {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
+                    {% if post.lesson.trace_word and post.lesson.spell_word %}
+                        Spell the word you hear
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    {% else %}
+        <div class="flex items-center mb-3">
+            <div class="mr-3">
+                {% if post.profile_picture %}
+                    <img src="{{ post.profile_picture }}" alt="Profile Picture" class="w-10 h-10 rounded-full object-cover shadow-sm">
+                {% else %}
+                    <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        {{ post.lesson.subject[0] | upper if post.lesson.subject else 'L' }}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="flex-1">
+                <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
+                <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
+            </div>
+        </div>
+        <p class="text-grok-text mb-4 prose prose-sm max-w-none">
+            {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
+            {% if post.lesson.trace_word and post.lesson.spell_word %}
+                Spell the word you hear
+            {% endif %}
+        </p>
+        <div class="space-y-4 mb-4">
+            {% if post.lesson.trace_word %}
+                {% include 'trace_activity.html.j2' %}
+            {% endif %}
+            {% if post.lesson.spell_word %}
+                {% include 'spell_activity.html.j2' %}
+            {% endif %}
+            {% if post.lesson.mc_question %}
+                {% include 'mc_activity.html.j2' %}
+            {% endif %}
+            {% if post.lesson.sentence_question %}
+                {% include 'sentence_activity.html.j2' %}
+            {% endif %}
+            {% if post.lesson.math_question %}
+                {% include 'math_activity.html.j2' %}
+            {% endif %}
+            {% if post.lesson.sound %}
+                {% include 'sound_activity.html.j2' %}
             {% endif %}
         </div>
-        <div class="flex-1">
-            <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
-            <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
+        <div class="flex justify-between text-grok-secondary mb-4 text-xs">
+            <span> {{ post.views or 0 }} views</span>
+            <span> {{ post.likes or 0 }} likes</span>
+            <span> {{ (comments[post.id] | length) if post.id in comments else 0 }} notes</span>
         </div>
-    </div>
-    <p class="text-grok-text mb-4 prose prose-sm max-w-none">
-        {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
-        {% if post.lesson.trace_word and post.lesson.spell_word %}
-            Spell the word you hear
-        {% endif %}
-    </p>
-    <div class="space-y-4 mb-4">
-        {% if post.lesson.trace_word %}
-            {% include 'trace_activity.html.j2' %}
-        {% endif %}
-        {% if post.lesson.spell_word %}
-            {% include 'spell_activity.html.j2' %}
-        {% endif %}
-        {% if post.lesson.mc_question %}
-            {% include 'mc_activity.html.j2' %}
-        {% endif %}
-        {% if post.lesson.sentence_question %}
-            {% include 'sentence_activity.html.j2' %}
-        {% endif %}
-        {% if post.lesson.math_question %}
-            {% include 'math_activity.html.j2' %}
-        {% endif %}
-        {% if post.lesson.sound %}
-            {% include 'sound_activity.html.j2' %}
-        {% endif %}
-    </div>
-    <div class="flex justify-between text-grok-secondary mb-4 text-xs">
-        <span> {{ post.views or 0 }} views</span>
-        <span> {{ post.likes or 0 }} likes</span>
-        <span> {{ (comments[post.id] | length) if post.id in comments else 0 }} notes</span>
-    </div>
-    <div class="flex justify-between border-t border-blue-300 pt-3 text-sm">
-        <button onclick="window.likePost({{ post.id }})" class="text-grok-text flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
-            <i class="fas fa-heart mr-1"></i>{{ 'Unlike' if post.liked_by_user else 'Like' }}
-        </button>
-        <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text flex items-center">
-            <i class="fas fa-comment mr-1"></i>Notes
-        </button>
-        <button class="text-grok-text flex items-center opacity-50 cursor-not-allowed" disabled>
-            <i class="fas fa-share mr-1"></i>Share
-        </button>
-    </div>
-    <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
-        <form method="POST" action="/comment/{{ post.id }}">
-            <textarea name="content" placeholder="Add a note..." class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" required rows="2"></textarea>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md mt-2">Post Note</button>
-        </form>
-    </div>
-    {% if post.id in comments %}
-        <div class="mt-4">
-            <h4 class="text-sm font-semibold text-grok-text mb-2">Notes:</h4>
-            {% for comment in (comments[post.id] | sort(attribute='created_at'))[:3] %}
-                <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
-                    <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
-                    <p>{{ comment.content | safe }}</p>
-                </div>
-            {% endfor %}
-            {% if (comments[post.id] | length) > 3 %}
-                <div id="hidden-comments-{{ post.id }}" style="display: none;">
-                    {% for comment in comments[post.id] | slice(3) %}
-                        <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
-                            <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
-                            <p>{{ comment.content | safe }}</p>
-                        </div>
-                    {% endfor %}
-                </div>
-                <button id="toggle-btn-{{ post.id }}" onclick="window.toggleCommentsExtra({{ post.id }})" class="text-blue-500 underline text-sm">Show more ({{ (comments[post.id] | length) - 3 }} more)</button>
-            {% endif %}
+        <div class="flex justify-between border-t border-blue-300 pt-3 text-sm">
+            <button onclick="window.likePost({{ post.id }})" class="text-grok-text flex items-center {% if post.liked_by_user %}text-blue-500{% endif %}">
+                <i class="fas fa-heart mr-1"></i>{{ 'Unlike' if post.liked_by_user else 'Like' }}
+            </button>
+            <button onclick="window.toggleComments({{ post.id }})" class="text-grok-text flex items-center">
+                <i class="fas fa-comment mr-1"></i>Notes
+            </button>
+            <button class="text-grok-text flex items-center opacity-50 cursor-not-allowed" disabled>
+                <i class="fas fa-share mr-1"></i>Share
+            </button>
         </div>
+        <div id="comment-form-{{ post.id }}" style="display: none;" class="mt-3">
+            <form method="POST" action="/comment/{{ post.id }}">
+                <textarea name="content" placeholder="Add a note..." class="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900" required rows="2"></textarea>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md mt-2">Post Note</button>
+            </form>
+        </div>
+        {% if post.id in comments %}
+            <div class="mt-4">
+                <h4 class="text-sm font-semibold text-grok-text mb-2">Notes:</h4>
+                {% for comment in (comments[post.id] | sort(attribute='created_at'))[:3] %}
+                    <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
+                        <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
+                        <p>{{ comment.content | safe }}</p>
+                    </div>
+                {% endfor %}
+                {% if (comments[post.id] | length) > 3 %}
+                    <div id="hidden-comments-{{ post.id }}" style="display: none;">
+                        {% for comment in comments[post.id] | slice(3) %}
+                            <div class="border-l-2 border-blue-400 pl-4 mb-2 text-sm">
+                                <strong class="text-grok-text">{{ comment.handle | default('Anon') }}</strong> - <small class="text-grok-secondary">{{ comment.created_at }}</small>
+                                <p>{{ comment.content | safe }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button id="toggle-btn-{{ post.id }}" onclick="window.toggleCommentsExtra({{ post.id }})" class="text-blue-500 underline text-sm">Show more ({{ (comments[post.id] | length) - 3 }} more)</button>
+                {% endif %}
+            </div>
+        {% endif %}
     {% endif %}
 </div>
 
@@ -101,24 +120,28 @@ if (!window.initAllActivities) {
       const lessonId = card.id.split('-')[1];
       window.activityState[lessonId] = window.activityState[lessonId] || { tries: {} };
       const isCompleted = card.dataset.completed === 'true';
+      if (isCompleted) {
+        // For completed cards, hide interactions entirely (overlay already handles visuals)
+        card.querySelectorAll('.activity-section, button:not(.toggle-comments)').forEach(el => {
+          el.style.pointerEvents = 'none';
+          el.classList.add('opacity-50');
+        });
+        return; // Skip enabling activities
+      }
       const sections = Array.from(card.querySelectorAll('.activity-section')).filter(s => window.activityOrder.includes(s.dataset.type));
       console.log(`Enabling ${sections.length} activities in lesson ${lessonId}`);
       sections.forEach(section => {
         const type = section.dataset.type;
         window.activityState[lessonId].tries[type] = window.activityState[lessonId].tries[type] || 3;
-        if (isCompleted || window.activityState[lessonId].tries[type] === 0) {
-          section.classList.add('opacity-50', 'pointer-events-none');
-        } else {
-          section.classList.remove('disabled-activity', 'opacity-50');
-          section.style.opacity = '1';
-          section.style.pointerEvents = 'auto';
-          section.querySelectorAll('input, button, canvas, select').forEach(el => {
-            el.disabled = false;
-            el.style.opacity = '1';
-            el.classList.remove('opacity-50', 'cursor-not-allowed');
-          });
-        }
-        if (type === 'trace' && !isCompleted) {
+        section.classList.remove('disabled-activity', 'opacity-50');
+        section.style.opacity = '1';
+        section.style.pointerEvents = 'auto';
+        section.querySelectorAll('input, button, canvas, select').forEach(el => {
+          el.disabled = false;
+          el.style.opacity = '1';
+          el.classList.remove('opacity-50', 'cursor-not-allowed');
+        });
+        if (type === 'trace') {
           // Use global init from base
           window.initTraceCanvases();
         }
@@ -132,6 +155,8 @@ if (!window.submitActivity) {
   window.submitActivity = async function(event, lessonId, activityType) {
     event.preventDefault();
     console.log(`submitActivity called for lesson ${lessonId}, type ${activityType}`); // Debug log
+    const card = document.getElementById(`lesson-${lessonId}`);
+    if (card.dataset.completed === 'true') return; // No submissions on completed
     if (window.activityState[lessonId].tries[activityType] === 0) return;
     const formData = new FormData();
     formData.append('lesson_id', lessonId);
@@ -139,7 +164,7 @@ if (!window.submitActivity) {
     let responseValue;
     if (activityType === 'trace') {
       const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-      responseValue = canvas ? canvas.toDataURL('image/png') : '';
+      responseValue = canvas ? canvas.toDataURL('image/png') : ''; // Base64 PNG
     } else if (activityType === 'sound') {
       responseValue = document.getElementById(`sound-${lessonId}`).value;
     } else if (activityType === 'spell') {
@@ -211,14 +236,21 @@ if (!window.submitActivity) {
           fetch(`/complete_lesson/${lessonId}`)
             .then(r => r.ok ? console.log('Lesson marked complete') : console.error('Complete failed'))
             .catch(e => console.error('Complete error:', e));
-          const card = document.getElementById(`lesson-${lessonId}`);
-          if (card) {
-            card.classList.add('lesson-completed');
-            card.querySelectorAll('.activity-section').forEach(s => {
-              s.classList.add('opacity-50', 'pointer-events-none');
-            });
-            card.innerHTML += '<p class="text-green-700 font-bold mt-4">Lesson Completed!</p>';
-          }
+          // Show completed overlay
+          card.innerHTML = `
+            <div class="relative bg-green-100/50 border-2 border-green-400 rounded-xl p-6 text-center">
+              <div class="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
+                <div class="text-green-700 font-bold text-2xl">✓ Completed!</div>
+              </div>
+              <div class="relative z-10 opacity-50">
+                <p class="text-grok-text font-semibold">${card.querySelector('p.text-grok-text.font-semibold').textContent}</p>
+                <p class="text-grok-secondary text-sm">${card.querySelector('p.text-grok-secondary').textContent}</p>
+                <p class="text-grok-text mb-4 prose prose-sm max-w-none">${card.querySelector('p.prose').textContent}</p>
+              </div>
+            </div>
+          `;
+          card.dataset.completed = 'true';
+          card.classList.add('lesson-completed');
         }
       } else {
         console.error('API error:', data.error); // Debug log

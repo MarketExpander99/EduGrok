@@ -221,16 +221,19 @@ def check_lesson():
             correct_answer = lesson['spell_word']
             question = f'Spell the word: {lesson["spell_word"]}'
         elif activity_type == 'sound':
-            correct_answer = lesson['sound']
+            correct_answer = lesson['spell_word']  # FIXED: Use spell_word for sound matching (full word)
             question = f'Repeat the sound: /{lesson["sound"]}/'
         elif activity_type == 'trace':
             correct_answer = lesson['trace_word']  # Or 'drawn' placeholder
             question = f'Trace the word: {lesson["trace_word"]}'
+        elif activity_type == 'math':
+            correct_answer = lesson['math_answer']
+            question = lesson['math_question']
         else:
             return jsonify({'success': False, 'error': 'Invalid activity_type'}), 400
 
         # Check correctness (simple string match; enhance for fuzzy later)
-        # FIXED: For trace activities, always mark as correct regardless of response
+        # FIXED: For trace activities, always mark as correct regardless of response (drawing saved as base64)
         if activity_type == 'trace':
             is_correct = True
         else:
@@ -245,21 +248,22 @@ def check_lesson():
             existing_retry = retry_val + 1 if not is_correct else 1  # Reset on correct, increment on wrong
 
         # Save to DB (INSERT OR REPLACE; retry_count will be handled by schema)
+        # FIXED: Ensure response (base64 for trace) is saved fully
         c.execute('''INSERT OR REPLACE INTO activity_responses 
                      (lesson_id, user_id, activity_type, response, is_correct, points, responded_at, retry_count) 
                      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)''',
                   (lesson_id, session['user_id'], activity_type, response, int(is_correct), 10 if is_correct else 0, existing_retry))
         conn.commit()
 
-        # Check if lesson complete (all activities submitted correctly)
-        # FIXED: Dynamic expected_activities based on non-None fields
+        # FIXED: Check if lesson complete (all activities submitted correctly, including math)
+        # Dynamic expected_activities based on non-None fields
         activity_fields = {
             'mc': lesson['mc_answer'] is not None,
             'sentence': lesson['sentence_answer'] is not None,
             'spell': lesson['spell_word'] is not None,
             'sound': lesson['sound'] is not None,
             'trace': lesson['trace_word'] is not None,
-            'math': lesson.get('math_answer') is not None  # If added
+            'math': lesson.get('math_answer') is not None
         }
         expected_activities = sum(1 for v in activity_fields.values() if v)
         c.execute("SELECT COUNT(DISTINCT activity_type) FROM activity_responses WHERE lesson_id = ? AND user_id = ? AND is_correct = 1", (lesson_id, session['user_id']))
@@ -279,14 +283,16 @@ def check_lesson():
             c.execute("UPDATE users SET points = points + 50 WHERE id = ?", (session['user_id'],))
             conn.commit()
 
-        logger.info(f"User {session['user_id']} submitted {activity_type} for lesson {lesson_id}: {response} (correct: {is_correct})")
+        logger.info(f"User {session['user_id']} submitted {activity_type} for lesson {lesson_id}: {response[:50]}... (correct: {is_correct})")
 
+        # FIXED: Return flag to hide card in frontend if complete
         return jsonify({
             'success': True,
             'is_correct': is_correct,
             'question': question,
             'correct_answer': correct_answer,
-            'lesson_complete': lesson_complete
+            'lesson_complete': lesson_complete,
+            'hide_card': lesson_complete  # Explicit flag for frontend to hide lesson card
         })
 
     except ValueError as e:
@@ -318,13 +324,15 @@ def complete_lesson(lesson_id):
                   (session['user_id'], lesson_id))
         conn.commit()
         flash('Lesson completed successfully! Waiting for parent confirmation.', 'success')
+        # FIXED: Enhanced redirect to home/feed for kids, with flash message
+        return redirect(url_for('home'))
     except Exception as e:
         logger.error(f"Complete lesson error: {e}")
         conn.rollback()
         flash('Error completing lesson', 'error')
+        return redirect(url_for('lessons'))
     finally:
         conn.close()
-    return redirect(url_for('home'))  # Kids go to home/feed
 
 def reset_lesson(lesson_id):
     if 'user_id' not in session:

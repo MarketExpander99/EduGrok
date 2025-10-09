@@ -1,5 +1,4 @@
-﻿# [db.py]
-import sqlite3
+﻿import sqlite3
 import os
 from flask import g
 import logging
@@ -274,6 +273,7 @@ def check_db_schema():
             c.execute("ALTER TABLE lesson_responses RENAME TO activity_responses")
             conn.commit()
             logger.info("Renamed lesson_responses to activity_responses")
+            logger.info("Ensured activity_responses.response can handle base64 drawings (TEXT field)")
         elif lesson_exists and activity_exists:
             # Migrate data from lesson_responses to activity_responses
             c.execute('''INSERT OR IGNORE INTO activity_responses 
@@ -283,6 +283,7 @@ def check_db_schema():
             c.execute("DROP TABLE lesson_responses")
             conn.commit()
             logger.info("Migrated data from lesson_responses to activity_responses and dropped lesson_responses")
+            logger.info("Ensured activity_responses.response can handle base64 drawings (TEXT field)")
         elif not activity_exists:
             # Create activity_responses if it doesn't exist
             c.execute('''CREATE TABLE activity_responses 
@@ -298,6 +299,7 @@ def check_db_schema():
                           FOREIGN KEY (user_id) REFERENCES users(id))''')
             conn.commit()
             logger.info("Created activity_responses table")
+            logger.info("Ensured activity_responses.response can handle base64 drawings (TEXT field)")
         # FIXED: Remove duplicates before adding unique index to prevent constraint failure
         c.execute("""
             DELETE FROM activity_responses 

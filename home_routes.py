@@ -88,7 +88,7 @@ def home():
         global_posts_raw = c.fetchall()
         global_posts = [dict(post) for post in global_posts_raw]
 
-        # User lessons: only from current user, exclude confirmed (parent_confirmed=1)
+        # User lessons: only from current user, exclude if completed_lessons entry exists (regardless of parent_confirmed)
         lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle, COALESCE(u.profile_picture, '') as profile_picture,
                           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                           (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
@@ -97,7 +97,7 @@ def home():
                           LEFT JOIN posts orig ON p.original_post_id = orig.id
                           LEFT JOIN users orig_u ON orig.user_id = orig_u.id
                           LEFT JOIN completed_lessons cl ON cl.lesson_id = p.lesson_id AND cl.user_id = p.user_id
-                          WHERE p.type = 'lesson' AND p.user_id = ? AND (cl.parent_confirmed IS NULL OR cl.parent_confirmed = 0)
+                          WHERE p.type = 'lesson' AND p.user_id = ? AND cl.id IS NULL
                           ORDER BY {order_by}'''
         c.execute(lesson_query, [user_id, user_id, user_id])
         lesson_posts_raw = c.fetchall()
