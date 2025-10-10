@@ -217,31 +217,50 @@ def seed_lessons():
         c.execute('DELETE FROM lessons')
         now = datetime.now().isoformat()
         lessons = [
-            # Monday Oct 6
+            # Week 1 Mon: Oct 6, 2025
             ('Week 1 Mon: Counting Apples (Math)', 1, 'math', 'Count fall apples and add small groups.', 'Practice number sense with seasonal fruits.', now, None, None, None, None, None, None, None, None, None, 'How many apples? 3 + 2 = ?', '5'),
             ('Week 1 Mon: Phonics - Short A (Language)', 1, 'language', 'Identify words with short A sound.', 'Build phonics skills for reading readiness.', now, 'apple', 'apple', '/æpəl/', 'Which word has short A?', json.dumps(['apple', 'igloo', 'umbrella']), 'apple', 'I see a red ___.', json.dumps(['apple', 'banana', 'car']), 'apple', None, None),
             ('Week 1 Mon: Fall Leaves Change (Science)', 1, 'science', 'Observe why leaves change in fall.', 'Explore seasons and plant life cycles.', now, None, None, None, 'What color do leaves turn in fall?', json.dumps(['red', 'blue', 'yellow']), 'red', None, None, None, None, None),
             ('Week 1 Mon: My Family Roles (Social Studies)', 1, 'social_studies', 'Learn about family members and their jobs.', 'Understand family structures.', now, 'mom', 'mom', '/mɒm/', 'Who cooks dinner?', json.dumps(['mom', 'teacher', 'doctor']), 'mom', 'My ___ helps at home.', json.dumps(['mom', 'dad', 'friend']), 'mom', None, None),
-            # Tuesday Oct 7
+            # Week 1 Tue: Oct 7, 2025
             ('Week 1 Tue: Shapes in Nature (Math)', 1, 'math', 'Identify circles and squares in leaves.', 'Connect shapes to the environment.', now, None, None, None, None, None, None, None, None, None, 'How many sides on a square?', '4'),
             ('Week 1 Tue: Sight Word - The (Language)', 1, 'language', 'Practice reading "the".', 'Build high-frequency word recognition.', now, 'the', 'the', '/ðə/', 'Spell the word for /ðə/.', json.dumps(['the', 'tha', 'thee']), 'the', '___ cat is happy.', json.dumps(['The', 'A', 'An']), 'The', None, None),
             ('Week 1 Tue: Animals Prepare for Winter (Science)', 1, 'science', 'Discuss how squirrels gather nuts.', 'Learn animal adaptations.', now, 'nut', 'nut', '/nʌt/', 'What do squirrels collect?', json.dumps(['nuts', 'leaves', 'rocks']), 'nuts', None, None, None, None, None),
             ('Week 1 Tue: Community Helpers - Teacher (Social Studies)', 1, 'social_studies', 'Role of teachers in school.', 'Explore jobs in the community.', now, 'teach', 'teach', '/tiːtʃ/', 'Who helps you learn?', json.dumps(['teacher', 'firefighter', 'chef']), 'teacher', 'The ___ reads stories.', json.dumps(['teacher', 'doctor', 'pilot']), 'teacher', None, None),
-            # Wednesday Oct 8
+            # Week 1 Wed: Oct 8, 2025
             ('Week 1 Wed: Addition - 1+1=2 (Math)', 1, 'math', 'Add two groups of one.', 'Basic addition facts.', now, None, None, None, None, None, None, None, None, None, '1 + 1 = ?', '2'),
             ('Week 1 Wed: CVC Word - Cat (Language)', 1, 'language', 'Blend C-V-C sounds for "cat".', 'Phonics blending practice.', now, 'cat', 'cat', '/kæt/', 'Spell /k/ /æ/ /t/.', json.dumps(['cat', 'cot', 'cut']), 'cat', 'The ___ sat on the mat.', json.dumps(['cat', 'dog', 'bat']), 'cat', None, None),
             ('Week 1 Wed: Weather in Fall (Science)', 1, 'science', 'What is cooler weather?', 'Seasonal weather patterns.', now, None, None, None, 'What do we wear in fall?', json.dumps(['coat', 'swimsuit', 'sunglasses']), 'coat', None, None, None, None, None),
             ('Week 1 Wed: My School Rules (Social Studies)', 1, 'social_studies', 'Importance of following rules.', 'School community basics.', now, 'rule', 'rule', '/ruːl/', 'What is a rule?', json.dumps(['rule', 'toy', 'book']), 'rule', 'We follow the ___ at school.', json.dumps(['rule', 'game', 'song']), 'rule', None, None),
-            # Thursday Oct 9
+            # Week 1 Thu: Oct 9, 2025
             ('Week 1 Thu: Counting to 5 (Math)', 1, 'math', 'Count objects up to 5.', 'Number sequencing.', now, None, None, None, None, None, None, None, None, None, 'Count: 1,2,3,?,5', '4'),
             ('Week 1 Thu: Rhyming Words (Language)', 1, 'language', 'Find words that rhyme with "hat".', 'Rhyming awareness.', now, 'hat', 'hat', '/hæt/', 'What rhymes with hat?', json.dumps(['cat', 'house', 'sun']), 'cat', 'The ___ is on my head.', json.dumps(['hat', 'shoe', 'book']), 'hat', None, None),
             ('Week 1 Thu: Plants in Fall (Science)', 1, 'science', 'How do trees lose leaves?', 'Plant life cycles.', now, 'leaf', 'leaf', '/liːf/', 'What falls from trees?', json.dumps(['leaves', 'apples', 'birds']), 'leaves', None, None, None, None, None),
             ('Week 1 Thu: Helping at Home (Social Studies)', 1, 'social_studies', 'Chores and family help.', 'Responsibility in family.', now, 'help', 'help', '/hɛlp/', 'What do you do to help?', json.dumps(['help', 'play', 'sleep']), 'help', 'I ___ mom clean.', json.dumps(['help', 'run', 'eat']), 'help', None, None),
-            # Friday Oct 10
+            # Week 1 Fri: Oct 10, 2025
             ('Week 1 Fri: Subtraction Basics (Math)', 1, 'math', 'Take away one from two.', 'Intro to subtraction.', now, None, None, None, None, None, None, None, None, None, '3 - 1 = ?', '2'),
             ('Week 1 Fri: Simple Sentences (Language)', 1, 'language', 'Build "I see a dog."', 'Sentence structure.', now, 'dog', 'dog', '/dɒɡ/', 'What is a pet?', json.dumps(['dog', 'car', 'tree']), 'dog', 'I see a ___.', json.dumps(['dog', 'house', 'cloud']), 'dog', None, None),
             ('Week 1 Fri: Recycling in Fall (Science)', 1, 'science', 'Why recycle leaves?', 'Environmental care.', now, None, None, None, 'What can we recycle?', json.dumps(['paper', 'food', 'toys']), 'paper', None, None, None, None, None),
             ('Week 1 Fri: Seasons Change (Social Studies)', 1, 'social_studies', 'From summer to fall.', 'Understanding seasons.', now, 'fall', 'fall', '/fɔːl/', 'What season has pumpkins?', json.dumps(['fall', 'winter', 'spring']), 'fall', 'In ___ the leaves change.', json.dumps(['fall', 'summer', 'rain']), 'fall', None, None),
+            # Week 2 Mon: Oct 13, 2025
+            ('Week 2 Mon: Subtraction with Fruit (Math)', 1, 'math', 'Take away apples from a group.', 'Practice subtraction with visuals.', now, None, None, None, None, None, None, None, None, None, '5 - 2 = ?', '3'),
+            ('Week 2 Mon: Sight Word - And (Language)', 1, 'language', 'Practice reading "and".', 'High-frequency word practice.', now, 'and', 'and', '/ænd/', 'Spell the word for /ænd/.', json.dumps(['and', 'end', 'add']), 'and', 'Cats ___ dogs play.', json.dumps(['and', 'or', 'but']), 'and', None, None),
+            ('Week 2 Mon: What is an Ecosystem? (Science)', 2, 'science', 'Explore plants and animals living together.', 'Intro to ecosystems.', now, None, None, None, 'What lives in an ecosystem?', json.dumps(['plants', 'toys', 'books']), 'plants', None, None, None, None, None),
+            ('Week 2 Mon: My Community (Social Studies)', 2, 'social_studies', 'Learn about places in your town.', 'Community awareness.', now, 'town', 'town', '/taʊn/', 'Where is the school?', json.dumps(['town', 'sky', 'sea']), 'town', 'I live in a ___.', json.dumps(['town', 'cloud', 'river']), 'town', None, None),
+            # Week 2 Tue: Oct 14, 2025
+            ('Week 2 Tue: Subtracting Tens (Math)', 2, 'math', 'Subtract multiples of 10.', 'Build number sense with tens.', now, None, None, None, None, None, None, None, None, None, '20 - 10 = ?', '10'),
+            ('Week 2 Tue: Phonics - Short E (Language)', 1, 'language', 'Identify words with short E sound.', 'Phonics for reading.', now, 'egg', 'egg', '/ɛɡ/', 'Which word has short E?', json.dumps(['egg', 'apple', 'ice']), 'egg', 'I eat an ___.', json.dumps(['egg', 'car', 'tree']), 'egg', None, None),
+            ('Week 2 Tue: Animal Habitats (Science)', 2, 'science', 'Where do lions and penguins live?', 'Explore animal homes.', now, 'home', 'home', '/hoʊm/', 'Where do animals live?', json.dumps(['home', 'school', 'shop']), 'home', 'A lion’s ___ is a savanna.', json.dumps(['home', 'park', 'zoo']), 'home', None, None),
+            ('Week 2 Tue: Community Helpers - Doctor (Social Studies)', 2, 'social_studies', 'Role of doctors in health.', 'Community jobs.', now, 'doctor', 'doctor', '/ˈdɒktər/', 'Who helps when sick?', json.dumps(['doctor', 'teacher', 'chef']), 'doctor', 'The ___ checks my health.', json.dumps(['doctor', 'pilot', 'friend']), 'doctor', None, None),
+            # Week 2 Wed: Oct 15, 2025
+            ('Week 2 Wed: Word Problems - Subtraction (Math)', 2, 'math', 'Solve simple subtraction stories.', 'Apply subtraction in context.', now, None, None, None, None, None, None, None, None, None, 'I had 4 apples, ate 1. How many left?', '3'),
+            ('Week 2 Wed: Writing Sentences (Language)', 2, 'language', 'Build simple sentences.', 'Sentence structure practice.', now, 'run', 'run', '/rʌn/', 'What can you do fast?', json.dumps(['run', 'sleep', 'eat']), 'run', 'I can ___ fast.', json.dumps(['run', 'sit', 'read']), 'run', None, None),
+            ('Week 2 Wed: Weather Patterns (Science)', 1, 'science', 'Learn about rain and wind.', 'Understand weather changes.', now, None, None, None, 'What is rainy weather?', json.dumps(['rain', 'snow', 'sun']), 'rain', None, None, None, None, None),
+            ('Week 2 Wed: Our Town Map (Social Studies)', 2, 'social_studies', 'Map your community landmarks.', 'Community geography.', now, 'map', 'map', '/mæp/', 'What shows our town?', json.dumps(['map', 'book', 'toy']), 'map', 'A ___ shows the school.', json.dumps(['map', 'pen', 'chair']), 'map', None, None),
+            # Week 2 Thu: Oct 16, 2025
+            ('Week 2 Thu: Counting Backwards (Math)', 1, 'math', 'Count down from 10.', 'Practice reverse counting.', now, None, None, None, None, None, None, None, None, None, 'Count: 5,4,3,?,1', '2'),
+            ('Week 2 Thu: Sight Word - You (Language)', 1, 'language', 'Practice reading "you".', 'High-frequency word recognition.', now, 'you', 'you', '/juː/', 'Spell the word for /juː/.', json.dumps(['you', 'yoo', 'u']), 'you', '___ are my friend.', json.dumps(['You', 'I', 'He']), 'You', None, None),
+            ('Week 2 Thu: Plant Life Cycles (Science)', 2, 'science', 'How do plants grow?', 'Explore plant growth stages.', now, 'seed', 'seed', '/siːd/', 'What starts a plant?', json.dumps(['seed', 'leaf', 'flower']), 'seed', 'A plant grows from a ___.', json.dumps(['seed', 'rock', 'stick']), 'seed', None, None),
         ]
         for i, lesson in enumerate(lessons):
             if len(lesson) != 17:
@@ -251,7 +270,7 @@ def seed_lessons():
                           sentence_question, sentence_options, sentence_answer, math_question, math_answer) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', lessons)
         conn.commit()
-        logger.info("Grade 1 weekly lessons seeded successfully (20 lessons for Oct 6-10, 2025)")
+        logger.info("Grade 1-2 lessons seeded successfully (35 lessons for Oct 6-16, 2025)")
     except sqlite3.Error as e:
         logger.error(f"Error seeding lessons: {str(e)}")
         raise
@@ -300,7 +319,7 @@ def check_db_schema():
             conn.commit()
             logger.info("Created activity_responses table")
             logger.info("Ensured activity_responses.response can handle base64 drawings (TEXT field)")
-        # FIXED: Remove duplicates before adding unique index to prevent constraint failure
+        # Remove duplicates before adding unique index
         c.execute("""
             DELETE FROM activity_responses 
             WHERE id NOT IN (
@@ -314,7 +333,7 @@ def check_db_schema():
         """)
         conn.commit()
         logger.info("Removed duplicate activity_responses, keeping latest per user/lesson/activity_type")
-        # FIXED: Add unique index to prevent duplicate submissions per user/lesson/activity_type
+        # Add unique index to prevent duplicate submissions
         try:
             c.execute("DROP INDEX IF EXISTS unique_activity_response")
         except sqlite3.OperationalError:
@@ -344,7 +363,6 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to users table")
-                # For profile_picture, update existing rows to default if added
                 if col == 'profile_picture':
                     c.execute("UPDATE users SET profile_picture = '' WHERE profile_picture IS NULL")
                     conn.commit()
@@ -397,7 +415,7 @@ def check_db_schema():
                 c.execute(f"ALTER TABLE friendships ADD COLUMN {col} {col_type} DEFAULT {default}")
                 conn.commit()
                 logger.info(f"Added {col} column to friendships table")
-        # NEW: Check and add retry_count to activity_responses
+        # Check and add retry_count to activity_responses
         c.execute("PRAGMA table_info(activity_responses)")
         columns = {col[1]: col[2] for col in c.fetchall()}
         if 'retry_count' not in columns:

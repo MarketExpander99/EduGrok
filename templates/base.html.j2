@@ -1,273 +1,259 @@
-<!-- base.html.j2 (Updated: Added global TTS support detection and initialization for mobile browsers (iOS Safari/Android Chrome). Enhanced playAudio with resume-on-gesture for suspended contexts, support check, and visual fallback toast for unsupported devices. Integrated playClickSound globally for consistency. Preserved all previous updates including mobile nav scroll improvements and notifications. -->
-<!-- Update: Integrated lesson activity JS globals (selectMcOption for highlighting, submitActivity AJAX, speakQuestion TTS wrapper, trace drawing stubs). Merged with existing TTS/playAudio. Added .selected-mc CSS via style injection. Preps for retry limits and completion checks. -->
-<!-- Fix: Updated submitActivity to use FormData (for backend request.form compat); generalized response grabbing for mc/sentence (hidden), spell/sound (input), trace (canvas base64). Handles non-response types without alert. Enhanced trace drawing with full mouse/touch event implementation, initTraceCanvases for auto-setup on load (no toggle needed), and targeted UI replacement for trace completion. Added frontend override for 'sound' activity: matches user input to spell_word (case-insensitive) to bypass phonetic backend mismatch. -->
-<!-- New: Added CSS variable definitions for 'lilac_princess' and 'dino_cowboy' themes. Updated html class logic to apply corresponding theme classes (lilac-princess-theme, dino-cowboy-theme) when theme matches. -->
+<!-- base.html.j2 -->
+<!-- Updates: Rebranded from EduGrok to DreamForge (title, sidebar, footer). Added Yoco donation link (https://pay.yoco.com/DreamForge) in desktop sidebar and mobile nav with dreamforge-themed styling (accent bg, hover, FA heart icon). Prefixed CSS vars/classes with dreamforge- (e.g., --dreamforge-bg) for consistency. Preserved all existing features: TTS (playAudio, speakQuestion), trace canvases (initTraceCanvases), activity globals (selectMcOption, submitActivity), mobile nav scroll, notifications. Ensured xAI attribution in footer per guidelines. -->
 
 <!DOCTYPE html>
 <html lang="{{ language or 'en' }}" class="{% if theme == 'farm' %}farm-theme{% elif theme == 'space' %}space-theme{% elif theme == 'lilac_princess' %}lilac-princess-theme{% elif theme == 'dino_cowboy' %}dino-cowboy-theme{% else %}astronaut-theme{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}EduGrok{% endblock %}</title>
+    <title>{% block title %}DreamForge{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root {
-            --grok-bg: #000000;
-            --grok-text: #ffffff;
-            --grok-surface: #1a1a1a;
-            --grok-border: #333333;
-            --grok-accent: #00d4ff;
-            --grok-secondary: #a0a0a0;
+            --dreamforge-bg: #000000;
+            --dreamforge-text: #ffffff;
+            --dreamforge-surface: #1a1a1a;
+            --dreamforge-border: #333333;
+            --dreamforge-accent: #00d4ff;
+            --dreamforge-secondary: #a0a0a0;
         }
-        .bg-grok-bg { background-color: var(--grok-bg); }
-        .text-grok-text { color: var(--grok-text); }
-        .bg-grok-surface { background-color: var(--grok-surface); }
-        .border-grok-border { border-color: var(--grok-border); }
-        .bg-grok-accent { background-color: var(--grok-accent); }
-        .text-grok-accent { color: var(--grok-accent); }
-        .text-grok-secondary { color: var(--grok-secondary); }
-        .focus\:ring-grok-accent:focus { --tw-ring-color: var(--grok-accent); }
-        .farm-theme { --grok-bg: #f0f8e8; --grok-text: #2d5016; --grok-surface: #e8f5e8; --grok-border: #90ee90; --grok-accent: #228b22; }
-        .space-theme { --grok-bg: #000011; --grok-text: #00ffff; --grok-surface: #000022; --grok-border: #000044; --grok-accent: #ff00ff; }
-        .astronaut-theme { --grok-bg: #0a0a0a; --grok-text: #e0e0e0; --grok-surface: #1f1f1f; --grok-border: #404040; --grok-accent: #4a90e2; }
-        .lilac-princess-theme { --grok-bg: #f8f4ff; --grok-text: #4b0082; --grok-surface: #e6d9ff; --grok-border: #c3a6e5; --grok-accent: #9370db; --grok-secondary: #dda0dd; }
-        .dino-cowboy-theme { --grok-bg: #fdf5e6; --grok-text: #8b4513; --grok-surface: #f4e4bc; --grok-border: #deb887; --grok-accent: #cd853f; --grok-secondary: #a0522d; }
-        .card { @apply bg-grok-surface p-4 rounded-lg shadow-md border border-grok-border; }
-        .hover\:bg-grok-accent-hover:hover { background-color: color-mix(in srgb, var(--grok-accent) 80%, black); }
+        .bg-dreamforge-bg { background-color: var(--dreamforge-bg); }
+        .text-dreamforge-text { color: var(--dreamforge-text); }
+        .bg-dreamforge-surface { background-color: var(--dreamforge-surface); }
+        .border-dreamforge-border { border-color: var(--dreamforge-border); }
+        .bg-dreamforge-accent { background-color: var(--dreamforge-accent); }
+        .text-dreamforge-accent { color: var(--dreamforge-accent); }
+        .text-dreamforge-secondary { color: var(--dreamforge-secondary); }
+        .focus\:ring-dreamforge-accent:focus { --tw-ring-color: var(--dreamforge-accent); }
+        .farm-theme { --dreamforge-bg: #f0f8e8; --dreamforge-text: #2d5016; --dreamforge-surface: #e8f5e8; --dreamforge-border: #90ee90; --dreamforge-accent: #228b22; }
+        .space-theme { --dreamforge-bg: #000011; --dreamforge-text: #00ffff; --dreamforge-surface: #000022; --dreamforge-border: #000044; --dreamforge-accent: #ff00ff; }
+        .astronaut-theme { --dreamforge-bg: #0a0a0a; --dreamforge-text: #e0e0e0; --dreamforge-surface: #1f1f1f; --dreamforge-border: #404040; --dreamforge-accent: #4a90e2; }
+        .lilac-princess-theme { --dreamforge-bg: #f8f4ff; --dreamforge-text: #4b0082; --dreamforge-surface: #e6d9ff; --dreamforge-border: #c3a6e5; --dreamforge-accent: #9370db; --dreamforge-secondary: #dda0dd; }
+        .dino-cowboy-theme { --dreamforge-bg: #fdf5e6; --dreamforge-text: #8b4513; --dreamforge-surface: #f4e4bc; --dreamforge-border: #deb887; --dreamforge-accent: #cd853f; --dreamforge-secondary: #a0522d; }
+        .card { @apply bg-dreamforge-surface p-4 rounded-lg shadow-md border border-dreamforge-border; }
+        .hover\:bg-dreamforge-accent-hover:hover { background-color: color-mix(in srgb, var(--dreamforge-accent) 80%, black); }
         .selected-mc { background-color: #dbeafe !important; border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="bg-grok-bg text-grok-text min-h-screen">
+<body class="bg-dreamforge-bg text-dreamforge-text min-h-screen">
     <!-- Desktop Sidebar: Fixed left like X/Twitter, hidden on mobile -->
-    <aside id="desktop-sidebar" class="fixed left-0 top-0 h-full w-64 bg-grok-surface border-r border-grok-border z-50 hidden md:block overflow-y-auto">
+    <aside id="desktop-sidebar" class="fixed left-0 top-0 h-full w-64 bg-dreamforge-surface border-r border-dreamforge-border z-50 hidden md:block overflow-y-auto">
         <div class="p-4">
-            <a href="/home" class="text-2xl font-bold text-grok-accent mb-8 block">EduGrok</a>
+            <a href="/home" class="text-2xl font-bold text-dreamforge-accent mb-8 block">DreamForge</a>
             <nav class="space-y-1">
-                <a href="/home" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/home" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-home w-5 mr-3"></i>
                     <span>Feed</span>
                 </a>
-                <a href="/lessons" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/lessons" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-book w-5 mr-3"></i>
                     <span>Lessons</span>
                 </a>
-                <a href="/games" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/games" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-gamepad w-5 mr-3"></i>
                     <span>Games</span>
                 </a>
-                <a href="/parent_dashboard" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/parent_dashboard" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-tachometer-alt w-5 mr-3"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="#" onclick="markReadAndGoHome(); return false;" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition relative">
+                <a href="#" onclick="markReadAndGoHome(); return false;" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition relative">
                     <i class="fas fa-bell w-5 mr-3"></i>
                     <span>Notifications</span>
                     <span id="notif-count" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs px-1.5 py-0.5 min-w-[1.5em] hidden">0</span>
                 </a>
-                <a href="/profile" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/profile" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-user w-5 mr-3"></i>
                     <span>Profile</span>
                 </a>
-                <a href="/logout" class="flex items-center px-4 py-3 text-grok-text hover:bg-grok-accent/20 rounded-lg transition">
+                <a href="/logout" class="flex items-center px-4 py-3 text-dreamforge-text hover:bg-dreamforge-accent/20 rounded-lg transition">
                     <i class="fas fa-sign-out-alt w-5 mr-3"></i>
                     <span>Logout</span>
+                </a>
+                <!-- Yoco Donation Button -->
+                <a href="https://pay.yoco.com/DreamForge" class="flex items-center px-4 py-3 text-dreamforge-text bg-dreamforge-accent hover:bg-dreamforge-accent-hover rounded-lg transition" 
+                   target="_blank" aria-label="Donate to DreamForge">
+                    <i class="fas fa-heart w-5 mr-3"></i>
+                    <span>Donate</span>
                 </a>
             </nav>
         </div>
     </aside>
 
-<!-- Main Content: Shifted right on desktop -->
-<main class="ml-0 md:ml-64 pt-4 pb-20 md:pb-0 px-4 md:px-6">
-    {% block content %}{% endblock %}
-</main>
+    <!-- Main Content: Shifted right on desktop -->
+    <main class="ml-0 md:ml-64 pt-4 pb-20 md:pb-0 px-4 md:px-6">
+        {% block content %}{% endblock %}
+    </main>
 
-<!-- Mobile Bottom Nav: Hides on scroll down, shows on scroll up (desktop hidden) -->
-<nav id="bottom-nav" class="bg-grok-bg fixed bottom-0 left-0 right-0 border-t border-grok-border z-40 md:hidden transition-transform duration-300 ease-in-out translate-y-0">
-    <div class="flex justify-around p-3">
-        <a href="/home" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-home text-xl"></i>
-            <span class="text-xs">Feed</span>
-        </a>
-        <a href="/lessons" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-book text-xl"></i>
-            <span class="text-xs">Lessons</span>
-        </a>
-        <a href="/games" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-gamepad text-xl"></i>
-            <span class="text-xs">Games</span>
-        </a>
-        <a href="/parent_dashboard" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-tachometer-alt text-xl"></i>
-            <span class="text-xs">Dashboard</span>
-        </a>
-        <a href="#" onclick="markReadAndGoHome(); return false;" class="flex flex-col items-center relative p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-bell text-xl"></i>
-            <span class="text-xs">Notifications</span>
-            <span id="mobile-notif-count" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs px-1 py-0 min-w-[18px] hidden">0</span>
-        </a>
-        <a href="/profile" class="flex flex-col items-center p-2 text-grok-text hover:text-grok-accent transition">
-            <i class="fas fa-user text-xl"></i>
-            <span class="text-xs">Profile</span>
-        </a>
-    </div>
-</nav>
+    <!-- Mobile Bottom Nav: Hides on scroll down, shows on scroll up (desktop hidden) -->
+    <nav id="bottom-nav" class="bg-dreamforge-bg fixed bottom-0 left-0 right-0 border-t border-dreamforge-border z-40 md:hidden transition-transform duration-300 ease-in-out translate-y-0">
+        <div class="flex justify-around p-3">
+            <a href="/home" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs">Feed</span>
+            </a>
+            <a href="/lessons" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-book text-xl"></i>
+                <span class="text-xs">Lessons</span>
+            </a>
+            <a href="/games" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-gamepad text-xl"></i>
+                <span class="text-xs">Games</span>
+            </a>
+            <a href="/parent_dashboard" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-tachometer-alt text-xl"></i>
+                <span class="text-xs">Dashboard</span>
+            </a>
+            <a href="#" onclick="markReadAndGoHome(); return false;" class="flex flex-col items-center relative p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-bell text-xl"></i>
+                <span class="text-xs">Notifications</span>
+                <span id="mobile-notif-count" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-xs px-1 py-0 min-w-[18px] hidden">0</span>
+            </a>
+            <a href="/profile" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition">
+                <i class="fas fa-user text-xl"></i>
+                <span class="text-xs">Profile</span>
+            </a>
+            <!-- Yoco Donation Button -->
+            <a href="https://pay.yoco.com/DreamForge" class="flex flex-col items-center p-2 text-dreamforge-text hover:text-dreamforge-accent transition" 
+               target="_blank" aria-label="Donate to DreamForge">
+                <i class="fas fa-heart text-xl"></i>
+                <span class="text-xs">Donate</span>
+            </a>
+        </div>
+    </nav>
 
-<script>
-    // Ensure bottom nav shows initially
-    document.addEventListener('DOMContentLoaded', function() {
-        const bottomNav = document.getElementById('bottom-nav');
-        if (bottomNav) {
-            bottomNav.classList.remove('translate-y-full');
-        }
-        // Set initial lastScrollTop after a short delay to capture stable position
-        setTimeout(() => {
-            lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        }, 100);
-
-        // Initialize all trace canvases for drawing
-        window.initTraceCanvases();
-    });
-
-    // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
-    let lastScrollTop = 0;
-    let ticking = false;
-    const bottomNav = document.getElementById('bottom-nav');
-    const scrollThreshold = 10; // Minimum scroll change to trigger hide/show
-    const topThreshold = 50; // Don't hide if near top
-
-    function updateNavPosition() {
-        let st = window.pageYOffset || document.documentElement.scrollTop;
-        const delta = st - lastScrollTop;
-        const isScrollingDown = delta > scrollThreshold;
-        const isScrollingUp = delta < -scrollThreshold;
-        const nearTop = st < topThreshold;
-
-        // Mobile bottom nav: hide on significant down scroll (unless near top), show on up
-        if (bottomNav) {
-            if (isScrollingDown && !nearTop) {
-                bottomNav.classList.add('translate-y-full');
-            } else if (isScrollingUp || nearTop) {
+    <script>
+        // Ensure bottom nav shows initially
+        document.addEventListener('DOMContentLoaded', function() {
+            const bottomNav = document.getElementById('bottom-nav');
+            if (bottomNav) {
                 bottomNav.classList.remove('translate-y-full');
             }
-        }
+            // Set initial lastScrollTop after a short delay to capture stable position
+            setTimeout(() => {
+                lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            }, 100);
 
-        lastScrollTop = st <= 0 ? 0 : st;
-        ticking = false;
-    }
+            // Initialize all trace canvases for drawing
+            window.initTraceCanvases();
+        });
 
-    window.addEventListener('scroll', () => {
-        if (!ticking) {
-            requestAnimationFrame(updateNavPosition);
-            ticking = true;
-        }
-    });
+        // Scroll behavior: Only for mobile bottom nav (hide on down, show on up)
+        let lastScrollTop = 0;
+        let ticking = false;
+        const bottomNav = document.getElementById('bottom-nav');
+        const scrollThreshold = 10; // Minimum scroll change to trigger hide/show
+        const topThreshold = 50; // Don't hide if near top
 
-    // Initial check on load
-    updateNavPosition();
+        function updateNavPosition() {
+            let st = window.pageYOffset || document.documentElement.scrollTop;
+            const delta = st - lastScrollTop;
+            const isScrollingDown = delta > scrollThreshold;
+            const isScrollingUp = delta < -scrollThreshold;
+            const nearTop = st < topThreshold;
 
-    // Fetch and display notifications count (shared for sidebar and bottom nav)
-    if ('{{ 'user_id' in session }}' === 'True') {
-        fetch('/api/notifications_count')
-            .then(response => response.json())
-            .then(data => {
-                const countEl = document.getElementById('notif-count');
-                const mobileCountEl = document.getElementById('mobile-notif-count');
-                const count = data.count;
-                if (count > 0) {
-                    if (countEl) {
-                        countEl.textContent = count;
-                        countEl.classList.remove('hidden');
-                    }
-                    if (mobileCountEl) {
-                        mobileCountEl.textContent = count;
-                        mobileCountEl.classList.remove('hidden');
-                    }
+            // Mobile bottom nav: hide on significant down scroll (unless near top), show on up
+            if (bottomNav) {
+                if (isScrollingDown && !nearTop) {
+                    bottomNav.classList.add('translate-y-full');
+                } else if (isScrollingUp || nearTop) {
+                    bottomNav.classList.remove('translate-y-full');
                 }
-            })
-            .catch(error => console.error('Error fetching notifications count:', error));
-    }
+            }
 
-    // Mark notifications as read and go to home
-    function markReadAndGoHome() {
-        fetch('/api/mark_notifications_read', { method: 'POST' })
-            .then(() => {
-                window.location.href = '/home?highlight_first=true';
-            })
-            .catch(error => {
-                console.error('Error marking notifications read:', error);
-                window.location.href = '/home?highlight_first=true'; // Proceed anyway
-            });
-    }
-
-    // Global TTS Support and Initialization (for mobile compatibility)
-    let ttsInitialized = false;
-    let speechSynth = null;
-    let isTTSSupported = false;
-
-    if ('speechSynthesis' in window) {
-        speechSynth = window.speechSynthesis;
-        isTTSSupported = true;
-    }
-
-    // Resume TTS on user gesture for mobile (iOS Safari requires interaction)
-    function initTTS() {
-        if (ttsInitialized || !isTTSSupported) return;
-        if (speechSynth && speechSynth.paused) {
-            speechSynth.resume();
+            lastScrollTop = st <= 0 ? 0 : st;
+            ticking = false;
         }
-        ttsInitialized = true;
-    }
 
-    // Add gesture listener for init (e.g., first click/tap)
-    document.addEventListener('click', initTTS, { once: true });
-    document.addEventListener('touchstart', initTTS, { once: true });
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(updateNavPosition);
+                ticking = true;
+            }
+        });
 
-    // Global speakQuestion (TTS wrapper for questions/instructions)
-    window.speakQuestion = function(text, button) {
-        if (!isTTSSupported) {
-            showToast('TTS not supported on this device. Text: ' + text, 'warning');
-            return;
+        // Initial check on load
+        updateNavPosition();
+
+        // Fetch and display notifications count (shared for sidebar and bottom nav)
+        if ('{{ 'user_id' in session }}' === 'True') {
+            fetch('/api/notifications_count')
+                .then(response => response.json())
+                .then(data => {
+                    const countEl = document.getElementById('notif-count');
+                    const mobileCountEl = document.getElementById('mobile-notif-count');
+                    const count = data.count;
+                    if (count > 0) {
+                        if (countEl) {
+                            countEl.textContent = count;
+                            countEl.classList.remove('hidden');
+                        }
+                        if (mobileCountEl) {
+                            mobileCountEl.textContent = count;
+                            mobileCountEl.classList.remove('hidden');
+                        }
+                    }
+                })
+                .catch(error => console.error('Error fetching notifications count:', error));
         }
-        initTTS();
-        try {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US'; // Or session.language
-            utterance.rate = 0.8;
-            utterance.pitch = 1;
-            if (button) button.classList.add('speaking');
-            utterance.onerror = function(e) {
-                console.warn('TTS error:', e);
-                if (button) button.classList.remove('speaking');
-                showToast('TTS failed. Text: ' + text, 'warning');
-            };
-            utterance.onend = function() {
-                if (button) button.classList.remove('speaking');
-                console.log('TTS completed');
-            };
-            speechSynth.speak(utterance);
-        } catch (e) {
-            console.warn('TTS failed:', e);
-            showToast('TTS unavailable. Text: ' + text, 'warning');
-        }
-    };
 
-    // Global playAudio with enhanced mobile support and fallback (for sounds/words)
-    if (!window.playAudio) {
-        window.playAudio = function(text) {
+        // Mark notifications as read and go to home
+        function markReadAndGoHome() {
+            fetch('/api/mark_notifications_read', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/home?highlight_first=true';
+                })
+                .catch(error => {
+                    console.error('Error marking notifications read:', error);
+                    window.location.href = '/home?highlight_first=true'; // Proceed anyway
+                });
+        }
+
+        // Global TTS Support and Initialization (for mobile compatibility)
+        let ttsInitialized = false;
+        let speechSynth = null;
+        let isTTSSupported = false;
+
+        if ('speechSynthesis' in window) {
+            speechSynth = window.speechSynthesis;
+            isTTSSupported = true;
+        }
+
+        // Resume TTS on user gesture for mobile (iOS Safari requires interaction)
+        function initTTS() {
+            if (ttsInitialized || !isTTSSupported) return;
+            if (speechSynth && speechSynth.paused) {
+                speechSynth.resume();
+            }
+            ttsInitialized = true;
+        }
+
+        // Add gesture listener for init (e.g., first click/tap)
+        document.addEventListener('click', initTTS, { once: true });
+        document.addEventListener('touchstart', initTTS, { once: true });
+
+        // Global speakQuestion (TTS wrapper for questions/instructions)
+        window.speakQuestion = function(text, button) {
             if (!isTTSSupported) {
                 showToast('TTS not supported on this device. Text: ' + text, 'warning');
                 return;
             }
-            initTTS(); // Ensure initialized
+            initTTS();
             try {
                 const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; // Or session.language
+                utterance.rate = 0.8;
+                utterance.pitch = 1;
+                if (button) button.classList.add('speaking');
                 utterance.onerror = function(e) {
                     console.warn('TTS error:', e);
+                    if (button) button.classList.remove('speaking');
                     showToast('TTS failed. Text: ' + text, 'warning');
                 };
                 utterance.onend = function() {
+                    if (button) button.classList.remove('speaking');
                     console.log('TTS completed');
                 };
                 speechSynth.speak(utterance);
@@ -275,276 +261,301 @@
                 console.warn('TTS failed:', e);
                 showToast('TTS unavailable. Text: ' + text, 'warning');
             }
-        }
-    }
+        };
 
-    // Global playClickSound (simple beep via Web Audio API)
-    if (!window.playClickSound) {
-        window.playClickSound = function() {
-            if (typeof AudioContext !== 'undefined') {
+        // Global playAudio with enhanced mobile support and fallback (for sounds/words)
+        if (!window.playAudio) {
+            window.playAudio = function(text) {
+                if (!isTTSSupported) {
+                    showToast('TTS not supported on this device. Text: ' + text, 'warning');
+                    return;
+                }
+                initTTS(); // Ensure initialized
                 try {
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioCtx.createOscillator();
-                    const gainNode = audioCtx.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    oscillator.frequency.value = 800;
-                    oscillator.type = 'sine';
-                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                    oscillator.start(audioCtx.currentTime);
-                    oscillator.stop(audioCtx.currentTime + 0.1);
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.onerror = function(e) {
+                        console.warn('TTS error:', e);
+                        showToast('TTS failed. Text: ' + text, 'warning');
+                    };
+                    utterance.onend = function() {
+                        console.log('TTS completed');
+                    };
+                    speechSynth.speak(utterance);
                 } catch (e) {
-                    console.warn('Click sound failed:', e);
+                    console.warn('TTS failed:', e);
+                    showToast('TTS unavailable. Text: ' + text, 'warning');
                 }
             }
         }
-    }
 
-    // Simple toast for TTS fallbacks (visual cue)
-    function showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 text-white ${type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
-
-    // Lesson Activity Globals
-    // MC/Sentence Selection (toggle highlight, update hidden)
-    window.selectMcOption = function(lessonId, button, value, type = 'mc') {
-        // Deselect all in this section
-        const section = button.closest('.activity-section');
-        section.querySelectorAll('.mc-btn').forEach(btn => {
-            btn.classList.remove('selected-mc');
-        });
-        // Select this one
-        button.classList.add('selected-mc');
-        // Update hidden input
-        const hiddenId = `${type}-hidden-${lessonId}`;
-        const hidden = document.getElementById(hiddenId);
-        if (hidden) hidden.value = value;
-        console.log(`Selected ${type}: ${value} for lesson ${lessonId}`);
-        window.playClickSound(); // Feedback sound
-    };
-
-    // Submit Activity (AJAX to /check_lesson; handles retry, feedback - FIXED: FormData + generalized response grab)
-    window.submitActivity = function(event, lessonId, activityType) {
-        event.preventDefault();
-        const section = event.target.closest('.activity-section');
-        let response = '';
-
-        // Grab response based on type
-        if (activityType === 'mc' || activityType === 'sentence') {
-            const hiddenId = `${activityType}-hidden-${lessonId}`;
-            response = document.getElementById(hiddenId)?.value || '';
-        } else if (activityType === 'spell' || activityType === 'sound') {
-            const inputId = `${activityType}-${lessonId}`;
-            response = document.getElementById(inputId)?.value.trim() || '';
-        } else if (activityType === 'trace') {
-            const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-            if (canvas) response = canvas.toDataURL('image/png'); // Base64 for DB
-        }
-
-        const retryDivId = `retry-${activityType}-${lessonId}`;
-        const retryDiv = document.getElementById(retryDivId);
-        let triesLeft = parseInt(retryDiv?.textContent.match(/\d+/)?.[0] || 3);
-
-        if (!response && activityType !== 'trace') {
-            alert('Please provide a response!');
-            return;
-        }
-        if (activityType === 'trace' && !response) {
-            alert('Please draw something!');
-            return;
-        }
-
-        // Use FormData to match backend request.form
-        const formData = new FormData();
-        formData.append('lesson_id', lessonId);
-        formData.append('activity_type', activityType);
-        formData.append('response', response);
-
-        fetch('/check_lesson', {
-            method: 'POST',
-            body: formData  // No Content-Type - lets browser set multipart/form-data
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Frontend override for 'sound' activity: match to spell_word if available
-                if (activityType === 'sound' && section.dataset.correctWord) {
-                    const correctWord = section.dataset.correctWord.toLowerCase();
-                    if (response.toLowerCase() === correctWord) {
-                        data.is_correct = true;
-                        data.correct_answer = section.dataset.correctWord;
+        // Global playClickSound (simple beep via Web Audio API)
+        if (!window.playClickSound) {
+            window.playClickSound = function() {
+                if (typeof AudioContext !== 'undefined') {
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        oscillator.frequency.value = 800;
+                        oscillator.type = 'sine';
+                        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                        oscillator.start(audioCtx.currentTime);
+                        oscillator.stop(audioCtx.currentTime + 0.1);
+                    } catch (e) {
+                        console.warn('Click sound failed:', e);
                     }
                 }
-                if (data.is_correct) {
-                    const successMsg = `<h4 class="text-green-600 font-medium">${data.question} <span class="text-green-700">✓ Correct!</span></h4>`;
-                    if (activityType === 'trace') {
-                        const uiDiv = document.getElementById(`trace-ui-${lessonId}`);
-                        if (uiDiv) uiDiv.innerHTML = successMsg;
-                    } else {
-                        section.innerHTML = successMsg;
+            }
+        }
+
+        // Simple toast for TTS fallbacks (visual cue)
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 text-white ${type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Lesson Activity Globals
+        // MC/Sentence Selection (toggle highlight, update hidden)
+        window.selectMcOption = function(lessonId, button, value, type = 'mc') {
+            // Deselect all in this section
+            const section = button.closest('.activity-section');
+            section.querySelectorAll('.mc-btn').forEach(btn => {
+                btn.classList.remove('selected-mc');
+            });
+            // Select this one
+            button.classList.add('selected-mc');
+            // Update hidden input
+            const hiddenId = `${type}-hidden-${lessonId}`;
+            const hidden = document.getElementById(hiddenId);
+            if (hidden) hidden.value = value;
+            console.log(`Selected ${type}: ${value} for lesson ${lessonId}`);
+            window.playClickSound(); // Feedback sound
+        };
+
+        // Submit Activity (AJAX to /check_lesson; handles retry, feedback)
+        window.submitActivity = function(event, lessonId, activityType) {
+            event.preventDefault();
+            const section = event.target.closest('.activity-section');
+            let response = '';
+
+            // Grab response based on type
+            if (activityType === 'mc' || activityType === 'sentence') {
+                const hiddenId = `${activityType}-hidden-${lessonId}`;
+                response = document.getElementById(hiddenId)?.value || '';
+            } else if (activityType === 'spell' || activityType === 'sound') {
+                const inputId = `${activityType}-${lessonId}`;
+                response = document.getElementById(inputId)?.value.trim() || '';
+            } else if (activityType === 'trace') {
+                const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+                if (canvas) response = canvas.toDataURL('image/png'); // Base64 for DB
+            }
+
+            const retryDivId = `retry-${activityType}-${lessonId}`;
+            const retryDiv = document.getElementById(retryDivId);
+            let triesLeft = parseInt(retryDiv?.textContent.match(/\d+/)?.[0] || 3);
+
+            if (!response && activityType !== 'trace') {
+                alert('Please provide a response!');
+                return;
+            }
+            if (activityType === 'trace' && !response) {
+                alert('Please draw something!');
+                return;
+            }
+
+            // Use FormData to match backend request.form
+            const formData = new FormData();
+            formData.append('lesson_id', lessonId);
+            formData.append('activity_type', activityType);
+            formData.append('response', response);
+
+            fetch('/check_lesson', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Frontend override for 'sound' activity
+                    if (activityType === 'sound' && section.dataset.correctWord) {
+                        const correctWord = section.dataset.correctWord.toLowerCase();
+                        if (response.toLowerCase() === correctWord) {
+                            data.is_correct = true;
+                            data.correct_answer = section.dataset.correctWord;
+                        }
                     }
-                    // Award points (via backend)
-                } else {
-                    triesLeft--;
-                    if (retryDiv) retryDiv.textContent = `Tries left: ${triesLeft}`;
-                    if (triesLeft <= 0) {
-                        const failMsg = `<h4 class="text-red-600 font-medium">${data.question} <span class="text-red-700">✗ Out of tries! Correct: ${data.correct_answer}</span></h4>`;
+                    if (data.is_correct) {
+                        const successMsg = `<h4 class="text-green-600 font-medium">${data.question} <span class="text-green-700">✓ Correct!</span></h4>`;
                         if (activityType === 'trace') {
                             const uiDiv = document.getElementById(`trace-ui-${lessonId}`);
-                            if (uiDiv) uiDiv.innerHTML = failMsg;
+                            if (uiDiv) uiDiv.innerHTML = successMsg;
                         } else {
-                            section.innerHTML = failMsg;
+                            section.innerHTML = successMsg;
                         }
                     } else {
-                        alert(`Wrong! Tries left: ${triesLeft}. Correct: ${data.correct_answer}`);
+                        triesLeft--;
+                        if (retryDiv) retryDiv.textContent = `Tries left: ${triesLeft}`;
+                        if (triesLeft <= 0) {
+                            const failMsg = `<h4 class="text-red-600 font-medium">${data.question} <span class="text-red-700">✗ Out of tries! Correct: ${data.correct_answer}</span></h4>`;
+                            if (activityType === 'trace') {
+                                const uiDiv = document.getElementById(`trace-ui-${lessonId}`);
+                                if (uiDiv) uiDiv.innerHTML = failMsg;
+                            } else {
+                                section.innerHTML = failMsg;
+                            }
+                        } else {
+                            alert(`Wrong! Tries left: ${triesLeft}. Correct: ${data.correct_answer}`);
+                        }
                     }
+                    // Check if lesson complete
+                    if (data.lesson_complete) {
+                        location.reload();
+                    }
+                } else {
+                    alert('Submit failed: ' + (data.error || 'Unknown error'));
                 }
-                // Check if lesson complete
-                if (data.lesson_complete) {
-                    location.reload();
+            })
+            .catch(err => {
+                console.error('Submit error:', err);
+                alert('Network error—try again!');
+            });
+        };
+
+        // Trace Drawing Initialization (auto-setup all canvases on load)
+        window.initTraceCanvases = function() {
+            const canvases = document.querySelectorAll('canvas[id^="trace-canvas-"]');
+            canvases.forEach(canvas => {
+                const lessonId = canvas.id.replace('trace-canvas-', '');
+                const ctx = canvas.getContext('2d');
+                let drawing = false;
+                let lastX = 0;
+                let lastY = 0;
+
+                // Set default styles
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // Mouse events
+                function getMousePos(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    return {
+                        x: e.clientX - rect.left,
+                        y: e.clientY - rect.top
+                    };
                 }
-            } else {
-                alert('Submit failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            console.error('Submit error:', err);
-            alert('Network error—try again!');
-        });
-    };
 
-    // Trace Drawing Initialization (auto-setup all canvases on load)
-    window.initTraceCanvases = function() {
-        const canvases = document.querySelectorAll('canvas[id^="trace-canvas-"]');
-        canvases.forEach(canvas => {
-            const lessonId = canvas.id.replace('trace-canvas-', '');
-            const ctx = canvas.getContext('2d');
-            let drawing = false;
-            let lastX = 0;
-            let lastY = 0;
-
-            // Set default styles
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            // Mouse events
-            function getMousePos(e) {
-                const rect = canvas.getBoundingClientRect();
-                return {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
+                canvas.onmousedown = function(e) {
+                    drawing = true;
+                    const pos = getMousePos(e);
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                    lastX = pos.x;
+                    lastY = pos.y;
+                    canvas.style.cursor = 'crosshair';
                 };
-            }
 
-            canvas.onmousedown = function(e) {
-                drawing = true;
-                const pos = getMousePos(e);
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-                lastX = pos.x;
-                lastY = pos.y;
-                canvas.style.cursor = 'crosshair';
-            };
-
-            canvas.onmousemove = function(e) {
-                if (!drawing) return;
-                const pos = getMousePos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                lastX = pos.x;
-                lastY = pos.y;
-            };
-
-            canvas.onmouseup = function() {
-                drawing = false;
-            };
-
-            canvas.onmouseout = function() {
-                drawing = false;
-            };
-
-            // Touch events
-            function getTouchPos(e) {
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches[0];
-                return {
-                    x: touch.clientX - rect.left,
-                    y: touch.clientY - rect.top
+                canvas.onmousemove = function(e) {
+                    if (!drawing) return;
+                    const pos = getMousePos(e);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                    lastX = pos.x;
+                    lastY = pos.y;
                 };
-            }
 
-            canvas.ontouchstart = function(e) {
-                e.preventDefault();
-                drawing = true;
-                const pos = getTouchPos(e);
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-                lastX = pos.x;
-                lastY = pos.y;
-                canvas.style.cursor = 'crosshair';
-            };
+                canvas.onmouseup = function() {
+                    drawing = false;
+                };
 
-            canvas.ontouchmove = function(e) {
-                e.preventDefault();
-                if (!drawing) return;
-                const pos = getTouchPos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                lastX = pos.x;
-                lastY = pos.y;
-            };
+                canvas.onmouseout = function() {
+                    drawing = false;
+                };
 
-            canvas.ontouchend = function(e) {
-                e.preventDefault();
-                drawing = false;
-            };
-
-            // Update color
-            window.updateColor = function(lessonId, color) {
-                if (lessonId === lessonId) ctx.strokeStyle = color;
-            };
-
-            // Update line width
-            window.updateLineWidth = function(lessonId, width) {
-                if (lessonId === lessonId) ctx.lineWidth = parseInt(width);
-            };
-
-            // Draw shape (global, but scoped to this canvas)
-            window.drawShape = function(lessonId, shape) {
-                if (lessonId !== lessonId) return;
-                const centerX = canvas.width / 2;
-                const centerY = canvas.height / 2;
-                const radius = 50;
-                ctx.beginPath();
-                if (shape === 'circle') {
-                    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                } else if (shape === 'square') {
-                    ctx.rect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+                // Touch events
+                function getTouchPos(e) {
+                    const rect = canvas.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    return {
+                        x: touch.clientX - rect.left,
+                        y: touch.clientY - rect.top
+                    };
                 }
-                ctx.stroke();
-            };
 
-            // Clear canvas (global)
-            window.clearCanvas = function(canvasId) {
-                if (canvasId !== canvas.id) return;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            };
-        });
-    };
+                canvas.ontouchstart = function(e) {
+                    e.preventDefault();
+                    drawing = true;
+                    const pos = getTouchPos(e);
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                    lastX = pos.x;
+                    lastY = pos.y;
+                    canvas.style.cursor = 'crosshair';
+                };
 
-    // CSS for speaking animation
-    const speakingStyle = document.createElement('style');
-    speakingStyle.textContent = `
-        button.speaking { animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    `;
-    document.head.appendChild(speakingStyle);
-</script>
-{% block scripts %}{% endblock %}</body></html>
+                canvas.ontouchmove = function(e) {
+                    e.preventDefault();
+                    if (!drawing) return;
+                    const pos = getTouchPos(e);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                    lastX = pos.x;
+                    lastY = pos.y;
+                };
+
+                canvas.ontouchend = function(e) {
+                    e.preventDefault();
+                    drawing = false;
+                };
+
+                // Update color
+                window.updateColor = function(lessonId, color) {
+                    if (lessonId === lessonId) ctx.strokeStyle = color;
+                };
+
+                // Update line width
+                window.updateLineWidth = function(lessonId, width) {
+                    if (lessonId === lessonId) ctx.lineWidth = parseInt(width);
+                };
+
+                // Draw shape (global, but scoped to this canvas)
+                window.drawShape = function(lessonId, shape) {
+                    if (lessonId !== lessonId) return;
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const radius = 50;
+                    ctx.beginPath();
+                    if (shape === 'circle') {
+                        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                    } else if (shape === 'square') {
+                        ctx.rect(centerX - radius, centerY - radius, radius * 2, radius * 2);
+                    }
+                    ctx.stroke();
+                };
+
+                // Clear canvas (global)
+                window.clearCanvas = function(canvasId) {
+                    if (canvasId !== canvas.id) return;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                };
+            });
+        };
+
+        // CSS for speaking animation
+        const speakingStyle = document.createElement('style');
+        speakingStyle.textContent = `
+            button.speaking { animation: pulse 1s infinite; }
+            @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        `;
+        document.head.appendChild(speakingStyle);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

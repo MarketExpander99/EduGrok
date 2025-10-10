@@ -1,5 +1,5 @@
 <!-- Filename: lesson_card.html.j2 -->
-<!-- Fixes: Added conditional to hide entire card content if post.completed is true (passed from backend), showing a "Completed!" overlay instead. Enhanced JS to respect completed state more robustly, ensuring no interactions on completed cards. Confirmed base64 submission for trace via toDataURL in submitActivity. Retained inline trace integration, activity enabling/disabling, and all other existing functionality/JS. Updated description default for trace lessons. Updated submitActivity to trim response values for input-based activities (math, spell, sound) to prevent whitespace issues, and ensured validation alerts if trimmed value is empty. -->
+<!-- Fixes: Enhanced JS debugging for math: Log input element existence/value, fallback search if ID miss. Added stopPropagation on submit. Retained all prior fixes (trim, subject check, etc.). -->
 <div class="card bg-grok-surface border-2 border-blue-400 p-5 rounded-xl shadow-lg max-w-lg mx-auto mb-6 {% if post.is_new %}pulse-border bg-blue-50/20{% endif %}" id="lesson-{{ post.lesson.id | default(post.id) }}" {% if post.completed %}data-completed="true"{% endif %}>
     {% if post.completed %}
         <!-- Completed Overlay -->
@@ -11,7 +11,7 @@
                 <p class="text-grok-text font-semibold">{{ post.lesson.title | default('Untitled Lesson') }} ({{ post.handle | default('User') }})</p>
                 <p class="text-grok-secondary text-sm">{{ post.created_at | default('Now') }} • {{ post.lesson.subject | default('General') | capitalize }}</p>
                 <p class="text-grok-text mb-4 prose prose-sm max-w-none">
-                    {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
+                    {{ post.lesson.description | default('Practice basic math facts.' if post.lesson.math_question else 'Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
                     {% if post.lesson.trace_word and post.lesson.spell_word %}
                         Spell the word you hear
                     {% endif %}
@@ -35,7 +35,7 @@
             </div>
         </div>
         <p class="text-grok-text mb-4 prose prose-sm max-w-none">
-            {{ post.lesson.description | default('Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
+            {{ post.lesson.description | default('Practice basic math facts.' if post.lesson.math_question else 'Build phonics skills for reading readiness.' if post.lesson.trace_word else 'Dive into this interactive lesson!') | safe }}
             {% if post.lesson.trace_word and post.lesson.spell_word %}
                 Spell the word you hear
             {% endif %}
@@ -53,7 +53,7 @@
             {% if post.lesson.sentence_question %}
                 {% include 'sentence_activity.html.j2' %}
             {% endif %}
-            {% if post.lesson.math_question %}
+            {% if post.lesson.subject == 'math' and post.lesson.math_question %}
                 {% include 'math_activity.html.j2' %}
             {% endif %}
             {% if post.lesson.sound %}
@@ -143,7 +143,7 @@ if (!window.initAllActivities) {
         });
         if (type === 'trace') {
           // Use global init from base
-          window.initTraceCanvases();
+          if (window.initTraceCanvases) window.initTraceCanvases();
         }
       });
     });
@@ -154,10 +154,11 @@ if (!window.initAllActivities) {
 if (!window.submitActivity) {
   window.submitActivity = async function(event, lessonId, activityType) {
     event.preventDefault();
+    event.stopPropagation(); // Prevent bubble
     console.log(`submitActivity called for lesson ${lessonId}, type ${activityType}`); // Debug log
     const card = document.getElementById(`lesson-${lessonId}`);
     if (card.dataset.completed === 'true') return; // No submissions on completed
-    if (window.activityState[lessonId].tries[activityType] === 0) return;
+    if (window.activityState[lessonId]?.tries[activityType] === 0) return;
     const formData = new FormData();
     formData.append('lesson_id', lessonId);
     formData.append('activity_type', activityType);
@@ -166,18 +167,30 @@ if (!window.submitActivity) {
       const canvas = document.getElementById(`trace-canvas-${lessonId}`);
       responseValue = canvas ? canvas.toDataURL('image/png') : ''; // Base64 PNG
     } else if (activityType === 'sound') {
-      responseValue = document.getElementById(`sound-${lessonId}`).value.trim();
+      const soundInput = document.getElementById(`sound-${lessonId}`);
+      responseValue = soundInput ? soundInput.value.trim() : '';
     } else if (activityType === 'spell') {
-      responseValue = document.getElementById(`spell-${lessonId}`).value.trim();
+      const spellInput = document.getElementById(`spell-${lessonId}`);
+      responseValue = spellInput ? spellInput.value.trim() : '';
     } else if (activityType === 'mc') {
-      responseValue = document.getElementById(`mc-hidden-${lessonId}`).value;
+      responseValue = document.getElementById(`mc-hidden-${lessonId}`)?.value || '';
     } else if (activityType === 'sentence') {
-      responseValue = document.getElementById(`sentence-hidden-${lessonId}`).value;
+      responseValue = document.getElementById(`sentence-hidden-${lessonId}`)?.value || '';
     } else if (activityType === 'math') {
-      responseValue = document.getElementById(`math-${lessonId}`).value.trim();
+      let mathInput = document.getElementById(`math-${lessonId}`);
+      if (!mathInput) {
+        // Fallback: Search in the section
+        const section = document.querySelector(`#lesson-${lessonId} [data-type="math"] input[type="text"]`);
+        mathInput = section || null;
+        console.log('Fallback math input found:', !!mathInput); // Debug
+      }
+      responseValue = mathInput ? mathInput.value.trim() : '';
+      console.log('Math input element:', mathInput); // Debug: null or element
+      console.log('Math responseValue:', responseValue); // Debug for empty value issue
     }
+    console.log('Sending FormData entries:', Array.from(formData.entries())); // Debug: full payload
     if (!responseValue) {
-      alert('Please provide a response');
+      alert('Please provide a response (frontend check)');
       return;
     }
     formData.append('response', responseValue);
@@ -237,15 +250,18 @@ if (!window.submitActivity) {
             .then(r => r.ok ? console.log('Lesson marked complete') : console.error('Complete failed'))
             .catch(e => console.error('Complete error:', e));
           // Show completed overlay
+          const titleEl = card.querySelector('p.text-grok-text.font-semibold');
+          const dateEl = card.querySelector('p.text-grok-secondary');
+          const descEl = card.querySelector('p.prose');
           card.innerHTML = `
             <div class="relative bg-green-100/50 border-2 border-green-400 rounded-xl p-6 text-center">
               <div class="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl">
                 <div class="text-green-700 font-bold text-2xl">✓ Completed!</div>
               </div>
               <div class="relative z-10 opacity-50">
-                <p class="text-grok-text font-semibold">${card.querySelector('p.text-grok-text.font-semibold').textContent}</p>
-                <p class="text-grok-secondary text-sm">${card.querySelector('p.text-grok-secondary').textContent}</p>
-                <p class="text-grok-text mb-4 prose prose-sm max-w-none">${card.querySelector('p.prose').textContent}</p>
+                <p class="text-grok-text font-semibold">${titleEl ? titleEl.textContent : ''}</p>
+                <p class="text-grok-secondary text-sm">${dateEl ? dateEl.textContent : ''}</p>
+                <p class="text-grok-text mb-4 prose prose-sm max-w-none">${descEl ? descEl.textContent : ''}</p>
               </div>
             </div>
           `;
@@ -253,40 +269,47 @@ if (!window.submitActivity) {
           card.classList.add('lesson-completed');
         }
       } else {
+        alert(data.error || 'Server error'); // Show backend error (e.g., "Please provide a response" if backend sends it)
         console.error('API error:', data.error); // Debug log
       }
     } catch (e) {
+      alert('Submission failed. Please try again.');
       console.error('Submission failed:', e); // Debug log
     }
   };
 }
 
 // Add resetActivity to clear input on retry
-window.resetActivity = function(lessonId, activityType) {
-  const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
-  const input = section.querySelector('input, textarea');
-  if (input) input.value = '';
-  const feedback = section.querySelector('.text-red-700');
-  if (feedback) feedback.remove();
-  if (activityType === 'trace') {
-    const canvas = document.getElementById(`trace-canvas-${lessonId}`);
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Redraw guide if needed
+if (!window.resetActivity) {
+  window.resetActivity = function(lessonId, activityType) {
+    const section = document.querySelector(`#lesson-${lessonId} [data-type="${activityType}"]`);
+    const input = section.querySelector('input, textarea');
+    if (input) input.value = '';
+    const feedback = section.querySelector('.text-red-700');
+    if (feedback) feedback.remove();
+    if (activityType === 'trace') {
+      const canvas = document.getElementById(`trace-canvas-${lessonId}`);
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Redraw guide if needed
+      }
     }
-  }
-  if (activityType === 'mc' || activityType === 'sentence') {
-    section.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
-    section.querySelector(`#${activityType}-hidden-${lessonId}`).value = '';
-  }
-};
+    if (activityType === 'mc' || activityType === 'sentence') {
+      section.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
+      const hiddenId = `${activityType}-hidden-${lessonId}`;
+      const hidden = document.getElementById(hiddenId);
+      if (hidden) hidden.value = '';
+    }
+  };
+}
 
 // Add for MC selection if not present
 if (!window.selectMcOption) {
   window.selectMcOption = function(lessonId, btn, value, type) {
-    const hidden = document.getElementById(`${type}-hidden-${lessonId}`);
-    hidden.value = value;
+    const hiddenId = `${type}-hidden-${lessonId}`;
+    const hidden = document.getElementById(hiddenId);
+    if (hidden) hidden.value = value;
     btn.parentNode.querySelectorAll('.mc-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
   };

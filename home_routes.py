@@ -88,7 +88,7 @@ def home():
         global_posts_raw = c.fetchall()
         global_posts = [dict(post) for post in global_posts_raw]
 
-        # User lessons: only from current user, exclude if completed_lessons entry exists (regardless of parent_confirmed)
+        # FIXED: Reverted to original lesson_query (no JOIN to lessons to avoid key collisions); fetch lesson separately in loop for safety
         lesson_query = f'''SELECT DISTINCT p.*, COALESCE(u.handle, p.handle) as handle, orig_u.handle as original_handle, COALESCE(u.profile_picture, '') as profile_picture,
                           (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = ?) as liked_by_user,
                           (SELECT COUNT(*) FROM reposts r WHERE r.post_id = p.id AND r.user_id = ?) as reposted_by_user
@@ -103,14 +103,8 @@ def home():
         lesson_posts_raw = c.fetchall()
         lesson_posts = [dict(post) for post in lesson_posts_raw]
 
-        # Combine and sort all posts
-        posts = global_posts + lesson_posts
-        posts.sort(key=lambda x: x['created_at'] or '', reverse=True)
-        posts = posts[:20]  # Limit total
-
-        logger.info(f"Raw posts fetched: {len(global_posts)} global, {len(lesson_posts)} lessons; Total: {len(posts)}")
-
-        for post in posts:
+        # FIXED: In loop, fetch lesson separately (safe, no collisions), attach to post['lesson'], parse JSON, set completed, add debug log
+        for post in lesson_posts:
             try:
                 if post.get('type') == 'lesson' and post.get('lesson_id'):
                     c.execute("SELECT * FROM lessons WHERE id = ?", (post['lesson_id'],))
@@ -135,11 +129,23 @@ def home():
                         c.execute("SELECT 1 FROM completed_lessons WHERE user_id = ? AND lesson_id = ?", (user_id, post['lesson_id']))
                         completed_row = c.fetchone()
                         post['completed'] = bool(completed_row)
+                        logger.info(f"Attached lesson {lesson_dict['id']} to post {post['id']}: math_question={lesson_dict.get('math_question', 'None')}")  # Debug log for math
                     else:
                         logger.warning(f"Lesson not found for post {post.get('id')}, lesson_id {post.get('lesson_id')}")
+                        post['lesson'] = None  # Explicitly set to None if missing
+                else:
+                    logger.warning(f"Post {post.get('id')} is type 'lesson' but missing lesson_id")
+                    post['lesson'] = None
             except Exception as e:
                 logger.error(f"Error processing lesson for post {post.get('id', 'unknown')}: {e}\n{traceback.format_exc()}")
-            post['is_new'] = last_view is None or post['created_at'] > last_view
+                post['lesson'] = None
+
+        # Combine and sort all posts
+        posts = global_posts + lesson_posts
+        posts.sort(key=lambda x: x['created_at'] or '', reverse=True)
+        posts = posts[:20]  # Limit total
+
+        logger.info(f"Raw posts fetched: {len(global_posts)} global, {len(lesson_posts)} lessons; Total: {len(posts)}")
 
         # Filter out invalid lesson posts
         original_count = len(posts)

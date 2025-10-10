@@ -192,10 +192,15 @@ def check_lesson():
     # Parse FormData (works for both form and AJAX)
     lesson_id = request.form.get('lesson_id')
     activity_type = request.form.get('activity_type')
-    response = request.form.get('response', '').strip()
+    response = request.form.get('response', '')
 
     if not lesson_id or not activity_type:
         return jsonify({'success': False, 'error': 'Missing lesson_id or activity_type'}), 400
+
+    # FIXED: Early check for empty response (after strip) to return specific error
+    stripped_response = response.strip()
+    if not stripped_response:
+        return jsonify({'success': False, 'error': 'Please provide a response'}), 400
 
     try:
         lesson_id = int(lesson_id)
@@ -247,11 +252,11 @@ def check_lesson():
         elif activity_type == 'spell':
             correct_answer = lesson['spell_word']
             question = f'Spell the word: {lesson["spell_word"]}'
-            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
+            is_correct = stripped_response.lower() == correct_answer.lower() if stripped_response and correct_answer else False
         elif activity_type == 'sound':
             correct_answer = lesson['spell_word']  # FIXED: Use spell_word for sound matching (full word)
             question = f'Repeat the sound: /{lesson["sound"]}/'
-            is_correct = response.lower() == correct_answer.lower() if response and correct_answer else False
+            is_correct = stripped_response.lower() == correct_answer.lower() if stripped_response and correct_answer else False
         elif activity_type == 'trace':
             correct_answer = lesson['trace_word']  # Or 'drawn' placeholder
             question = f'Trace the word: {lesson["trace_word"]}'
@@ -259,7 +264,6 @@ def check_lesson():
         elif activity_type == 'math':
             correct_answer = lesson['math_answer']
             question = lesson['math_question']
-            stripped_response = response.strip()
             logger.info(f"Math response: '{stripped_response}' vs correct: '{correct_answer}'")
             is_correct = stripped_response.lower() == correct_answer.lower() if stripped_response and correct_answer else False
         else:
